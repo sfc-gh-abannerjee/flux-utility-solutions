@@ -1,0 +1,49 @@
+# Flux Ops Center - SPCS Service Specification
+# 
+# This file defines the container service deployment for Snowpark Container Services.
+# Replace {{ variables }} with your environment-specific values.
+#
+# Deploy with:
+#   snow spcs service create FLUX_OPS_CENTER \
+#     --spec-path service.yaml \
+#     --compute-pool {{ compute_pool }}
+
+spec:
+  containers:
+  - name: frontend
+    image: /{{ database }}/{{ schema }}/{{ image_repo }}/flux_ops_center:latest
+    
+    # Environment variables injected at runtime
+    env:
+      SNOWFLAKE_WAREHOUSE: "{{ warehouse }}"
+      # PostgreSQL connection (if using hybrid architecture)
+      POSTGRES_HOST: "{{ postgres_host }}"
+      POSTGRES_PORT: "5432"
+      POSTGRES_DATABASE: "postgres"
+      POSTGRES_USER: "{{ postgres_user }}"
+      POSTGRES_PASSWORD: "{{ postgres_password }}"
+    
+    # Resource allocation
+    resources:
+      requests:
+        memory: 2Gi
+        cpu: "2"
+      limits:
+        memory: 4Gi
+        cpu: "4"
+    
+    # Readiness probe for load balancer
+    readinessProbe:
+      port: 8080
+      path: /
+  
+  # Public endpoint configuration
+  endpoints:
+  - name: ui
+    port: 8080
+    public: true
+  
+  # High availability: Keep instances warm to avoid cold starts
+  # Production: min_instances: 2 eliminates 30-45s cold start delays
+  min_instances: 1
+  max_instances: 5
