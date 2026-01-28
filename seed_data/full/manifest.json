@@ -1,0 +1,51 @@
+{
+  "description": "Full seed data for production-scale testing (~10GB)",
+  "generated_at": null,
+  "generator_version": "1.0.0",
+  "target_database": "FLUX_PROD",
+  "target_schema": "PRODUCTION",
+  "files": [
+    {
+      "file": "substations.parquet",
+      "table": "SUBSTATIONS",
+      "rows": 98,
+      "truncate": true,
+      "description": "Distribution substations"
+    },
+    {
+      "file": "transformers.parquet",
+      "table": "TRANSFORMER_METADATA",
+      "rows": 91000,
+      "truncate": true,
+      "description": "Distribution transformers with health scores"
+    },
+    {
+      "file": "customers.parquet",
+      "table": "CUSTOMERS_MASTER_DATA",
+      "rows": 686000,
+      "truncate": true,
+      "description": "Customer master data"
+    },
+    {
+      "file": "meters.parquet",
+      "table": "METER_INFRASTRUCTURE",
+      "rows": 597000,
+      "truncate": true,
+      "description": "Smart meter assignments"
+    },
+    {
+      "file": "ami_readings.parquet",
+      "table": "AMI_INTERVAL_READINGS",
+      "rows": 28800000,
+      "truncate": false,
+      "description": "30 days of 15-min AMI readings for 10K meters"
+    }
+  ],
+  "load_order": [
+    "substations.parquet",
+    "transformers.parquet",
+    "meters.parquet",
+    "customers.parquet",
+    "ami_readings.parquet"
+  ]
+}
