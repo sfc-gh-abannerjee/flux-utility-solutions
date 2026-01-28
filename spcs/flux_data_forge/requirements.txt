@@ -1,0 +1,25 @@
+# Flux Data Forge Dependencies
+
+# Web framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+
+# Snowflake
+snowflake-connector-python[pandas]
+
+# Data generation
+numpy>=1.24.0
+pandas>=2.0.0
+faker>=22.0.0
+pyarrow>=14.0.0
+
+# Async and scheduling
+asyncio
+apscheduler>=3.10.0
+
+# Configuration
+python-dotenv>=1.0.0
+pydantic-settings>=2.0.0
+
+# Performance
+orjson>=3.9.0
