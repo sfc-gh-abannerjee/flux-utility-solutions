@@ -5,15 +5,15 @@
 -- Purpose: Create compute pools and SPCS services for application layer
 -- Dependencies: 01_database_infrastructure.sql
 -- Jinja2 Variables:
---   {{ database }}      - Target database name
---   {{ compute_pool }}  - Compute pool name
---   {{ spcs_service }}  - SPCS service name
---   {{ admin_role }}    - Admin role
+--   <% database %>      - Target database name
+--   <% compute_pool %>  - Compute pool name
+--   <% spcs_service %>  - SPCS service name
+--   <% admin_role %>    - Admin role
 --
 -- Note: Service specification YAML is in spcs/flux_ops_center_spec.yaml
 -- =============================================================================
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 
 -- -----------------------------------------------------------------------------
 -- 1. CREATE IMAGE REPOSITORY
@@ -30,7 +30,7 @@ SHOW IMAGE REPOSITORIES IN SCHEMA APPLICATIONS;
 -- -----------------------------------------------------------------------------
 
 -- Interactive compute pool for user-facing services
-CREATE COMPUTE POOL IF NOT EXISTS IDENTIFIER('{{ compute_pool }}')
+CREATE COMPUTE POOL IF NOT EXISTS IDENTIFIER('<% compute_pool %>')
     MIN_NODES = 1
     MAX_NODES = 3
     INSTANCE_FAMILY = CPU_X64_S
@@ -48,8 +48,8 @@ CREATE COMPUTE POOL IF NOT EXISTS FLUX_ML_POOL
     COMMENT = 'GPU compute pool for ML model training and inference';
 
 -- Grant usage on compute pools
-GRANT USAGE ON COMPUTE POOL IDENTIFIER('{{ compute_pool }}') TO ROLE IDENTIFIER('{{ admin_role }}');
-GRANT USAGE ON COMPUTE POOL FLUX_ML_POOL TO ROLE IDENTIFIER('{{ admin_role }}');
+GRANT USAGE ON COMPUTE POOL IDENTIFIER('<% compute_pool %>') TO ROLE IDENTIFIER('<% admin_role %>');
+GRANT USAGE ON COMPUTE POOL FLUX_ML_POOL TO ROLE IDENTIFIER('<% admin_role %>');
 
 -- -----------------------------------------------------------------------------
 -- 3. CREATE NETWORK RULES
@@ -100,8 +100,8 @@ CREATE STAGE IF NOT EXISTS APPLICATIONS.SPCS_SPECS
 -- Note: This creates the service from inline specification
 -- Production deployments should use EXECUTE IMMEDIATE FROM for version control
 
-CREATE SERVICE IF NOT EXISTS APPLICATIONS.IDENTIFIER('{{ spcs_service }}')
-    IN COMPUTE POOL IDENTIFIER('{{ compute_pool }}')
+CREATE SERVICE IF NOT EXISTS APPLICATIONS.IDENTIFIER('<% spcs_service %>')
+    IN COMPUTE POOL IDENTIFIER('<% compute_pool %>')
     MIN_INSTANCES = 1
     MAX_INSTANCES = 3
     AUTO_RESUME = TRUE
@@ -111,11 +111,11 @@ CREATE SERVICE IF NOT EXISTS APPLICATIONS.IDENTIFIER('{{ spcs_service }}')
 spec:
   containers:
     - name: flux-ops-center
-      image: /{{ database }}/APPLICATIONS/FLUX_IMAGES/flux-ops-center:latest
+      image: /<% database %>/APPLICATIONS/FLUX_IMAGES/flux-ops-center:latest
       env:
-        SNOWFLAKE_DATABASE: {{ database }}
+        SNOWFLAKE_DATABASE: <% database %>
         SNOWFLAKE_SCHEMA: PRODUCTION
-        SNOWFLAKE_WAREHOUSE: {{ warehouse }}
+        SNOWFLAKE_WAREHOUSE: <% warehouse %>
         APP_NAME: Flux Operations Center
         APP_VERSION: 2.0.0
         LOG_LEVEL: INFO
@@ -147,7 +147,7 @@ spec:
           mountPath: /app/data
   volumes:
     - name: data-volume
-      source: "@{{ database }}.APPLICATIONS.SPCS_SPECS"
+      source: "@<% database %>.APPLICATIONS.SPCS_SPECS"
   endpoints:
     - name: flux-ui
       port: 8501
@@ -160,7 +160,7 @@ $$;
 -- Service for data generation and ETL operations
 
 CREATE SERVICE IF NOT EXISTS APPLICATIONS.FLUX_DATA_FORGE_SERVICE
-    IN COMPUTE POOL IDENTIFIER('{{ compute_pool }}')
+    IN COMPUTE POOL IDENTIFIER('<% compute_pool %>')
     MIN_INSTANCES = 0
     MAX_INSTANCES = 2
     AUTO_RESUME = TRUE
@@ -169,9 +169,9 @@ CREATE SERVICE IF NOT EXISTS APPLICATIONS.FLUX_DATA_FORGE_SERVICE
 spec:
   containers:
     - name: data-forge
-      image: /{{ database }}/APPLICATIONS/FLUX_IMAGES/flux-data-forge:latest
+      image: /<% database %>/APPLICATIONS/FLUX_IMAGES/flux-data-forge:latest
       env:
-        SNOWFLAKE_DATABASE: {{ database }}
+        SNOWFLAKE_DATABASE: <% database %>
         SNOWFLAKE_SCHEMA: PRODUCTION
         MODE: BATCH
       resources:
@@ -197,18 +197,18 @@ $$;
 SHOW SERVICES IN SCHEMA APPLICATIONS;
 
 -- Get service endpoints (run after services start)
--- CALL SYSTEM$GET_SERVICE_STATUS('APPLICATIONS.{{ spcs_service }}');
--- SELECT SYSTEM$GET_SERVICE_ENDPOINT('APPLICATIONS.{{ spcs_service }}', 'flux-ui');
+-- CALL SYSTEM$GET_SERVICE_STATUS('APPLICATIONS.<% spcs_service %>');
+-- SELECT SYSTEM$GET_SERVICE_ENDPOINT('APPLICATIONS.<% spcs_service %>', 'flux-ui');
 
 -- -----------------------------------------------------------------------------
 -- 9. GRANTS
 -- -----------------------------------------------------------------------------
 
-GRANT USAGE ON SERVICE APPLICATIONS.IDENTIFIER('{{ spcs_service }}') 
-    TO ROLE IDENTIFIER('{{ user_role }}');
+GRANT USAGE ON SERVICE APPLICATIONS.IDENTIFIER('<% spcs_service %>') 
+    TO ROLE IDENTIFIER('<% user_role %>');
 
 GRANT USAGE ON SERVICE APPLICATIONS.FLUX_DATA_FORGE_SERVICE 
-    TO ROLE IDENTIFIER('{{ admin_role }}');
+    TO ROLE IDENTIFIER('<% admin_role %>');
 
 -- =============================================================================
 -- DEPLOYMENT COMPLETE

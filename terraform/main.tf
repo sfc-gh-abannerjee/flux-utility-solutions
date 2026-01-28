@@ -95,34 +95,44 @@ module "warehouses" {
 }
 
 # =============================================================================
-# ROLES AND GRANTS MODULE
+# ADDITIONAL ROLES
+# Note: Core roles are created in database module
+# Additional roles can be added here using snowflake_role resources
 # =============================================================================
 
-module "roles" {
-  source = "./modules/database"
-  
-  database_name = module.database.database_name
-  admin_role    = var.admin_role
-  user_role     = var.user_role
-  
-  # Additional roles
-  additional_roles = [
-    {
-      name    = "FLUX_ANALYST_ROLE"
-      comment = "Cortex Analyst access"
-      parent  = var.user_role
-    },
-    {
-      name    = "FLUX_ETL_ROLE"
-      comment = "ETL and data loading"
-      parent  = var.admin_role
-    },
-    {
-      name    = "FLUX_SERVICE_ROLE"
-      comment = "Service account for SPCS"
-      parent  = var.admin_role
-    }
-  ]
+# Additional analyst role
+resource "snowflake_role" "analyst" {
+  name    = "${var.admin_role}_ANALYST"
+  comment = "Cortex Analyst access role"
+}
+
+resource "snowflake_role_grants" "analyst_to_user" {
+  role_name = snowflake_role.analyst.name
+  roles     = [module.database.user_role]
+}
+
+# ETL role
+resource "snowflake_role" "etl" {
+  name    = "${var.admin_role}_ETL"
+  comment = "ETL and data loading role"
+}
+
+resource "snowflake_role_grants" "etl_to_admin" {
+  role_name = snowflake_role.etl.name
+  roles     = [module.database.admin_role]
+}
+
+# Service role for SPCS
+resource "snowflake_role" "service" {
+  count   = var.enable_spcs ? 1 : 0
+  name    = "${var.admin_role}_SERVICE"
+  comment = "Service account role for SPCS"
+}
+
+resource "snowflake_role_grants" "service_to_admin" {
+  count     = var.enable_spcs ? 1 : 0
+  role_name = snowflake_role.service[0].name
+  roles     = [module.database.admin_role]
 }
 
 # =============================================================================

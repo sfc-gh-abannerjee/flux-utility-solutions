@@ -5,11 +5,11 @@
 -- Purpose: Create Cortex Search services for customer lookup and document search
 -- Dependencies: 05_customers_master.sql
 -- Jinja2 Variables:
---   {{ database }}   - Target database name
---   {{ warehouse }}  - Warehouse for search index refresh
+--   <% database %>   - Target database name
+--   <% warehouse %>  - Warehouse for search index refresh
 -- =============================================================================
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 USE SCHEMA APPLICATIONS;
 
 -- -----------------------------------------------------------------------------
@@ -21,7 +21,7 @@ USE SCHEMA APPLICATIONS;
 CREATE OR ALTER CORTEX SEARCH SERVICE CUSTOMER_SEARCH_SERVICE
     ON SEARCH_TEXT
     ATTRIBUTES CUSTOMER_SEGMENT, CITY, SERVICE_COUNTY, ACCOUNT_STATUS
-    WAREHOUSE = IDENTIFIER('{{ warehouse }}')
+    WAREHOUSE = IDENTIFIER('<% warehouse %>')
     TARGET_LAG = '1 day'
     COMMENT = 'Customer search - 686K profiles, searchable by name, address, segment'
 AS (
@@ -45,7 +45,7 @@ AS (
             COALESCE(SERVICE_COUNTY, ''), ' County ',
             COALESCE(ACCOUNT_STATUS, ''), ' customer'
         ) AS SEARCH_TEXT
-    FROM {{ database }}.PRODUCTION.CUSTOMERS_MASTER_DATA
+    FROM <% database %>.PRODUCTION.CUSTOMERS_MASTER_DATA
 );
 
 -- -----------------------------------------------------------------------------
@@ -57,7 +57,7 @@ AS (
 CREATE OR ALTER CORTEX SEARCH SERVICE AMI_METADATA_SEARCH
     ON SEARCH_TEXT
     ATTRIBUTES CUSTOMER_SEGMENT_ID, CITY, ZIP_CODE, COUNTY_NAME, TRANSFORMER_ID, SUBSTATION_ID
-    WAREHOUSE = IDENTIFIER('{{ warehouse }}')
+    WAREHOUSE = IDENTIFIER('<% warehouse %>')
     TARGET_LAG = '1 hour'
     COMMENT = 'Meter metadata search - 597K meters, searchable by ID, location, topology'
 AS (
@@ -71,7 +71,7 @@ AS (
         TRANSFORMER_ID,
         SUBSTATION_ID,
         AVG_DAILY_KWH
-    FROM {{ database }}.PRODUCTION.AMI_METADATA_SEARCHABLE
+    FROM <% database %>.PRODUCTION.AMI_METADATA_SEARCHABLE
 );
 
 -- Create the searchable view if not exists
@@ -123,7 +123,7 @@ COMMENT = 'Technical manual PDF chunks for RAG search';
 CREATE OR ALTER CORTEX SEARCH SERVICE TECHNICAL_MANUALS_SEARCH_SERVICE
     ON CHUNK_TEXT
     ATTRIBUTES CHUNK_ID, DOCUMENT_ID, DOCUMENT_TYPE, SOURCE_SYSTEM, LANGUAGE
-    WAREHOUSE = IDENTIFIER('{{ warehouse }}')
+    WAREHOUSE = IDENTIFIER('<% warehouse %>')
     TARGET_LAG = '1 minute'
     COMMENT = 'Technical manuals RAG search - 20K document chunks'
 AS (
@@ -134,7 +134,7 @@ AS (
         SOURCE_SYSTEM,
         LANGUAGE,
         CHUNK_TEXT
-    FROM {{ database }}.PRODUCTION.TECHNICAL_MANUALS_PDF_CHUNKS
+    FROM <% database %>.PRODUCTION.TECHNICAL_MANUALS_PDF_CHUNKS
 );
 
 -- -----------------------------------------------------------------------------
@@ -142,13 +142,13 @@ AS (
 -- -----------------------------------------------------------------------------
 
 GRANT USAGE ON CORTEX SEARCH SERVICE CUSTOMER_SEARCH_SERVICE 
-    TO ROLE IDENTIFIER('{{ user_role }}');
+    TO ROLE IDENTIFIER('<% user_role %>');
 
 GRANT USAGE ON CORTEX SEARCH SERVICE AMI_METADATA_SEARCH 
-    TO ROLE IDENTIFIER('{{ user_role }}');
+    TO ROLE IDENTIFIER('<% user_role %>');
 
 GRANT USAGE ON CORTEX SEARCH SERVICE TECHNICAL_MANUALS_SEARCH_SERVICE 
-    TO ROLE IDENTIFIER('{{ user_role }}');
+    TO ROLE IDENTIFIER('<% user_role %>');
 
 -- -----------------------------------------------------------------------------
 -- 5. VERIFICATION
@@ -159,7 +159,7 @@ SHOW CORTEX SEARCH SERVICES IN SCHEMA APPLICATIONS;
 
 -- Test customer search
 SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-    '{{ database }}.APPLICATIONS.CUSTOMER_SEARCH_SERVICE',
+    '<% database %>.APPLICATIONS.CUSTOMER_SEARCH_SERVICE',
     '{
         "query": "residential customer in Houston",
         "columns": ["CUSTOMER_ID", "FULL_NAME", "CITY", "CUSTOMER_SEGMENT"],

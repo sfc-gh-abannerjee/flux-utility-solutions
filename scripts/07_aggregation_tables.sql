@@ -5,10 +5,10 @@
 -- Purpose: Create aggregated transformer loading and thermal analysis tables
 -- Dependencies: 06_ami_readings_pipeline.sql, 03_substations_transformers.sql
 -- Jinja2 Variables:
---   {{ database }}  - Target database name
+--   <% database %>  - Target database name
 -- =============================================================================
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 USE SCHEMA PRODUCTION;
 
 -- -----------------------------------------------------------------------------

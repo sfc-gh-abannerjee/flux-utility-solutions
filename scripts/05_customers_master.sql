@@ -5,10 +5,10 @@
 -- Purpose: Create customer master data and related tables
 -- Dependencies: 04_meters_infrastructure.sql
 -- Jinja2 Variables:
---   {{ database }}  - Target database name
+--   <% database %>  - Target database name
 -- =============================================================================
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 USE SCHEMA PRODUCTION;
 
 -- -----------------------------------------------------------------------------

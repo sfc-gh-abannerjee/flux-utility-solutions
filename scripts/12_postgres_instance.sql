@@ -5,21 +5,21 @@
 -- Purpose: Create PostgreSQL database for real-time transactional workloads
 -- Dependencies: 01_database_infrastructure.sql
 -- Jinja2 Variables:
---   {{ database }}          - Target database name
---   {{ postgres_instance }} - PostgreSQL instance name
---   {{ admin_role }}        - Admin role
+--   <% database %>          - Target database name
+--   <% postgres_instance %> - PostgreSQL instance name
+--   <% admin_role %>        - Admin role
 --
 -- Note: PostgreSQL provides <20ms latency for real-time operations
 -- =============================================================================
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 
 -- -----------------------------------------------------------------------------
 -- 1. CREATE POSTGRESQL INSTANCE
 -- -----------------------------------------------------------------------------
 -- PostgreSQL 17.7 instance for transactional workloads
 
-CREATE POSTGRES DATABASE IF NOT EXISTS IDENTIFIER('{{ postgres_instance }}')
+CREATE POSTGRES DATABASE IF NOT EXISTS IDENTIFIER('<% postgres_instance %>')
     COMMENT = 'Flux Operations - Real-time transactional database for <20ms latency operations'
     AUTO_SUSPEND_MINS = 60
     INITIAL_WAREHOUSE_SIZE = 'MEDIUM';
@@ -262,8 +262,8 @@ $$;
 -- 7. GRANTS
 -- -----------------------------------------------------------------------------
 
-GRANT USAGE ON DATABASE IDENTIFIER('{{ postgres_instance }}') TO ROLE IDENTIFIER('{{ admin_role }}');
-GRANT SELECT ON ALL TABLES IN SCHEMA PRODUCTION TO ROLE IDENTIFIER('{{ user_role }}');
+GRANT USAGE ON DATABASE IDENTIFIER('<% postgres_instance %>') TO ROLE IDENTIFIER('<% admin_role %>');
+GRANT SELECT ON ALL TABLES IN SCHEMA PRODUCTION TO ROLE IDENTIFIER('<% user_role %>');
 
 -- =============================================================================
 -- DEPLOYMENT COMPLETE

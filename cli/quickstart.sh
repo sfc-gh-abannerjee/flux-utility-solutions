@@ -173,12 +173,33 @@ main() {
     
     echo "Step 6/6: Loading seed data"
     echo "─────────────────────────────────"
-    if [[ -f "$REPO_ROOT/generators/load_seed_data.py" ]]; then
-        log_step "Loading sample data..."
-        python3 "$REPO_ROOT/generators/load_seed_data.py" --source small --quick 2>/dev/null || \
-            log_success "Seed data loaded (or skipped if not available)"
+    
+    # Try to load from SI_DEMOS first (fastest)
+    log_step "Checking for SI_DEMOS seed data..."
+    
+    if snow sql $conn_flag -q "SELECT 1 FROM SI_DEMOS.PRODUCTION.SUBSTATIONS LIMIT 1" > /dev/null 2>&1; then
+        log_success "SI_DEMOS accessible"
+        
+        log_step "Loading reference tables..."
+        snow sql $conn_flag -f "$REPO_ROOT/scripts/50_load_seed_data.sql" \
+            -D "database=FLUX_QUICKSTART" \
+            -D "warehouse=FLUX_QUICKSTART_WH" > /dev/null 2>&1 && \
+            log_success "Reference tables loaded" || log_success "Reference tables (partial)"
+        
+        log_step "Generating AMI sample data (7 days)..."
+        snow sql $conn_flag -f "$REPO_ROOT/scripts/51_generate_ami_sample.sql" \
+            -D "database=FLUX_QUICKSTART" \
+            -D "days=7" > /dev/null 2>&1 && \
+            log_success "AMI data generated" || log_success "AMI data skipped"
     else
-        log_success "Seed data loading skipped (run generators separately)"
+        log_success "SI_DEMOS not in this account - using generators"
+        if [[ -f "$REPO_ROOT/generators/load_seed_data.py" ]]; then
+            log_step "Loading sample data..."
+            python3 "$REPO_ROOT/generators/load_seed_data.py" --source small --quick 2>/dev/null || \
+                log_success "Seed data loaded (or skipped if not available)"
+        else
+            log_success "Seed data loading skipped (run generators separately)"
+        fi
     fi
     echo ""
     

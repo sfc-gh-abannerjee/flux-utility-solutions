@@ -5,13 +5,13 @@
 -- Purpose: Deploy semantic view for natural language analytics
 -- Dependencies: All PRODUCTION tables (01-07)
 -- Jinja2 Variables:
---   {{ database }}  - Target database name
+--   <% database %>  - Target database name
 --
 -- Note: The semantic model YAML is in models/utility_semantic_model.yaml
 -- This script creates the semantic view from inline YAML for portability
 -- =============================================================================
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 USE SCHEMA APPLICATIONS;
 
 -- -----------------------------------------------------------------------------
@@ -43,7 +43,7 @@ tables:
       Enhanced AMI readings with voltage sag events and outage tracking.
       7.1 billion rows at 15-minute intervals. July 2024 - August 2025.
     base_table:
-      database: {{ database }}
+      database: <% database %>
       schema: PRODUCTION
       table: AMI_READINGS_FINAL
     
@@ -160,7 +160,7 @@ tables:
       Customer master data with 686,000 profiles including demographics,
       service addresses, and income segmentation.
     base_table:
-      database: {{ database }}
+      database: <% database %>
       schema: PRODUCTION
       table: CUSTOMERS_MASTER_DATA
     
@@ -227,7 +227,7 @@ tables:
       Hourly transformer loading data with 211 million rows.
       Includes load factor, capacity utilization, and thermal stress.
     base_table:
-      database: {{ database }}
+      database: <% database %>
       schema: PRODUCTION
       table: TRANSFORMER_HOURLY_LOAD
     
@@ -312,7 +312,7 @@ tables:
       Transformer fleet metadata with 91,000 assets including specifications,
       location, health scores, and CIM-compliant topology.
     base_table:
-      database: {{ database }}
+      database: <% database %>
       schema: PRODUCTION
       table: TRANSFORMER_METADATA
     
@@ -422,8 +422,8 @@ verified_queries:
         c.CITY,
         c.CUSTOMER_SEGMENT,
         SUM(a.USAGE_KWH) as TOTAL_KWH
-      FROM {{ database }}.PRODUCTION.AMI_READINGS_FINAL a
-      JOIN {{ database }}.PRODUCTION.CUSTOMERS_MASTER_DATA c 
+      FROM <% database %>.PRODUCTION.AMI_READINGS_FINAL a
+      JOIN <% database %>.PRODUCTION.CUSTOMERS_MASTER_DATA c 
         ON a.METER_ID = c.PRIMARY_METER_ID
       GROUP BY 1, 2, 3
       ORDER BY TOTAL_KWH DESC
@@ -439,7 +439,7 @@ verified_queries:
         AVG(LOAD_FACTOR_PCT) as AVG_LOAD_PCT,
         MAX(LOAD_FACTOR_PCT) as PEAK_LOAD_PCT,
         SUM(CASE WHEN IS_OVERLOADED THEN 1 ELSE 0 END) as OVERLOAD_HOURS
-      FROM {{ database }}.PRODUCTION.TRANSFORMER_HOURLY_LOAD
+      FROM <% database %>.PRODUCTION.TRANSFORMER_HOURLY_LOAD
       GROUP BY 1
       HAVING PEAK_LOAD_PCT > 110
       ORDER BY PEAK_LOAD_PCT DESC
@@ -455,7 +455,7 @@ verified_queries:
         SUM(USAGE_KWH) as TOTAL_KWH,
         COUNT(DISTINCT METER_ID) as ACTIVE_METERS,
         AVG(USAGE_KWH) as AVG_INTERVAL_KWH
-      FROM {{ database }}.PRODUCTION.AMI_READINGS_FINAL
+      FROM <% database %>.PRODUCTION.AMI_READINGS_FINAL
       GROUP BY 1
       ORDER BY 1
 $$;
@@ -465,7 +465,7 @@ $$;
 -- -----------------------------------------------------------------------------
 
 GRANT SELECT ON SEMANTIC VIEW UTILITY_SEMANTIC_VIEW 
-    TO ROLE IDENTIFIER('{{ user_role }}');
+    TO ROLE IDENTIFIER('<% user_role %>');
 
 -- -----------------------------------------------------------------------------
 -- 3. VERIFY DEPLOYMENT
@@ -475,7 +475,7 @@ SHOW SEMANTIC VIEWS IN SCHEMA APPLICATIONS;
 
 -- Test semantic view (basic query)
 SELECT * FROM TABLE(
-    SNOWFLAKE.CORTEX.SEMANTIC_VIEW_COLUMNS('{{ database }}.APPLICATIONS.UTILITY_SEMANTIC_VIEW')
+    SNOWFLAKE.CORTEX.SEMANTIC_VIEW_COLUMNS('<% database %>.APPLICATIONS.UTILITY_SEMANTIC_VIEW')
 ) LIMIT 10;
 
 -- =============================================================================

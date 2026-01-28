@@ -8,7 +8,6 @@
 --   EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/git_deploy/deploy_from_git.sql
 --     USING (
 --       database => 'FLUX_PROD',
---       schema => 'PRODUCTION',
 --       warehouse => 'FLUX_WH',
 --       admin_role => 'ACCOUNTADMIN',
 --       user_role => 'FLUX_USER'
@@ -17,13 +16,12 @@
 
 -- Declare parameters with defaults
 SET database = COALESCE($database, 'FLUX_PROD');
-SET schema_name = COALESCE($schema, 'PRODUCTION');
 SET warehouse = COALESCE($warehouse, 'FLUX_WH');
 SET admin_role = COALESCE($admin_role, 'ACCOUNTADMIN');
 SET user_role = COALESCE($user_role, 'PUBLIC');
 
 -- Log start
-SELECT 'Starting Flux deployment to ' || $database || '.' || $schema_name AS deployment_info;
+SELECT 'Starting Flux deployment to ' || $database AS deployment_info;
 
 -- ============================================================================
 -- Phase 1: Infrastructure Setup
@@ -34,93 +32,133 @@ SELECT '=== Phase 1: Infrastructure Setup ===' AS phase;
 -- Fetch latest from git
 ALTER GIT REPOSITORY flux_utility_solutions_repo FETCH;
 
--- Execute infrastructure scripts
-EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/01_database_setup.sql
+-- Execute infrastructure script - creates database, schemas, roles
+EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/01_database_infrastructure.sql
   USING (database => $database, warehouse => $warehouse, admin_role => $admin_role, user_role => $user_role);
 
-EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/02_schemas.sql
+-- Execute warehouse setup
+EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/02_warehouses.sql
+  USING (database => $database, warehouse => $warehouse, admin_role => $admin_role);
+
+SELECT 'Phase 1 complete: Database, schemas, and warehouses created' AS status;
+
+-- ============================================================================
+-- Phase 2: Grid Foundation Tables
+-- ============================================================================
+
+SELECT '=== Phase 2: Grid Foundation ===' AS phase;
+
+-- Substations and Transformers
+EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/03_substations_transformers.sql
   USING (database => $database);
 
-SELECT 'Phase 1 complete' AS status;
+-- Meters infrastructure
+EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/04_meters_infrastructure.sql
+  USING (database => $database);
 
--- ============================================================================
--- Phase 2: Core Tables
--- ============================================================================
-
-SELECT '=== Phase 2: Core Tables ===' AS phase;
-
-EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/03_substations.sql
-  USING (database => $database, schema => $schema_name);
-
-EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/04_transformers.sql
-  USING (database => $database, schema => $schema_name);
-
+-- Customer master data
 EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/05_customers_master.sql
-  USING (database => $database, schema => $schema_name);
+  USING (database => $database);
 
-EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/06_meters.sql
-  USING (database => $database, schema => $schema_name);
-
-EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/07_ami_readings.sql
-  USING (database => $database, schema => $schema_name);
-
-SELECT 'Phase 2 complete' AS status;
+SELECT 'Phase 2 complete: Grid foundation tables created' AS status;
 
 -- ============================================================================
--- Phase 3: Operational Tables
+-- Phase 3: AMI and Operational Data
 -- ============================================================================
 
-SELECT '=== Phase 3: Operational Tables ===' AS phase;
+SELECT '=== Phase 3: AMI and Operational Data ===' AS phase;
 
-EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/08_outages.sql
-  USING (database => $database, schema => $schema_name);
+-- AMI readings pipeline
+EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/06_ami_readings_pipeline.sql
+  USING (database => $database);
 
-EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/09_work_orders.sql
-  USING (database => $database, schema => $schema_name);
+-- Aggregation tables (hourly load, outages, voltage sags)
+EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/07_aggregation_tables.sql
+  USING (database => $database);
 
-SELECT 'Phase 3 complete' AS status;
-
--- ============================================================================
--- Phase 4: Analytics Layer
--- ============================================================================
-
-SELECT '=== Phase 4: Analytics Layer ===' AS phase;
-
-EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/10_analytics_views.sql
-  USING (database => $database, schema => $schema_name);
-
-EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/11_dynamic_tables.sql
-  USING (database => $database, schema => $schema_name, warehouse => $warehouse);
-
-SELECT 'Phase 4 complete' AS status;
+SELECT 'Phase 3 complete: AMI and aggregation tables created' AS status;
 
 -- ============================================================================
--- Phase 5: Cortex AI Setup
+-- Phase 4: Cortex AI Layer
 -- ============================================================================
 
-SELECT '=== Phase 5: Cortex AI Setup ===' AS phase;
+SELECT '=== Phase 4: Cortex AI Setup ===' AS phase;
 
-EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/15_cortex_search.sql
-  USING (database => $database, schema => $schema_name, warehouse => $warehouse);
+-- Semantic View for Cortex Analyst
+EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/08_semantic_view.sql
+  USING (database => $database);
 
-EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/16_semantic_view.sql
-  USING (database => $database, schema => $schema_name);
+-- Cortex Search Services
+EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/09_cortex_search_services.sql
+  USING (database => $database, warehouse => $warehouse);
 
-EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/17_cortex_agent.sql
-  USING (database => $database, schema => $schema_name);
+-- Cortex Agent
+EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/10_cortex_agent.sql
+  USING (database => $database);
 
-SELECT 'Phase 5 complete' AS status;
+SELECT 'Phase 4 complete: Cortex AI services configured' AS status;
 
 -- ============================================================================
--- Phase 6: Application Layer
+-- Phase 5: ML and Advanced Features (Optional)
 -- ============================================================================
 
-SELECT '=== Phase 6: Application Layer ===' AS phase;
+SELECT '=== Phase 5: ML Features ===' AS phase;
 
-EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/18_application_views.sql
-  USING (database => $database, schema => $schema_name);
+-- ML Feature tables
+EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/11_ml_feature_tables.sql
+  USING (database => $database);
 
-SELECT 'Phase 6 complete' AS status;
+SELECT 'Phase 5 complete: ML feature tables created' AS status;
+
+-- ============================================================================
+-- Phase 6: Security and RBAC
+-- ============================================================================
+
+SELECT '=== Phase 6: Security Setup ===' AS phase;
+
+-- Final RBAC grants
+EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/16_rbac_final.sql
+  USING (database => $database, admin_role => $admin_role, user_role => $user_role);
+
+SELECT 'Phase 6 complete: RBAC configured' AS status;
+
+-- ============================================================================
+-- Phase 7: Seed Data Loading
+-- ============================================================================
+
+SELECT '=== Phase 7: Seed Data Loading ===' AS phase;
+
+-- Load seed data from SI_DEMOS (if in same account)
+-- This copies reference tables and generates sample AMI data
+BEGIN
+    EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/50_load_seed_data.sql
+      USING (database => $database, warehouse => $warehouse);
+    SELECT 'Seed data loaded from SI_DEMOS' AS status;
+EXCEPTION
+    WHEN OTHER THEN
+        SELECT 'SI_DEMOS not accessible - tables created but empty. Run load_seed_data.sh separately.' AS status;
+END;
+
+-- Generate AMI sample data
+BEGIN
+    EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/51_generate_ami_sample.sql
+      USING (database => $database, days => 7);
+    SELECT 'AMI sample data generated (7 days)' AS status;
+EXCEPTION
+    WHEN OTHER THEN
+        SELECT 'AMI generation skipped - can be run separately' AS status;
+END;
+
+SELECT 'Phase 7 complete: Seed data loaded' AS status;
+
+-- ============================================================================
+-- Phase 8: Validation
+-- ============================================================================
+
+SELECT '=== Phase 8: Validation ===' AS phase;
+
+EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/99_validate_deployment.sql
+  USING (database => $database);
 
 -- ============================================================================
 -- Deployment Complete
@@ -129,5 +167,11 @@ SELECT 'Phase 6 complete' AS status;
 SELECT 
   'Flux Utility Solutions deployed successfully!' AS message,
   $database AS database,
-  $schema_name AS schema,
   CURRENT_TIMESTAMP() AS deployed_at;
+
+-- Summary
+SELECT 
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.SCHEMATA WHERE CATALOG_NAME = $database) AS schemas_created,
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = $database AND TABLE_TYPE = 'BASE TABLE') AS tables_created,
+  (SELECT COUNT(*) FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_CATALOG = $database) AS views_created,
+  (SELECT SUM(ROW_COUNT) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = $database) AS total_rows;

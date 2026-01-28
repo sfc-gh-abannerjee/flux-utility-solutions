@@ -5,10 +5,10 @@
 -- Purpose: Create geospatial functions for grid topology analysis
 -- Dependencies: 03_substations_transformers.sql, 04_meters_infrastructure.sql
 -- Jinja2 Variables:
---   {{ database }}  - Target database name
+--   <% database %>  - Target database name
 -- =============================================================================
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 USE SCHEMA PRODUCTION;
 
 -- -----------------------------------------------------------------------------
@@ -269,7 +269,7 @@ FROM PRODUCTION.TRANSFORMER_METADATA
 WHERE LATITUDE IS NOT NULL;
 
 -- Grant access
-GRANT SELECT ON VIEW APPLICATIONS.GRID_TOPOLOGY_GEO TO ROLE IDENTIFIER('{{ user_role }}');
+GRANT SELECT ON VIEW APPLICATIONS.GRID_TOPOLOGY_GEO TO ROLE IDENTIFIER('<% user_role %>');
 
 -- -----------------------------------------------------------------------------
 -- 5. VERIFICATION

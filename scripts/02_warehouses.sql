@@ -4,11 +4,11 @@
 -- =============================================================================
 -- Purpose: Create compute warehouses for different workloads
 -- Jinja2 Variables:
---   {{ database }}        - Target database name
---   {{ warehouse }}       - Primary warehouse name
---   {{ warehouse_size }}  - Warehouse size (XSMALL, SMALL, MEDIUM, LARGE)
---   {{ admin_role }}      - Administrator role
---   {{ user_role }}       - End-user role
+--   <% database %>        - Target database name
+--   <% warehouse %>       - Primary warehouse name
+--   <% warehouse_size %>  - Warehouse size (XSMALL, SMALL, MEDIUM, LARGE)
+--   <% admin_role %>      - Administrator role
+--   <% user_role %>       - End-user role
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -16,8 +16,8 @@
 -- -----------------------------------------------------------------------------
 -- Used for: Dashboard queries, Cortex Analyst, general analytics
 
-CREATE OR ALTER WAREHOUSE IDENTIFIER('{{ warehouse }}')
-    WAREHOUSE_SIZE = '{{ warehouse_size }}'
+CREATE OR ALTER WAREHOUSE IDENTIFIER('<% warehouse %>')
+    WAREHOUSE_SIZE = '<% warehouse_size %>'
     WAREHOUSE_TYPE = 'STANDARD'
     AUTO_SUSPEND = 60
     AUTO_RESUME = TRUE
@@ -28,18 +28,18 @@ CREATE OR ALTER WAREHOUSE IDENTIFIER('{{ warehouse }}')
     COMMENT = 'Flux primary analytics warehouse';
 
 -- Grant usage to roles
-GRANT USAGE ON WAREHOUSE IDENTIFIER('{{ warehouse }}') 
-    TO ROLE IDENTIFIER('{{ admin_role }}');
+GRANT USAGE ON WAREHOUSE IDENTIFIER('<% warehouse %>') 
+    TO ROLE IDENTIFIER('<% admin_role %>');
 
-GRANT USAGE ON WAREHOUSE IDENTIFIER('{{ warehouse }}') 
-    TO ROLE IDENTIFIER('{{ user_role }}');
+GRANT USAGE ON WAREHOUSE IDENTIFIER('<% warehouse %>') 
+    TO ROLE IDENTIFIER('<% user_role %>');
 
 -- -----------------------------------------------------------------------------
 -- 2. LARGE WAREHOUSE (Heavy Analytics)
 -- -----------------------------------------------------------------------------
 -- Used for: AMI data processing (7.1B rows), ML training, bulk operations
 
-CREATE OR ALTER WAREHOUSE IDENTIFIER('{{ warehouse }}_LARGE')
+CREATE OR ALTER WAREHOUSE IDENTIFIER('<% warehouse_ %>LARGE')
     WAREHOUSE_SIZE = 'LARGE'
     WAREHOUSE_TYPE = 'STANDARD'
     AUTO_SUSPEND = 120
@@ -50,15 +50,15 @@ CREATE OR ALTER WAREHOUSE IDENTIFIER('{{ warehouse }}_LARGE')
     INITIALLY_SUSPENDED = TRUE
     COMMENT = 'Flux large warehouse for heavy analytics (AMI, ML)';
 
-GRANT USAGE ON WAREHOUSE IDENTIFIER('{{ warehouse }}_LARGE') 
-    TO ROLE IDENTIFIER('{{ admin_role }}');
+GRANT USAGE ON WAREHOUSE IDENTIFIER('<% warehouse_ %>LARGE') 
+    TO ROLE IDENTIFIER('<% admin_role %>');
 
 -- -----------------------------------------------------------------------------
 -- 3. LOADING WAREHOUSE (ETL)
 -- -----------------------------------------------------------------------------
 -- Used for: Data loading, Snowpipe, staging operations
 
-CREATE OR ALTER WAREHOUSE IDENTIFIER('{{ warehouse }}_LOADING')
+CREATE OR ALTER WAREHOUSE IDENTIFIER('<% warehouse_ %>LOADING')
     WAREHOUSE_SIZE = 'SMALL'
     WAREHOUSE_TYPE = 'STANDARD'
     AUTO_SUSPEND = 60
@@ -68,15 +68,15 @@ CREATE OR ALTER WAREHOUSE IDENTIFIER('{{ warehouse }}_LOADING')
     INITIALLY_SUSPENDED = TRUE
     COMMENT = 'Flux ETL warehouse for data loading';
 
-GRANT USAGE ON WAREHOUSE IDENTIFIER('{{ warehouse }}_LOADING') 
-    TO ROLE IDENTIFIER('{{ admin_role }}');
+GRANT USAGE ON WAREHOUSE IDENTIFIER('<% warehouse_ %>LOADING') 
+    TO ROLE IDENTIFIER('<% admin_role %>');
 
 -- -----------------------------------------------------------------------------
 -- 4. CORTEX WAREHOUSE (AI Services)
 -- -----------------------------------------------------------------------------
 -- Used for: Cortex Search refresh, embedding generation
 
-CREATE OR ALTER WAREHOUSE IDENTIFIER('{{ warehouse }}_CORTEX')
+CREATE OR ALTER WAREHOUSE IDENTIFIER('<% warehouse_ %>CORTEX')
     WAREHOUSE_SIZE = 'MEDIUM'
     WAREHOUSE_TYPE = 'STANDARD'
     AUTO_SUSPEND = 300
@@ -86,23 +86,23 @@ CREATE OR ALTER WAREHOUSE IDENTIFIER('{{ warehouse }}_CORTEX')
     INITIALLY_SUSPENDED = TRUE
     COMMENT = 'Flux Cortex AI warehouse for search and embeddings';
 
-GRANT USAGE ON WAREHOUSE IDENTIFIER('{{ warehouse }}_CORTEX') 
-    TO ROLE IDENTIFIER('{{ admin_role }}');
+GRANT USAGE ON WAREHOUSE IDENTIFIER('<% warehouse_ %>CORTEX') 
+    TO ROLE IDENTIFIER('<% admin_role %>');
 
-GRANT USAGE ON WAREHOUSE IDENTIFIER('{{ warehouse }}_CORTEX') 
-    TO ROLE IDENTIFIER('{{ user_role }}');
+GRANT USAGE ON WAREHOUSE IDENTIFIER('<% warehouse_ %>CORTEX') 
+    TO ROLE IDENTIFIER('<% user_role %>');
 
 -- -----------------------------------------------------------------------------
 -- 5. SET DEFAULT WAREHOUSE
 -- -----------------------------------------------------------------------------
 
-ALTER USER CURRENT_USER SET DEFAULT_WAREHOUSE = '{{ warehouse }}';
+ALTER USER CURRENT_USER SET DEFAULT_WAREHOUSE = '<% warehouse %>';
 
 -- -----------------------------------------------------------------------------
 -- 6. VERIFICATION
 -- -----------------------------------------------------------------------------
 
-SHOW WAREHOUSES LIKE '{{ warehouse }}%';
+SHOW WAREHOUSES LIKE '<% warehouse %>%';
 
 -- =============================================================================
 -- DEPLOYMENT COMPLETE

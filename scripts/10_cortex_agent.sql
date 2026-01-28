@@ -5,12 +5,12 @@
 -- Purpose: Create Cortex Agent for natural language grid analytics
 -- Dependencies: 08_semantic_view.sql, 09_cortex_search_services.sql
 -- Jinja2 Variables:
---   {{ database }}  - Target database name
+--   <% database %>  - Target database name
 --
 -- Note: Full agent spec is in agents/grid_intelligence_agent.yaml
 -- =============================================================================
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 USE SCHEMA APPLICATIONS;
 
 -- -----------------------------------------------------------------------------
@@ -29,19 +29,19 @@ CREATE OR ALTER AGENT GRID_INTELLIGENCE_AGENT
     TOOLS = (
         -- Cortex Analyst for structured data queries
         CORTEX_ANALYST(
-            SEMANTIC_VIEW => '{{ database }}.APPLICATIONS.UTILITY_SEMANTIC_VIEW'
+            SEMANTIC_VIEW => '<% database %>.APPLICATIONS.UTILITY_SEMANTIC_VIEW'
         ),
         -- Cortex Search for customer lookup
         CORTEX_SEARCH(
-            SEARCH_SERVICE => '{{ database }}.APPLICATIONS.CUSTOMER_SEARCH_SERVICE'
+            SEARCH_SERVICE => '<% database %>.APPLICATIONS.CUSTOMER_SEARCH_SERVICE'
         ),
         -- Cortex Search for meter lookup
         CORTEX_SEARCH(
-            SEARCH_SERVICE => '{{ database }}.APPLICATIONS.AMI_METADATA_SEARCH'
+            SEARCH_SERVICE => '<% database %>.APPLICATIONS.AMI_METADATA_SEARCH'
         ),
         -- Cortex Search for technical documentation
         CORTEX_SEARCH(
-            SEARCH_SERVICE => '{{ database }}.APPLICATIONS.TECHNICAL_MANUALS_SEARCH_SERVICE'
+            SEARCH_SERVICE => '<% database %>.APPLICATIONS.TECHNICAL_MANUALS_SEARCH_SERVICE'
         )
     )
     -- Agent instructions (orchestration layer)
@@ -163,14 +163,14 @@ $$;
 
 -- Grant execute to admin role
 GRANT USAGE ON PROCEDURE CASCADE_FAILURE_SIMULATION(VARCHAR, NUMBER) 
-    TO ROLE IDENTIFIER('{{ admin_role }}');
+    TO ROLE IDENTIFIER('<% admin_role %>');
 
 -- -----------------------------------------------------------------------------
 -- 3. GRANT AGENT ACCESS
 -- -----------------------------------------------------------------------------
 
 GRANT USAGE ON AGENT GRID_INTELLIGENCE_AGENT 
-    TO ROLE IDENTIFIER('{{ user_role }}');
+    TO ROLE IDENTIFIER('<% user_role %>');
 
 -- -----------------------------------------------------------------------------
 -- 4. VERIFICATION

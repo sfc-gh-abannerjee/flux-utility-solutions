@@ -5,14 +5,14 @@
 -- Purpose: Configure Git integration for EXECUTE IMMEDIATE FROM deployment
 -- Dependencies: 01_database_infrastructure.sql
 -- Jinja2 Variables:
---   {{ database }}     - Target database name
---   {{ git_repo_url }} - Git repository URL
---   {{ admin_role }}   - Admin role
+--   <% database %>     - Target database name
+--   <% git_repo_url %> - Git repository URL
+--   <% admin_role %>   - Admin role
 --
 -- Reference: https://docs.snowflake.com/en/developer-guide/git/git-overview
 -- =============================================================================
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 USE SCHEMA APPLICATIONS;
 
 -- -----------------------------------------------------------------------------
@@ -27,7 +27,7 @@ CREATE OR REPLACE API INTEGRATION FLUX_GIT_INTEGRATION
     COMMENT = 'Git integration for Flux utility solutions repository';
 
 -- Grant usage to admin role
-GRANT USAGE ON INTEGRATION FLUX_GIT_INTEGRATION TO ROLE IDENTIFIER('{{ admin_role }}');
+GRANT USAGE ON INTEGRATION FLUX_GIT_INTEGRATION TO ROLE IDENTIFIER('<% admin_role %>');
 
 -- -----------------------------------------------------------------------------
 -- 2. CREATE GIT REPOSITORY
@@ -39,7 +39,7 @@ CREATE OR REPLACE GIT REPOSITORY FLUX_SOLUTIONS_REPO
     COMMENT = 'Flux Utility Solutions Git repository';
 
 -- Grant usage
-GRANT READ ON GIT REPOSITORY FLUX_SOLUTIONS_REPO TO ROLE IDENTIFIER('{{ admin_role }}');
+GRANT READ ON GIT REPOSITORY FLUX_SOLUTIONS_REPO TO ROLE IDENTIFIER('<% admin_role %>');
 
 -- -----------------------------------------------------------------------------
 -- 3. FETCH LATEST FROM REPOSITORY

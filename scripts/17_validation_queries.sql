@@ -5,11 +5,11 @@
 -- Purpose: Validate deployment matches production and all components work
 -- Dependencies: All previous scripts (01-16)
 -- Jinja2 Variables:
---   {{ database }}    - Target database name
---   {{ source_db }}   - Source database to compare against (e.g., SI_DEMOS)
+--   <% database %>    - Target database name
+--   <% source_db %>   - Source database to compare against (e.g., SI_DEMOS)
 -- =============================================================================
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 
 -- -----------------------------------------------------------------------------
 -- 1. SCHEMA VALIDATION
@@ -21,7 +21,7 @@ SELECT 'SCHEMA_CHECK' AS CHECK_TYPE,
        CASE WHEN SCHEMA_NAME IN ('PRODUCTION', 'APPLICATIONS', 'SECRETS') 
             THEN 'PASS' ELSE 'UNEXPECTED' END AS STATUS
 FROM INFORMATION_SCHEMA.SCHEMATA
-WHERE CATALOG_NAME = '{{ database }}';
+WHERE CATALOG_NAME = '<% database %>';
 
 -- -----------------------------------------------------------------------------
 -- 2. TABLE COUNT VALIDATION
@@ -30,12 +30,12 @@ WHERE CATALOG_NAME = '{{ database }}';
 -- Compare table counts between environments
 WITH source_tables AS (
     SELECT TABLE_NAME, ROW_COUNT 
-    FROM {{ source_db }}.INFORMATION_SCHEMA.TABLES 
+    FROM <% source_db %>.INFORMATION_SCHEMA.TABLES 
     WHERE TABLE_SCHEMA = 'PRODUCTION' AND TABLE_TYPE = 'BASE TABLE'
 ),
 target_tables AS (
     SELECT TABLE_NAME, ROW_COUNT 
-    FROM {{ database }}.INFORMATION_SCHEMA.TABLES 
+    FROM <% database %>.INFORMATION_SCHEMA.TABLES 
     WHERE TABLE_SCHEMA = 'PRODUCTION' AND TABLE_TYPE = 'BASE TABLE'
 )
 SELECT 
@@ -89,7 +89,7 @@ SELECT 'SEMANTIC_COLUMNS' AS CHECK_TYPE,
        COUNT(*) AS COLUMN_COUNT,
        CASE WHEN COUNT(*) > 0 THEN 'PASS' ELSE 'FAIL' END AS STATUS
 FROM TABLE(
-    SNOWFLAKE.CORTEX.SEMANTIC_VIEW_COLUMNS('{{ database }}.APPLICATIONS.UTILITY_SEMANTIC_VIEW')
+    SNOWFLAKE.CORTEX.SEMANTIC_VIEW_COLUMNS('<% database %>.APPLICATIONS.UTILITY_SEMANTIC_VIEW')
 );
 
 -- -----------------------------------------------------------------------------
@@ -113,7 +113,7 @@ SELECT 'SEARCH_TEST' AS CHECK_TYPE,
        END AS STATUS
 FROM (
     SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-        '{{ database }}.APPLICATIONS.CUSTOMER_SEARCH_SERVICE',
+        '<% database %>.APPLICATIONS.CUSTOMER_SEARCH_SERVICE',
         '{"query": "residential Houston", "columns": ["CUSTOMER_ID"], "limit": 1}'
     ) AS RESULT
 );
@@ -140,7 +140,7 @@ SELECT 'WAREHOUSES' AS CHECK_TYPE,
        STATE,
        CASE WHEN STATE IN ('STARTED', 'SUSPENDED') THEN 'PASS' ELSE 'CHECK' END AS STATUS
 FROM INFORMATION_SCHEMA.WAREHOUSES
-WHERE NAME LIKE '{{ warehouse }}%' OR NAME LIKE 'FLUX%';
+WHERE NAME LIKE '<% warehouse %>%' OR NAME LIKE 'FLUX%';
 
 -- -----------------------------------------------------------------------------
 -- 8. SPCS SERVICE VALIDATION
@@ -167,7 +167,7 @@ SELECT 'ROLES' AS CHECK_TYPE,
        CREATED_ON,
        'PASS' AS STATUS
 FROM SNOWFLAKE.ACCOUNT_USAGE.ROLES
-WHERE NAME IN ('{{ admin_role }}', '{{ user_role }}', 'FLUX_ANALYST_ROLE', 'FLUX_ETL_ROLE')
+WHERE NAME IN ('<% admin_role %>', '<% user_role %>', 'FLUX_ANALYST_ROLE', 'FLUX_ETL_ROLE')
   AND DELETED_ON IS NULL;
 
 -- Check key grants
@@ -178,7 +178,7 @@ SELECT 'GRANTS' AS CHECK_TYPE,
        NAME AS OBJECT_NAME,
        'PASS' AS STATUS
 FROM SNOWFLAKE.ACCOUNT_USAGE.GRANTS_TO_ROLES
-WHERE GRANTEE_NAME IN ('{{ admin_role }}', '{{ user_role }}')
+WHERE GRANTEE_NAME IN ('<% admin_role %>', '<% user_role %>')
   AND DELETED_ON IS NULL
   AND GRANTED_ON IN ('DATABASE', 'SCHEMA', 'SEMANTIC_VIEW')
 LIMIT 20;

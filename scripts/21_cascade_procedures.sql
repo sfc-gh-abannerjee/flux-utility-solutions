@@ -11,9 +11,9 @@
 -- - Network topology traversal
 -- ============================================================================
 
-USE DATABASE {{ database }};
-USE SCHEMA {{ schema }};
-USE WAREHOUSE {{ warehouse }};
+USE DATABASE <% database %>;
+USE SCHEMA <% schema %>;
+USE WAREHOUSE <% warehouse %>;
 
 -- ============================================================================
 -- Cascade Analysis Procedures
@@ -238,7 +238,7 @@ $$;
 -- ============================================================================
 
 CREATE OR REPLACE TASK MONITOR_CASCADE_RISK
-  WAREHOUSE = {{ warehouse }}
+  WAREHOUSE = <% warehouse %>
   SCHEDULE = '5 MINUTE'
 AS
 INSERT INTO CASCADE_RISK_LOG (
@@ -273,8 +273,8 @@ WHERE t.health_score < 70
 -- Grant Execute Permissions
 -- ============================================================================
 
-GRANT USAGE ON PROCEDURE ANALYZE_CASCADE_IMPACT(VARCHAR, BOOLEAN) TO ROLE {{ user_role }};
-GRANT USAGE ON PROCEDURE CALCULATE_LOAD_SHED_SEQUENCE(FLOAT, VARCHAR) TO ROLE {{ user_role }};
-GRANT USAGE ON PROCEDURE GET_FAILURE_PROPAGATION_RISK(VARCHAR) TO ROLE {{ user_role }};
+GRANT USAGE ON PROCEDURE ANALYZE_CASCADE_IMPACT(VARCHAR, BOOLEAN) TO ROLE <% user_role %>;
+GRANT USAGE ON PROCEDURE CALCULATE_LOAD_SHED_SEQUENCE(FLOAT, VARCHAR) TO ROLE <% user_role %>;
+GRANT USAGE ON PROCEDURE GET_FAILURE_PROPAGATION_RISK(VARCHAR) TO ROLE <% user_role %>;
 
 SELECT 'Cascade procedures created successfully' AS status;

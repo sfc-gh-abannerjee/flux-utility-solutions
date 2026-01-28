@@ -5,11 +5,11 @@
 -- Purpose: Create AMI interval readings tables with Bronze→Silver→Gold pipeline
 -- Dependencies: 04_meters_infrastructure.sql
 -- Jinja2 Variables:
---   {{ database }}   - Target database name
---   {{ warehouse }}  - Warehouse for Dynamic Table refresh
+--   <% database %>   - Target database name
+--   <% warehouse %>  - Warehouse for Dynamic Table refresh
 -- =============================================================================
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 USE SCHEMA PRODUCTION;
 
 -- -----------------------------------------------------------------------------
@@ -165,7 +165,7 @@ COMMENT = 'Monthly AMI aggregations - 2.4M rows for dashboard performance';
 
 CREATE OR ALTER DYNAMIC TABLE APPLICATIONS.CIRCUIT_STATUS_REALTIME
     TARGET_LAG = '15 minutes'
-    WAREHOUSE = IDENTIFIER('{{ warehouse }}')
+    WAREHOUSE = IDENTIFIER('<% warehouse %>')
 AS
 SELECT 
     m.CIRCUIT_ID,

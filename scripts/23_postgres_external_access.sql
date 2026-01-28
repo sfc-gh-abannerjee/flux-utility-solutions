@@ -6,13 +6,13 @@
 --          for connecting to managed PostgreSQL from SPCS services
 -- Dependencies: 12_postgres_instance.sql (Managed PostgreSQL)
 -- Jinja2 Variables:
---   {{ database }}        - Target database name
---   {{ postgres_host }}   - PostgreSQL host (or SPCS DNS endpoint)
---   {{ admin_role }}      - Admin role for grants
---   {{ user_role }}       - User role for grants
+--   <% database %>        - Target database name
+--   <% postgres_host %>   - PostgreSQL host (or SPCS DNS endpoint)
+--   <% admin_role %>      - Admin role for grants
+--   <% user_role %>       - User role for grants
 -- =============================================================================
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 USE SCHEMA PRODUCTION;
 
 -- -----------------------------------------------------------------------------
@@ -25,13 +25,13 @@ USE SCHEMA PRODUCTION;
 CREATE OR ALTER SECRET APPLICATIONS.FLUX_POSTGRES_SECRET
     TYPE = PASSWORD
     USERNAME = 'postgres'
-    PASSWORD = '{{ postgres_password }}'  -- Replace with actual password or use secrets manager
+    PASSWORD = '<% postgres_password %>'  -- Replace with actual password or use secrets manager
     COMMENT = 'PostgreSQL credentials for Flux Operations Center';
 
 -- Generic secret for connection string format
 CREATE OR ALTER SECRET APPLICATIONS.FLUX_POSTGRES_CONNECTION_SECRET
     TYPE = GENERIC_STRING
-    SECRET_STRING = 'postgresql://postgres:{{ postgres_password }}@{{ postgres_host }}:5432/flux_operations'
+    SECRET_STRING = 'postgresql://postgres:<% postgres_password %>@<% postgres_host %>:5432/flux_operations'
     COMMENT = 'PostgreSQL connection string for FastAPI backend';
 
 
@@ -45,7 +45,7 @@ CREATE OR ALTER NETWORK RULE APPLICATIONS.FLUX_POSTGRES_NETWORK_RULE
     TYPE = HOST_PORT
     MODE = EGRESS
     VALUE_LIST = (
-        '{{ postgres_host }}:5432',
+        '<% postgres_host %>:5432',
         'flux-operations-postgres.oybz.svc.spcs.internal:5432',  -- SPCS internal DNS
         'flux-operations-postgres.i3hf.svc.spcs.internal:5432'   -- Alternate region
     )
@@ -111,13 +111,13 @@ CREATE OR ALTER EXTERNAL ACCESS INTEGRATION FLUX_EXTERNAL_API_INTEGRATION
 -- -----------------------------------------------------------------------------
 
 -- Grant usage on secrets
-GRANT USAGE ON SECRET APPLICATIONS.FLUX_POSTGRES_SECRET TO ROLE IDENTIFIER('{{ admin_role }}');
-GRANT USAGE ON SECRET APPLICATIONS.FLUX_POSTGRES_CONNECTION_SECRET TO ROLE IDENTIFIER('{{ admin_role }}');
+GRANT USAGE ON SECRET APPLICATIONS.FLUX_POSTGRES_SECRET TO ROLE IDENTIFIER('<% admin_role %>');
+GRANT USAGE ON SECRET APPLICATIONS.FLUX_POSTGRES_CONNECTION_SECRET TO ROLE IDENTIFIER('<% admin_role %>');
 
 -- Grant usage on external access integrations
-GRANT USAGE ON INTEGRATION FLUX_POSTGRES_INTEGRATION TO ROLE IDENTIFIER('{{ admin_role }}');
-GRANT USAGE ON INTEGRATION FLUX_CARTO_INTEGRATION TO ROLE IDENTIFIER('{{ admin_role }}');
-GRANT USAGE ON INTEGRATION FLUX_EXTERNAL_API_INTEGRATION TO ROLE IDENTIFIER('{{ admin_role }}');
+GRANT USAGE ON INTEGRATION FLUX_POSTGRES_INTEGRATION TO ROLE IDENTIFIER('<% admin_role %>');
+GRANT USAGE ON INTEGRATION FLUX_CARTO_INTEGRATION TO ROLE IDENTIFIER('<% admin_role %>');
+GRANT USAGE ON INTEGRATION FLUX_EXTERNAL_API_INTEGRATION TO ROLE IDENTIFIER('<% admin_role %>');
 
 
 -- -----------------------------------------------------------------------------

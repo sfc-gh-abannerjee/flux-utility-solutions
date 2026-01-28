@@ -8,11 +8,11 @@
 --   - 12_postgres_instance.sql (Managed PostgreSQL)
 --   - 23_postgres_external_access.sql (EAI configuration)
 -- Jinja2 Variables:
---   {{ database }}   - Target database name
---   {{ warehouse }}  - Warehouse for task execution
+--   <% database %>   - Target database name
+--   <% warehouse %>  - Warehouse for task execution
 -- =============================================================================
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 USE SCHEMA PRODUCTION;
 
 -- -----------------------------------------------------------------------------
@@ -232,7 +232,7 @@ $$;
 
 -- Task: Stage transformer changes (runs every 5 minutes)
 CREATE OR ALTER TASK TASK_STAGE_TRANSFORMER_CHANGES
-    WAREHOUSE = IDENTIFIER('{{ warehouse }}')
+    WAREHOUSE = IDENTIFIER('<% warehouse %>')
     SCHEDULE = '5 MINUTE'
     ALLOW_OVERLAPPING_EXECUTION = FALSE
     COMMENT = 'Stage transformer changes for PostgreSQL sync'
@@ -243,7 +243,7 @@ AS
 
 -- Task: Sync transformers to PostgreSQL (runs after staging)
 CREATE OR ALTER TASK TASK_SYNC_TRANSFORMERS_TO_POSTGRES
-    WAREHOUSE = IDENTIFIER('{{ warehouse }}')
+    WAREHOUSE = IDENTIFIER('<% warehouse %>')
     AFTER TASK_STAGE_TRANSFORMER_CHANGES
     COMMENT = 'Sync staged transformer changes to PostgreSQL'
 AS
@@ -251,7 +251,7 @@ AS
 
 -- Task: Process outage events (runs every minute for near-real-time)
 CREATE OR ALTER TASK TASK_SYNC_OUTAGES
-    WAREHOUSE = IDENTIFIER('{{ warehouse }}')
+    WAREHOUSE = IDENTIFIER('<% warehouse %>')
     SCHEDULE = '1 MINUTE'
     ALLOW_OVERLAPPING_EXECUTION = FALSE
     COMMENT = 'Near real-time outage event sync'

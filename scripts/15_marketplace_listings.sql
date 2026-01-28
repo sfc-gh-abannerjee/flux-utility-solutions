@@ -5,11 +5,11 @@
 -- Purpose: Configure data products for Snowflake Marketplace sharing
 -- Dependencies: All PRODUCTION tables
 -- Jinja2 Variables:
---   {{ database }}     - Target database name
---   {{ admin_role }}   - Admin role for sharing
+--   <% database %>     - Target database name
+--   <% admin_role %>   - Admin role for sharing
 -- =============================================================================
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 
 -- -----------------------------------------------------------------------------
 -- 1. CREATE SHARE FOR GRID ANALYTICS DATA PRODUCT
@@ -19,7 +19,7 @@ CREATE SHARE IF NOT EXISTS FLUX_GRID_ANALYTICS_SHARE
     COMMENT = 'Flux Grid Analytics - Anonymized utility grid data for research and analytics';
 
 -- Grant usage on database to share
-GRANT USAGE ON DATABASE IDENTIFIER('{{ database }}') TO SHARE FLUX_GRID_ANALYTICS_SHARE;
+GRANT USAGE ON DATABASE IDENTIFIER('<% database %>') TO SHARE FLUX_GRID_ANALYTICS_SHARE;
 GRANT USAGE ON SCHEMA PRODUCTION TO SHARE FLUX_GRID_ANALYTICS_SHARE;
 
 -- -----------------------------------------------------------------------------
@@ -160,7 +160,7 @@ INSERT INTO APPLICATIONS.MARKETPLACE_LISTINGS (
     'FLUX_GRID_ANALYTICS_SHARE',
     'Utility Grid Analytics Dataset',
     'Comprehensive anonymized dataset of utility grid operations including transformer performance, AMI consumption patterns, and reliability metrics. Ideal for research, benchmarking, and ML model development.',
-    'Energy & Utilities',
+    'Energy <%  %> Utilities',
     'Utilities',
     PARSE_JSON('["Grid reliability research", "Load forecasting model training", "Asset health benchmarking", "Energy consumption pattern analysis"]'),
     'DAILY',

@@ -83,11 +83,12 @@ Thumbs.db
 # -----------------------------------------------------------------------------
 # Data Files (Large)
 # -----------------------------------------------------------------------------
-*.parquet
+# Allow seed_data parquet files for full deployment capability
 *.csv
 *.json.gz
 seed_data/small/*.parquet
-seed_data/full/*.parquet
+# Keep full seed data parquet files in repo
+!seed_data/full/**/*.parquet
 !seed_data/*/manifest.json
 !seed_data/*/README.md
 

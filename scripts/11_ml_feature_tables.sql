@@ -5,10 +5,10 @@
 -- Purpose: Create feature tables for ML model training and inference
 -- Dependencies: 06_ami_readings_pipeline.sql, 07_aggregation_tables.sql
 -- Jinja2 Variables:
---   {{ database }}  - Target database name
+--   <% database %>  - Target database name
 -- =============================================================================
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 USE SCHEMA PRODUCTION;
 
 -- -----------------------------------------------------------------------------
@@ -289,9 +289,9 @@ COMMENT = 'Load forecasts from ML model';
 -- 6. GRANTS
 -- -----------------------------------------------------------------------------
 
-GRANT SELECT ON ALL TABLES IN SCHEMA PRODUCTION TO ROLE IDENTIFIER('{{ user_role }}');
-GRANT SELECT, INSERT ON ML_TRANSFORMER_PREDICTIONS TO ROLE IDENTIFIER('{{ admin_role }}');
-GRANT SELECT, INSERT ON ML_LOAD_FORECASTS TO ROLE IDENTIFIER('{{ admin_role }}');
+GRANT SELECT ON ALL TABLES IN SCHEMA PRODUCTION TO ROLE IDENTIFIER('<% user_role %>');
+GRANT SELECT, INSERT ON ML_TRANSFORMER_PREDICTIONS TO ROLE IDENTIFIER('<% admin_role %>');
+GRANT SELECT, INSERT ON ML_LOAD_FORECASTS TO ROLE IDENTIFIER('<% admin_role %>');
 
 -- =============================================================================
 -- DEPLOYMENT COMPLETE

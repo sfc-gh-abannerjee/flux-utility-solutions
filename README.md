@@ -91,7 +91,9 @@ flux-utility-solutions/
 ├── terraform/         # Path 5: Infrastructure as Code
 ├── models/            # Cortex Analyst semantic models
 ├── agents/            # Cortex Agent definitions
-├── seed_data/         # Pre-built parquet datasets
+├── seed_data/         # Bundled CSV seed data + PostgreSQL scripts
+│   ├── csv/           # Sample data (substations, transformers, meters, customers)
+│   └── postgresql/    # PostgreSQL schema and loading scripts
 ├── generators/        # Synthetic data generation (optional)
 ├── sync/              # PostgreSQL sync scripts
 ├── app/               # SPCS application source
@@ -163,6 +165,7 @@ flux-utility-solutions/
 | [docs/USE_CASE_MAP.md](./docs/USE_CASE_MAP.md) | Customer need → module mapping |
 | [docs/PATH_COMPARISON.md](./docs/PATH_COMPARISON.md) | When to use each deployment path |
 | [docs/TERRAFORM_GUIDE.md](./docs/TERRAFORM_GUIDE.md) | Infrastructure as Code deep-dive |
+| [docs/SEED_DATA_GUIDE.md](./docs/SEED_DATA_GUIDE.md) | Loading seed data into Snowflake/PostgreSQL |
 | [docs/KNOWN_GAPS.md](./docs/KNOWN_GAPS.md) | Data limitations and workarounds |
 
 ---

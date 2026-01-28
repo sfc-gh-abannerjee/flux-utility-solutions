@@ -302,13 +302,95 @@ load_seed_data() {
     log_info "Phase 10: Seed Data Loading"
     log_info "=========================================="
     
-    # Check if seed data exists
-    if [[ -d "$REPO_ROOT/seed_data/small" ]] && [[ -f "$REPO_ROOT/seed_data/small/manifest.json" ]]; then
-        log_info "Loading seed data from seed_data/small/"
-        python3 "$REPO_ROOT/generators/load_seed_data.py" --source small
+    local conn_flag=""
+    [[ -n "$CONNECTION" ]] && conn_flag="-c $CONNECTION"
+    
+    # Check if bundled seed data CSV files exist (primary method)
+    local seed_data_dir="$REPO_ROOT/seed_data/csv"
+    if [[ -f "$seed_data_dir/substations.csv" && \
+          -f "$seed_data_dir/transformers.csv" && \
+          -f "$seed_data_dir/meters.csv" && \
+          -f "$seed_data_dir/customers.csv" ]]; then
+        
+        log_info "Loading seed data from bundled CSV files..."
+        
+        # Create stage and file format
+        log_info "Creating seed data stage..."
+        snow sql $conn_flag -q "
+            USE DATABASE $DATABASE; USE SCHEMA PRODUCTION;
+            CREATE STAGE IF NOT EXISTS SEED_DATA_STAGE DIRECTORY = (ENABLE = TRUE);
+            CREATE OR REPLACE FILE FORMAT CSV_FORMAT TYPE='CSV' FIELD_DELIMITER=',' SKIP_HEADER=1 
+                FIELD_OPTIONALLY_ENCLOSED_BY='\"' NULL_IF=('','NULL','None') ERROR_ON_COLUMN_COUNT_MISMATCH=FALSE;
+        " > /dev/null 2>&1
+        
+        # Upload CSV files to stage
+        log_info "Uploading CSV files to stage..."
+        for file in substations transformers meters customers; do
+            snow stage copy "$seed_data_dir/${file}.csv" "@$DATABASE.PRODUCTION.SEED_DATA_STAGE/${file}/" --overwrite 2>/dev/null || \
+                log_warn "Could not upload ${file}.csv via snow stage copy"
+        done
+        
+        # Load data into tables
+        log_info "Loading SUBSTATIONS..."
+        snow sql $conn_flag -q "
+            USE DATABASE $DATABASE; USE SCHEMA PRODUCTION; USE WAREHOUSE $WAREHOUSE;
+            TRUNCATE TABLE IF EXISTS SUBSTATIONS;
+            COPY INTO SUBSTATIONS (SUBSTATION_ID, SUBSTATION_NAME, LATITUDE, LONGITUDE, CAPACITY_MVA, REGION, VOLTAGE_LEVEL, COMMISSIONED_DATE, OPERATIONAL_STATUS, SUBSTATION_TYPE)
+            FROM (SELECT \$1, \$2, \$3, \$4, \$5, \$6, \$7, TRY_TO_DATE(\$8,'YYYY-MM-DD'), \$9, \$10 FROM @SEED_DATA_STAGE/substations/)
+            FILE_FORMAT = CSV_FORMAT ON_ERROR = 'CONTINUE';
+        " > /dev/null 2>&1
+        
+        log_info "Loading TRANSFORMER_METADATA..."
+        snow sql $conn_flag -q "
+            USE DATABASE $DATABASE; USE SCHEMA PRODUCTION; USE WAREHOUSE $WAREHOUSE;
+            TRUNCATE TABLE IF EXISTS TRANSFORMER_METADATA;
+            COPY INTO TRANSFORMER_METADATA (TRANSFORMER_ID, SUBSTATION_ID, CIRCUIT_ID, LATITUDE, LONGITUDE, RATED_KVA, INSTALL_YEAR, LAST_MAINTENANCE_DATE, CURRENT_LOAD_KVA, PEAK_LOAD_KVA, LOAD_UTILIZATION_PCT, METER_COUNT, HEALTH_SCORE, MANUFACTURER, MODEL_NUMBER)
+            FROM (SELECT \$1, \$2, \$3, \$4, \$5, \$6, \$7, TRY_TO_DATE(\$8,'YYYY-MM-DD'), \$9, \$10, \$11, \$12, \$13, \$14, \$15 FROM @SEED_DATA_STAGE/transformers/)
+            FILE_FORMAT = CSV_FORMAT ON_ERROR = 'CONTINUE';
+        " > /dev/null 2>&1
+        
+        log_info "Loading METER_INFRASTRUCTURE..."
+        snow sql $conn_flag -q "
+            USE DATABASE $DATABASE; USE SCHEMA PRODUCTION; USE WAREHOUSE $WAREHOUSE;
+            TRUNCATE TABLE IF EXISTS METER_INFRASTRUCTURE;
+            COPY INTO METER_INFRASTRUCTURE (METER_ID, METER_LATITUDE, METER_LONGITUDE, METER_TYPE, TRANSFORMER_ID, SUBSTATION_ID, CIRCUIT_ID, HEALTH_SCORE, COMMISSIONED_DATE, CITY, ZIP_CODE, CUSTOMER_SEGMENT_ID)
+            FROM (SELECT \$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, TRY_TO_DATE(\$9,'YYYY-MM-DD'), \$10, \$11, \$12 FROM @SEED_DATA_STAGE/meters/)
+            FILE_FORMAT = CSV_FORMAT ON_ERROR = 'CONTINUE';
+        " > /dev/null 2>&1
+        
+        log_info "Loading CUSTOMERS_MASTER_DATA..."
+        snow sql $conn_flag -q "
+            USE DATABASE $DATABASE; USE SCHEMA PRODUCTION; USE WAREHOUSE $WAREHOUSE;
+            TRUNCATE TABLE IF EXISTS CUSTOMERS_MASTER_DATA;
+            COPY INTO CUSTOMERS_MASTER_DATA (CUSTOMER_ID, FIRST_NAME, LAST_NAME, FULL_NAME, PRIMARY_METER_ID, CUSTOMER_SEGMENT, SERVICE_ADDRESS, SERVICE_COUNTY, CITY, ZIP_CODE, PHONE, EMAIL, ACCOUNT_STATUS, SERVICE_START_DATE)
+            FROM (SELECT \$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$10, \$11, \$12, \$13, TRY_TO_DATE(\$14,'YYYY-MM-DD') FROM @SEED_DATA_STAGE/customers/)
+            FILE_FORMAT = CSV_FORMAT ON_ERROR = 'CONTINUE';
+        " > /dev/null 2>&1
+        
+        # Generate AMI sample data
+        log_info "Generating AMI sample data (7 days)..."
+        if [[ -f "$REPO_ROOT/scripts/51_generate_ami_sample.sql" ]]; then
+            snow sql $conn_flag -f "$REPO_ROOT/scripts/51_generate_ami_sample.sql" \
+                -D "database=$DATABASE" \
+                -D "warehouse=$WAREHOUSE" \
+                -D "days=7" > /dev/null 2>&1 || log_warn "AMI generation skipped"
+        fi
+        
+        log_success "Seed data loaded from bundled CSV files"
+        
+    # Fallback: Use Python generators for synthetic data
+    elif [[ -f "$REPO_ROOT/generators/generate_all.py" ]]; then
+        log_info "No bundled seed data found. Generating synthetic data..."
+        python3 "$REPO_ROOT/generators/generate_all.py" \
+            --database "$DATABASE" \
+            --connection "${CONNECTION:-default}" \
+            --small 2>/dev/null || log_warn "Generator failed - tables will be empty"
     else
-        log_warn "Seed data not found. Run generators first or download from releases."
-        log_info "Generate data with: python generators/generate_all.py"
+        log_warn "No data source available. Tables created but empty."
+        log_info "Options to populate data:"
+        log_info "  1. Run: ./cli/load_seed_data.sh --database $DATABASE --warehouse $WAREHOUSE"
+        log_info "  2. Use Flux Data Forge SPCS service"
+        log_info "  3. Download seed data from repository releases"
     fi
 }
 

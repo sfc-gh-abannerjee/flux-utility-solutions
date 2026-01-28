@@ -10,9 +10,9 @@
 -- - Model deployment targets
 -- ============================================================================
 
-USE DATABASE {{ database }};
-USE SCHEMA {{ schema }};
-USE WAREHOUSE {{ warehouse }};
+USE DATABASE <% database %>;
+USE SCHEMA <% schema %>;
+USE WAREHOUSE <% warehouse %>;
 
 -- ============================================================================
 -- Model Registry Schema
@@ -214,8 +214,8 @@ WHERE deployment_status = 'PRODUCTION';
 -- Grant Permissions
 -- ============================================================================
 
-GRANT USAGE ON SCHEMA ML_REGISTRY TO ROLE {{ user_role }};
-GRANT SELECT ON ALL TABLES IN SCHEMA ML_REGISTRY TO ROLE {{ user_role }};
-GRANT SELECT ON ALL VIEWS IN SCHEMA ML_REGISTRY TO ROLE {{ user_role }};
+GRANT USAGE ON SCHEMA ML_REGISTRY TO ROLE <% user_role %>;
+GRANT SELECT ON ALL TABLES IN SCHEMA ML_REGISTRY TO ROLE <% user_role %>;
+GRANT SELECT ON ALL VIEWS IN SCHEMA ML_REGISTRY TO ROLE <% user_role %>;
 
 SELECT 'ML Model Registry setup complete' AS status;

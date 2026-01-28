@@ -5,14 +5,14 @@
 -- Purpose: Single procedure to orchestrate full deployment from scripts
 -- Dependencies: All scripts (01-17) accessible via stage or Git
 -- Jinja2 Variables:
---   {{ database }}    - Target database name
---   {{ environment }} - Target environment (dev/staging/prod)
+--   <% database %>    - Target database name
+--   <% environment %> - Target environment (dev/staging/prod)
 -- =============================================================================
 
 -- This script creates the orchestrator procedure that runs all other scripts
 -- in the correct order with proper error handling and logging.
 
-USE DATABASE IDENTIFIER('{{ database }}');
+USE DATABASE IDENTIFIER('<% database %>');
 USE SCHEMA APPLICATIONS;
 
 -- -----------------------------------------------------------------------------

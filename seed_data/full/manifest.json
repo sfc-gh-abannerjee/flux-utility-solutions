@@ -1,51 +1,108 @@
 {
-  "description": "Full seed data for production-scale testing (~10GB)",
-  "generated_at": null,
-  "generator_version": "1.0.0",
-  "target_database": "FLUX_PROD",
-  "target_schema": "PRODUCTION",
+  "description": "Full production seed data exported from SI_DEMOS in Parquet format",
+  "generated_at": "2025-01-28T01:10:00Z",
+  "generator_version": "2.0.0",
+  "source_database": "SI_DEMOS",
+  "source_schema": "PRODUCTION",
+  "format": "parquet",
+  "total_size_mb": 102,
   "files": [
     {
-      "file": "substations.parquet",
+      "folder": "substations",
       "table": "SUBSTATIONS",
-      "rows": 98,
-      "truncate": true,
+      "rows": 275,
+      "files": 1,
+      "size_bytes": 26555,
+      "truncate_before_load": true,
       "description": "Distribution substations"
     },
     {
-      "file": "transformers.parquet",
+      "folder": "circuits",
+      "table": "CIRCUIT_METADATA",
+      "rows": 8842,
+      "files": 1,
+      "size_bytes": 671199,
+      "truncate_before_load": true,
+      "description": "Circuit topology and metadata"
+    },
+    {
+      "folder": "transformers",
       "table": "TRANSFORMER_METADATA",
-      "rows": 91000,
-      "truncate": true,
+      "rows": 91554,
+      "files": 2,
+      "size_bytes": 5105935,
+      "truncate_before_load": true,
       "description": "Distribution transformers with health scores"
     },
     {
-      "file": "customers.parquet",
+      "folder": "meters",
+      "table": "METER_INFRASTRUCTURE",
+      "rows": 596906,
+      "files": 11,
+      "size_bytes": 48978017,
+      "truncate_before_load": true,
+      "description": "Smart meter assignments and infrastructure"
+    },
+    {
+      "folder": "customers",
       "table": "CUSTOMERS_MASTER_DATA",
-      "rows": 686000,
-      "truncate": true,
+      "rows": 686359,
+      "files": 16,
+      "size_bytes": 48014600,
+      "truncate_before_load": true,
       "description": "Customer master data"
     },
     {
-      "file": "meters.parquet",
-      "table": "METER_INFRASTRUCTURE",
-      "rows": 597000,
-      "truncate": true,
-      "description": "Smart meter assignments"
+      "folder": "work_orders",
+      "table": "WORK_ORDERS",
+      "rows": 25000,
+      "files": 6,
+      "size_bytes": 1809895,
+      "truncate_before_load": true,
+      "description": "Maintenance and service work orders"
     },
     {
-      "file": "ami_readings.parquet",
-      "table": "AMI_INTERVAL_READINGS",
-      "rows": 28800000,
-      "truncate": false,
-      "description": "30 days of 15-min AMI readings for 10K meters"
+      "folder": "outage_events",
+      "table": "OUTAGE_EVENTS",
+      "rows": 15000,
+      "files": 2,
+      "size_bytes": 1262093,
+      "truncate_before_load": true,
+      "description": "Historical outage events"
+    },
+    {
+      "folder": "power_lines",
+      "table": "POWER_LINES",
+      "rows": 12000,
+      "files": 1,
+      "size_bytes": 914864,
+      "truncate_before_load": true,
+      "description": "Power line segments and topology"
+    },
+    {
+      "folder": "weather_events",
+      "table": "WEATHER_EVENTS",
+      "rows": 500,
+      "files": 1,
+      "size_bytes": 4165,
+      "truncate_before_load": true,
+      "description": "Historical weather events affecting grid"
     }
   ],
   "load_order": [
-    "substations.parquet",
-    "transformers.parquet",
-    "meters.parquet",
-    "customers.parquet",
-    "ami_readings.parquet"
+    "substations",
+    "circuits",
+    "transformers",
+    "meters",
+    "customers",
+    "power_lines",
+    "work_orders",
+    "outage_events",
+    "weather_events"
+  ],
+  "notes": [
+    "AMI_INTERVAL_READINGS (7.1B rows) must be generated via SQL, not loaded from file",
+    "Timestamp columns were converted to VARCHAR for Parquet compatibility",
+    "Use 51_load_full_seed_data.sql to load this data"
   ]
 }
