@@ -15,9 +15,9 @@
 -- ============================================================================
 
 -- Use appropriate role
-USE ROLE {{ admin_role }};
-USE DATABASE {{ database }};
-USE SCHEMA {{ schema }};
+USE ROLE <% admin_role %>;
+USE DATABASE <% database %>;
+USE SCHEMA <% schema %>;
 
 -- ============================================================================
 -- Step 1: Create Secret for GitHub Authentication (Private Repos Only)
@@ -26,8 +26,8 @@ USE SCHEMA {{ schema }};
 
 CREATE SECRET IF NOT EXISTS github_token
   TYPE = PASSWORD
-  USERNAME = '{{ github_username }}'
-  PASSWORD = '{{ github_pat }}';
+  USERNAME = '<% github_username %>'
+  PASSWORD = '<% github_pat %>';
 
 -- ============================================================================
 -- Step 2: Create API Integration for GitHub
@@ -35,7 +35,7 @@ CREATE SECRET IF NOT EXISTS github_token
 
 CREATE OR REPLACE API INTEGRATION github_api_integration
   API_PROVIDER = git_https_api
-  API_ALLOWED_PREFIXES = ('https://github.com/{{ github_org }}')
+  API_ALLOWED_PREFIXES = ('https://github.com/<% github_org %>')
   -- For private repos, uncomment:
   -- ALLOWED_AUTHENTICATION_SECRETS = (github_token)
   ENABLED = TRUE;
@@ -48,7 +48,7 @@ CREATE OR REPLACE GIT REPOSITORY flux_utility_solutions_repo
   API_INTEGRATION = github_api_integration
   -- For private repos, uncomment:
   -- GIT_CREDENTIALS = github_token
-  ORIGIN = 'https://github.com/{{ github_org }}/flux-utility-solutions.git';
+  ORIGIN = 'https://github.com/<% github_org %>/flux-utility-solutions.git';
 
 -- ============================================================================
 -- Step 4: Fetch Latest from Repository
@@ -70,8 +70,8 @@ LS @flux_utility_solutions_repo/branches/main/scripts/;
 -- Grant Usage to Deployment Role
 -- ============================================================================
 
-GRANT USAGE ON INTEGRATION github_api_integration TO ROLE {{ user_role }};
-GRANT READ ON GIT REPOSITORY flux_utility_solutions_repo TO ROLE {{ user_role }};
+GRANT USAGE ON INTEGRATION github_api_integration TO ROLE <% user_role %>;
+GRANT READ ON GIT REPOSITORY flux_utility_solutions_repo TO ROLE <% user_role %>;
 
 -- ============================================================================
 -- Next Steps
