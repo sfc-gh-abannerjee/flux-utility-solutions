@@ -1,0 +1,70 @@
+# =============================================================================
+# Snowflake CLI Connection Template
+# =============================================================================
+# Copy this file to ~/.snowflake/connections.toml
+# Or use: snow connection add
+#
+# Documentation: https://docs.snowflake.com/en/developer-guide/snowflake-cli
+# =============================================================================
+
+# Default connection (used when --connection is not specified)
+[default]
+account = "YOUR_ACCOUNT_IDENTIFIER"
+user = "YOUR_USERNAME"
+password = "YOUR_PASSWORD"  # Or use authenticator for SSO
+warehouse = "FLUX_DEV_MEDIUM"
+database = "FLUX_DEV"
+schema = "PRODUCTION"
+role = "ACCOUNTADMIN"
+
+# Development environment
+[flux_dev]
+account = "YOUR_ACCOUNT_IDENTIFIER"
+user = "YOUR_USERNAME"
+authenticator = "externalbrowser"  # SSO via browser
+warehouse = "FLUX_DEV_MEDIUM"
+database = "FLUX_DEV"
+schema = "PRODUCTION"
+role = "ACCOUNTADMIN"
+
+# Production environment
+[flux_prod]
+account = "YOUR_ACCOUNT_IDENTIFIER"
+user = "YOUR_USERNAME"
+authenticator = "externalbrowser"
+warehouse = "FLUX_PROD_LARGE"
+database = "FLUX_PROD"
+schema = "PRODUCTION"
+role = "FLUX_ADMIN_ROLE"
+
+# =============================================================================
+# Authentication Options
+# =============================================================================
+#
+# 1. Password (not recommended for production)
+#    password = "your_password"
+#
+# 2. SSO via browser (recommended)
+#    authenticator = "externalbrowser"
+#
+# 3. Key-pair authentication (best for automation)
+#    authenticator = "SNOWFLAKE_JWT"
+#    private_key_path = "/path/to/rsa_key.p8"
+#
+# 4. Okta SSO
+#    authenticator = "https://your-org.okta.com"
+#
+# =============================================================================
+
+# =============================================================================
+# Finding Your Account Identifier
+# =============================================================================
+# Your account identifier is in your Snowsight URL:
+#   https://<account_identifier>.snowflakecomputing.com
+#
+# Examples:
+#   - xy12345.us-east-1 (AWS)
+#   - xy12345.us-central1.gcp (GCP)
+#   - xy12345.west-us-2.azure (Azure)
+#
+# =============================================================================
