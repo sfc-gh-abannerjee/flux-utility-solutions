@@ -89,6 +89,18 @@
       "description": "Historical weather events affecting grid"
     }
   ],
+  "external_data": {
+    "ami_interval_readings": {
+      "table": "AMI_INTERVAL_READINGS",
+      "rows": 7105569024,
+      "files": 385,
+      "size_gb": 78.7,
+      "s3_location": "s3://{{ s3_bucket }}/raw/ami/ami_interval_readings/",
+      "date_range": "2024-07-01 to 2025-08-31",
+      "description": "15-minute interval AMI readings for 597K meters over 14 months",
+      "load_script": "scripts/52_load_ami_from_s3.sql"
+    }
+  },
   "load_order": [
     "substations",
     "circuits",
@@ -101,8 +113,9 @@
     "weather_events"
   ],
   "notes": [
-    "AMI_INTERVAL_READINGS (7.1B rows) must be generated via SQL, not loaded from file",
+    "AMI_INTERVAL_READINGS (7.1B rows, 78.7GB) available from external S3 stage",
+    "Use scripts/52_load_ami_from_s3.sql to load AMI data",
     "Timestamp columns were converted to VARCHAR for Parquet compatibility",
-    "Use 51_load_full_seed_data.sql to load this data"
+    "Use 51_load_full_seed_data.sql to load reference data from repo"
   ]
 }
