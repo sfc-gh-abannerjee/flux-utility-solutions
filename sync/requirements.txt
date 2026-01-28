@@ -1,0 +1,15 @@
+# Sync Scripts Dependencies
+
+# Database connectors
+snowflake-connector-python[pandas]
+psycopg2-binary>=2.9.0
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Configuration
+python-dotenv>=1.0.0
+
+# Scheduling (optional)
+schedule>=1.2.0
