@@ -1,0 +1,699 @@
+# =============================================================================
+# grid_topology_domain.yaml
+# Flux Utility Solutions - Grid Topology Domain Semantic Model
+# =============================================================================
+# Description: Focused semantic model for grid infrastructure analytics.
+#              Covers transformers, substations, circuits, and grid topology
+#              following CIM (Common Information Model) standards.
+#
+# Jinja2 Variables:
+#   {{ database }} - Target database name (e.g., FLUX_PROD, SI_DEMOS)
+#
+# Deploy with:
+#   PUT file://models/domain_views/grid_topology_domain.yaml @{{ database }}.APPLICATIONS.SEMANTIC_MODELS;
+#   CREATE OR ALTER SEMANTIC VIEW {{ database }}.APPLICATIONS.GRID_TOPOLOGY_SEMANTIC
+#   FROM SEMANTIC MODEL @{{ database }}.APPLICATIONS.SEMANTIC_MODELS/grid_topology_domain.yaml;
+# =============================================================================
+
+name: grid_topology_domain
+description: |
+  Grid Topology Domain - Distribution infrastructure analytics.
+  
+  Asset Scale:
+  - 91,000 distribution transformers
+  - 98 substations
+  - 73 circuits/feeders
+  - H3 geospatial indexing for location analysis
+  
+  Key Use Cases:
+  - Transformer loading and thermal stress analysis
+  - Asset health monitoring and predictive maintenance
+  - Grid topology analysis (upstream/downstream)
+  - Outage impact assessment
+  - Capacity planning and constraint identification
+
+tables:
+  # ===========================================================================
+  # TRANSFORMER ASSETS
+  # ===========================================================================
+  - name: TRANSFORMER_METADATA
+    synonyms:
+      - TRANSFORMERS
+      - XFMR
+      - DISTRIBUTION_TRANSFORMERS
+      - TRANSFORMER_FLEET
+    description: >
+      Distribution transformer fleet with 91K assets. Includes specifications,
+      location (H3 indexed), health scores, and grid topology relationships.
+    base_table:
+      database: "{{ database }}"
+      schema: PRODUCTION
+      table: TRANSFORMER_METADATA
+    
+    dimensions:
+      - name: TRANSFORMER_ID
+        synonyms: [transformer, xfmr, xfmr_id, asset_id]
+        description: Transformer identifier (XFMR-XXXXX format)
+        expr: TRANSFORMER_ID
+        data_type: VARCHAR
+        sample_values: ['XFMR-00001', 'XFMR-45678', 'XFMR-91456']
+        unique: true
+      
+      - name: SUBSTATION_ID
+        synonyms: [substation, parent_substation]
+        description: Parent substation identifier
+        expr: SUBSTATION_ID
+        data_type: VARCHAR
+      
+      - name: CIRCUIT_ID
+        synonyms: [circuit, feeder, feeder_id]
+        description: Circuit/feeder assignment
+        expr: CIRCUIT_ID
+        data_type: VARCHAR
+      
+      - name: MANUFACTURER
+        synonyms: [make, brand, vendor]
+        description: Equipment manufacturer
+        expr: MANUFACTURER
+        data_type: VARCHAR
+        sample_values: ['ABB', 'Siemens', 'GE', 'Eaton', 'Schneider']
+      
+      - name: MODEL
+        synonyms: [model_number]
+        description: Equipment model
+        expr: MODEL
+        data_type: VARCHAR
+      
+      - name: PHASE_CONFIG
+        synonyms: [phases, phase]
+        description: Phase configuration
+        expr: PHASE_CONFIG
+        data_type: VARCHAR
+        sample_values: ['3-PHASE', 'SINGLE-PHASE']
+      
+      - name: VOLTAGE_CLASS
+        synonyms: [voltage, voltage_level]
+        description: Voltage class
+        expr: VOLTAGE_CLASS
+        data_type: VARCHAR
+        sample_values: ['4kV', '12kV', '25kV', '34.5kV']
+      
+      - name: STATUS
+        synonyms: [operational_status, asset_status]
+        description: Current operational status
+        expr: STATUS
+        data_type: VARCHAR
+        sample_values: ['ACTIVE', 'MAINTENANCE', 'DECOMMISSIONED', 'FAILED']
+      
+      - name: H3_INDEX
+        synonyms: [h3, hex_index, geohash]
+        description: H3 hexagonal spatial index (resolution 9)
+        expr: H3_INDEX
+        data_type: VARCHAR
+      
+      - name: CITY
+        description: City where transformer is located
+        expr: CITY
+        data_type: VARCHAR
+      
+      - name: COUNTY
+        description: County location
+        expr: COUNTY
+        data_type: VARCHAR
+        sample_values: ['Harris', 'Fort Bend', 'Montgomery', 'Galveston']
+    
+    time_dimensions:
+      - name: INSTALL_DATE
+        synonyms: [installation_date, commissioned_date]
+        description: Date transformer was installed
+        expr: INSTALL_DATE
+        data_type: DATE
+      
+      - name: LAST_MAINTENANCE_DATE
+        synonyms: [last_service, last_inspection]
+        description: Most recent maintenance date
+        expr: LAST_MAINTENANCE_DATE
+        data_type: DATE
+    
+    facts:
+      - name: LATITUDE
+        synonyms: [lat]
+        description: Latitude coordinate
+        expr: LATITUDE
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: LONGITUDE
+        synonyms: [lon, lng]
+        description: Longitude coordinate
+        expr: LONGITUDE
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: RATED_CAPACITY_KVA
+        synonyms: [capacity, rating, kva_rating, nameplate_capacity]
+        description: Nameplate capacity in kVA
+        expr: RATED_CAPACITY_KVA
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: AGE_YEARS
+        synonyms: [age, years_in_service]
+        description: Asset age in years
+        expr: DATEDIFF('YEAR', INSTALL_DATE, CURRENT_DATE())
+        data_type: NUMBER
+        access_modifier: public_access
+      
+      - name: HEALTH_SCORE
+        synonyms: [health, asset_health, condition_score]
+        description: Health score (0-100, higher is better)
+        expr: HEALTH_SCORE
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: RISK_SCORE
+        synonyms: [risk, failure_risk]
+        description: Failure risk score (0-100, lower is better)
+        expr: RISK_SCORE
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: METER_COUNT
+        synonyms: [meters_served, customer_count]
+        description: Number of meters served by transformer
+        expr: METER_COUNT
+        data_type: NUMBER
+        access_modifier: public_access
+    
+    filters:
+      - name: ACTIVE_TRANSFORMERS
+        description: Currently active transformers
+        expr: STATUS = 'ACTIVE'
+      
+      - name: HIGH_RISK
+        description: High failure risk (score > 70)
+        expr: RISK_SCORE > 70
+      
+      - name: AGING_ASSETS
+        description: Transformers older than 30 years
+        expr: DATEDIFF('YEAR', INSTALL_DATE, CURRENT_DATE()) > 30
+      
+      - name: LARGE_TRANSFORMERS
+        description: Transformers > 500 kVA
+        expr: RATED_CAPACITY_KVA > 500
+      
+      - name: THREE_PHASE
+        description: 3-phase transformers only
+        expr: PHASE_CONFIG = '3-PHASE'
+      
+      - name: HARRIS_COUNTY
+        description: Transformers in Harris County
+        expr: COUNTY = 'Harris'
+    
+    metrics:
+      - name: TRANSFORMER_COUNT
+        synonyms: [total_transformers, fleet_size]
+        description: Total transformer count
+        expr: COUNT(DISTINCT TRANSFORMER_ID)
+        access_modifier: public_access
+      
+      - name: TOTAL_CAPACITY_MVA
+        synonyms: [total_capacity, fleet_capacity]
+        description: Total fleet capacity in MVA
+        expr: SUM(RATED_CAPACITY_KVA) / 1000
+        access_modifier: public_access
+      
+      - name: AVG_HEALTH_SCORE
+        synonyms: [average_health, fleet_health]
+        description: Average health score across fleet
+        expr: AVG(HEALTH_SCORE)
+        access_modifier: public_access
+      
+      - name: AVG_AGE_YEARS
+        synonyms: [average_age]
+        description: Average transformer age
+        expr: AVG(DATEDIFF('YEAR', INSTALL_DATE, CURRENT_DATE()))
+        access_modifier: public_access
+      
+      - name: HIGH_RISK_COUNT
+        description: Count of high-risk transformers
+        expr: COUNT_IF(RISK_SCORE > 70)
+        access_modifier: public_access
+      
+      - name: TOTAL_METERS_SERVED
+        description: Total meters served by fleet
+        expr: SUM(METER_COUNT)
+        access_modifier: public_access
+    
+    primary_key:
+      columns:
+        - TRANSFORMER_ID
+
+  # ===========================================================================
+  # TRANSFORMER HOURLY METRICS
+  # ===========================================================================
+  - name: TRANSFORMER_HOURLY_METRICS
+    synonyms:
+      - TRANSFORMER_LOADING
+      - THERMAL_STRESS
+      - HOURLY_LOADING
+      - TRANSFORMER_TELEMETRY
+    description: >
+      Hourly transformer loading and thermal stress metrics. 211M rows
+      covering summer peak periods with loading percentages and temperature.
+    base_table:
+      database: "{{ database }}"
+      schema: PRODUCTION
+      table: TRANSFORMER_HOURLY_METRICS
+    
+    dimensions:
+      - name: TRANSFORMER_ID
+        synonyms: [transformer, xfmr]
+        description: Transformer identifier
+        expr: TRANSFORMER_ID
+        data_type: VARCHAR
+      
+      - name: LOAD_CATEGORY
+        synonyms: [loading_category, stress_level]
+        description: Load category (NORMAL, ELEVATED, HIGH, CRITICAL)
+        expr: CASE 
+          WHEN AVG_LOAD_PCT < 50 THEN 'NORMAL'
+          WHEN AVG_LOAD_PCT < 80 THEN 'ELEVATED'
+          WHEN AVG_LOAD_PCT < 100 THEN 'HIGH'
+          ELSE 'CRITICAL'
+        END
+        data_type: VARCHAR
+    
+    time_dimensions:
+      - name: HOUR_TIMESTAMP
+        synonyms: [timestamp, hour]
+        description: Hour timestamp
+        expr: HOUR_TIMESTAMP
+        data_type: TIMESTAMP_NTZ
+      
+      - name: READING_DATE
+        synonyms: [date]
+        description: Date portion
+        expr: DATE_TRUNC('DAY', HOUR_TIMESTAMP)
+        data_type: DATE
+      
+      - name: HOUR_OF_DAY
+        description: Hour of day (0-23)
+        expr: HOUR(HOUR_TIMESTAMP)
+        data_type: NUMBER
+    
+    facts:
+      - name: AVG_LOAD_PCT
+        synonyms: [loading, load_percent, average_loading]
+        description: Average loading percentage for the hour
+        expr: AVG_LOAD_PCT
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: MAX_LOAD_PCT
+        synonyms: [peak_loading, max_loading]
+        description: Maximum loading percentage for the hour
+        expr: MAX_LOAD_PCT
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: AVG_TEMPERATURE_F
+        synonyms: [temperature, temp, avg_temp]
+        description: Average oil/winding temperature (Fahrenheit)
+        expr: AVG_TEMPERATURE_F
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: MAX_TEMPERATURE_F
+        synonyms: [peak_temperature, max_temp]
+        description: Maximum temperature for the hour
+        expr: MAX_TEMPERATURE_F
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: TOTAL_KWH
+        synonyms: [energy, consumption]
+        description: Total energy throughput in kWh
+        expr: TOTAL_KWH
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: METER_COUNT
+        description: Meters contributing to this reading
+        expr: METER_COUNT
+        data_type: NUMBER
+        access_modifier: public_access
+    
+    filters:
+      - name: OVERLOADED
+        description: Hours with >100% loading
+        expr: MAX_LOAD_PCT > 100
+      
+      - name: HIGH_THERMAL_STRESS
+        description: High temperature (>180°F)
+        expr: MAX_TEMPERATURE_F > 180
+      
+      - name: PEAK_HOURS
+        description: Peak demand hours (2pm-7pm)
+        expr: HOUR(HOUR_TIMESTAMP) BETWEEN 14 AND 19
+      
+      - name: CRITICAL_LOADING
+        description: Critical loading (>120%)
+        expr: MAX_LOAD_PCT > 120
+    
+    metrics:
+      - name: AVG_FLEET_LOADING
+        description: Average loading across all transformers
+        expr: AVG(AVG_LOAD_PCT)
+        access_modifier: public_access
+      
+      - name: MAX_OBSERVED_LOADING
+        description: Maximum loading observed
+        expr: MAX(MAX_LOAD_PCT)
+        access_modifier: public_access
+      
+      - name: OVERLOAD_HOURS
+        description: Count of overloaded hours
+        expr: COUNT_IF(MAX_LOAD_PCT > 100)
+        access_modifier: public_access
+      
+      - name: THERMAL_VIOLATIONS
+        description: Count of thermal limit violations
+        expr: COUNT_IF(MAX_TEMPERATURE_F > 180)
+        access_modifier: public_access
+    
+    primary_key:
+      columns:
+        - TRANSFORMER_ID
+        - HOUR_TIMESTAMP
+
+  # ===========================================================================
+  # SUBSTATIONS
+  # ===========================================================================
+  - name: SUBSTATIONS
+    synonyms:
+      - SUBSTATION_DATA
+      - SUBSTATION_METADATA
+      - TRANSMISSION_SUBSTATIONS
+    description: >
+      Transmission and distribution substations. 98 substations serving
+      as the backbone of the distribution network.
+    base_table:
+      database: "{{ database }}"
+      schema: PRODUCTION
+      table: SUBSTATION_METADATA
+    
+    dimensions:
+      - name: SUBSTATION_ID
+        synonyms: [substation, sub_id]
+        description: Substation identifier (SUB-XXX format)
+        expr: SUBSTATION_ID
+        data_type: VARCHAR
+        unique: true
+      
+      - name: SUBSTATION_NAME
+        synonyms: [name]
+        description: Substation name
+        expr: SUBSTATION_NAME
+        data_type: VARCHAR
+      
+      - name: SUBSTATION_TYPE
+        synonyms: [type]
+        description: Substation type (TRANSMISSION, DISTRIBUTION)
+        expr: SUBSTATION_TYPE
+        data_type: VARCHAR
+        sample_values: ['TRANSMISSION', 'DISTRIBUTION']
+      
+      - name: VOLTAGE_LEVEL
+        synonyms: [voltage]
+        description: Primary voltage level
+        expr: VOLTAGE_LEVEL
+        data_type: VARCHAR
+        sample_values: ['69kV', '138kV', '345kV']
+      
+      - name: STATUS
+        description: Operational status
+        expr: STATUS
+        data_type: VARCHAR
+      
+      - name: REGION
+        synonyms: [area, service_area]
+        description: Service region
+        expr: REGION
+        data_type: VARCHAR
+      
+      - name: H3_INDEX
+        description: H3 spatial index
+        expr: H3_INDEX
+        data_type: VARCHAR
+    
+    facts:
+      - name: LATITUDE
+        expr: LATITUDE
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: LONGITUDE
+        expr: LONGITUDE
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: CAPACITY_MVA
+        synonyms: [capacity, rated_capacity]
+        description: Substation capacity in MVA
+        expr: CAPACITY_MVA
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: TRANSFORMER_COUNT
+        description: Number of transformers served
+        expr: TRANSFORMER_COUNT
+        data_type: NUMBER
+        access_modifier: public_access
+      
+      - name: CIRCUIT_COUNT
+        description: Number of circuits originating
+        expr: CIRCUIT_COUNT
+        data_type: NUMBER
+        access_modifier: public_access
+    
+    metrics:
+      - name: SUBSTATION_COUNT
+        description: Total substations
+        expr: COUNT(DISTINCT SUBSTATION_ID)
+        access_modifier: public_access
+      
+      - name: TOTAL_CAPACITY_MVA
+        description: Total substation capacity
+        expr: SUM(CAPACITY_MVA)
+        access_modifier: public_access
+    
+    primary_key:
+      columns:
+        - SUBSTATION_ID
+
+  # ===========================================================================
+  # CIRCUITS
+  # ===========================================================================
+  - name: CIRCUIT_METADATA
+    synonyms:
+      - CIRCUITS
+      - FEEDERS
+      - DISTRIBUTION_CIRCUITS
+    description: >
+      Distribution circuits/feeders. 73 circuits connecting substations
+      to distribution transformers.
+    base_table:
+      database: "{{ database }}"
+      schema: PRODUCTION
+      table: CIRCUIT_METADATA
+    
+    dimensions:
+      - name: CIRCUIT_ID
+        synonyms: [circuit, feeder, feeder_id]
+        description: Circuit identifier
+        expr: CIRCUIT_ID
+        data_type: VARCHAR
+        unique: true
+      
+      - name: CIRCUIT_NAME
+        synonyms: [name]
+        description: Circuit name
+        expr: CIRCUIT_NAME
+        data_type: VARCHAR
+      
+      - name: SUBSTATION_ID
+        synonyms: [origin_substation, source_substation]
+        description: Source substation
+        expr: SUBSTATION_ID
+        data_type: VARCHAR
+      
+      - name: VOLTAGE_CLASS
+        synonyms: [voltage]
+        description: Operating voltage
+        expr: VOLTAGE_CLASS
+        data_type: VARCHAR
+      
+      - name: STATUS
+        description: Circuit status
+        expr: STATUS
+        data_type: VARCHAR
+    
+    facts:
+      - name: LENGTH_MILES
+        synonyms: [length, circuit_length]
+        description: Circuit length in miles
+        expr: LENGTH_MILES
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: TRANSFORMER_COUNT
+        description: Transformers on circuit
+        expr: TRANSFORMER_COUNT
+        data_type: NUMBER
+        access_modifier: public_access
+      
+      - name: CUSTOMER_COUNT
+        synonyms: [customers_served]
+        description: Customers served
+        expr: CUSTOMER_COUNT
+        data_type: NUMBER
+        access_modifier: public_access
+    
+    metrics:
+      - name: CIRCUIT_COUNT
+        description: Total circuits
+        expr: COUNT(DISTINCT CIRCUIT_ID)
+        access_modifier: public_access
+      
+      - name: TOTAL_CIRCUIT_MILES
+        description: Total circuit miles
+        expr: SUM(LENGTH_MILES)
+        access_modifier: public_access
+    
+    primary_key:
+      columns:
+        - CIRCUIT_ID
+
+# =============================================================================
+# RELATIONSHIPS
+# =============================================================================
+relationships:
+  - name: transformer_to_substation
+    left_table: TRANSFORMER_METADATA
+    right_table: SUBSTATIONS
+    relationship_type: many_to_one
+    join_columns:
+      - left_column: SUBSTATION_ID
+        right_column: SUBSTATION_ID
+  
+  - name: transformer_to_circuit
+    left_table: TRANSFORMER_METADATA
+    right_table: CIRCUIT_METADATA
+    relationship_type: many_to_one
+    join_columns:
+      - left_column: CIRCUIT_ID
+        right_column: CIRCUIT_ID
+  
+  - name: transformer_to_hourly
+    left_table: TRANSFORMER_METADATA
+    right_table: TRANSFORMER_HOURLY_METRICS
+    relationship_type: one_to_many
+    join_columns:
+      - left_column: TRANSFORMER_ID
+        right_column: TRANSFORMER_ID
+  
+  - name: circuit_to_substation
+    left_table: CIRCUIT_METADATA
+    right_table: SUBSTATIONS
+    relationship_type: many_to_one
+    join_columns:
+      - left_column: SUBSTATION_ID
+        right_column: SUBSTATION_ID
+
+# =============================================================================
+# VERIFIED QUERIES
+# =============================================================================
+verified_queries:
+  - name: transformers_by_health
+    question: "What is the health distribution of the transformer fleet?"
+    sql: |
+      SELECT 
+        CASE 
+          WHEN HEALTH_SCORE >= 80 THEN 'GOOD'
+          WHEN HEALTH_SCORE >= 60 THEN 'FAIR'
+          WHEN HEALTH_SCORE >= 40 THEN 'POOR'
+          ELSE 'CRITICAL'
+        END AS health_category,
+        COUNT(*) AS transformer_count,
+        AVG(AGE_YEARS) AS avg_age
+      FROM {{ database }}.PRODUCTION.TRANSFORMER_METADATA
+      WHERE STATUS = 'ACTIVE'
+      GROUP BY 1
+      ORDER BY 2 DESC
+    verified_by: system
+    verified_at: "2026-01-28"
+
+  - name: overloaded_transformers
+    question: "Which transformers experienced overloading yesterday?"
+    sql: |
+      SELECT 
+        t.TRANSFORMER_ID,
+        t.RATED_CAPACITY_KVA,
+        MAX(h.MAX_LOAD_PCT) AS peak_loading,
+        COUNT(*) AS overload_hours
+      FROM {{ database }}.PRODUCTION.TRANSFORMER_METADATA t
+      JOIN {{ database }}.PRODUCTION.TRANSFORMER_HOURLY_METRICS h
+        ON t.TRANSFORMER_ID = h.TRANSFORMER_ID
+      WHERE h.HOUR_TIMESTAMP >= DATEADD('DAY', -1, CURRENT_DATE())
+        AND h.MAX_LOAD_PCT > 100
+      GROUP BY 1, 2
+      ORDER BY 3 DESC
+      LIMIT 20
+    verified_by: system
+    verified_at: "2026-01-28"
+
+  - name: substation_capacity
+    question: "What is the total capacity by substation type?"
+    sql: |
+      SELECT 
+        SUBSTATION_TYPE,
+        COUNT(*) AS substation_count,
+        SUM(CAPACITY_MVA) AS total_mva,
+        SUM(TRANSFORMER_COUNT) AS total_transformers
+      FROM {{ database }}.PRODUCTION.SUBSTATION_METADATA
+      GROUP BY 1
+    verified_by: system
+    verified_at: "2026-01-28"
+
+  - name: aging_fleet_analysis
+    question: "How many transformers are older than 30 years by manufacturer?"
+    sql: |
+      SELECT 
+        MANUFACTURER,
+        COUNT(*) AS aging_count,
+        AVG(HEALTH_SCORE) AS avg_health,
+        AVG(RISK_SCORE) AS avg_risk
+      FROM {{ database }}.PRODUCTION.TRANSFORMER_METADATA
+      WHERE DATEDIFF('YEAR', INSTALL_DATE, CURRENT_DATE()) > 30
+        AND STATUS = 'ACTIVE'
+      GROUP BY 1
+      ORDER BY 2 DESC
+    verified_by: system
+    verified_at: "2026-01-28"
+
+  - name: h3_spatial_analysis
+    question: "How many transformers are in each H3 hex cell?"
+    sql: |
+      SELECT 
+        H3_INDEX,
+        COUNT(*) AS transformer_count,
+        SUM(METER_COUNT) AS total_meters,
+        AVG(HEALTH_SCORE) AS avg_health
+      FROM {{ database }}.PRODUCTION.TRANSFORMER_METADATA
+      WHERE H3_INDEX IS NOT NULL
+      GROUP BY 1
+      ORDER BY 2 DESC
+      LIMIT 50
+    verified_by: system
+    verified_at: "2026-01-28"

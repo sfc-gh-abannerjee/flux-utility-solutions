@@ -1,22 +1,17 @@
-# Flux Data Forge - Streaming Synthetic Data Generator
-#
-# Build: docker build -t flux-data-forge:latest .
-# Run: docker run -p 8080:8080 flux-data-forge:latest
-
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies
-COPY requirements.txt ./
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY spcs_app/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY src/ ./src/
+COPY spcs_app/fastapi_app.py .
 
-EXPOSE 8080
+EXPOSE 8501
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"
-
-CMD ["python", "-m", "src.main"]
+CMD ["python", "fastapi_app.py"]

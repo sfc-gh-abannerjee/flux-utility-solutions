@@ -1,0 +1,487 @@
+# =============================================================================
+# ami_domain.yaml
+# Flux Utility Solutions - AMI Analytics Domain Semantic Model
+# =============================================================================
+# Description: Focused semantic model for AMI (Advanced Metering Infrastructure)
+#              data analytics. Covers smart meter readings, usage patterns,
+#              voltage events, and customer consumption analysis.
+#
+# Jinja2 Variables:
+#   {{ database }} - Target database name (e.g., FLUX_PROD, SI_DEMOS)
+#
+# Deploy with:
+#   PUT file://models/domain_views/ami_domain.yaml @{{ database }}.APPLICATIONS.SEMANTIC_MODELS;
+#   CREATE OR ALTER SEMANTIC VIEW {{ database }}.APPLICATIONS.AMI_ANALYTICS_SEMANTIC
+#   FROM SEMANTIC MODEL @{{ database }}.APPLICATIONS.SEMANTIC_MODELS/ami_domain.yaml;
+# =============================================================================
+
+name: ami_analytics_domain
+description: |
+  AMI Analytics Domain - Smart meter data for energy consumption analysis.
+  
+  Data Scale:
+  - 7.1 billion 15-minute interval readings
+  - 597,000 smart meters
+  - Summer peak periods: July-August 2024 and 2025
+  
+  Key Use Cases:
+  - Usage pattern analysis (hourly, daily, monthly)
+  - Voltage sag and power quality events
+  - Outage impact assessment
+  - Demand forecasting support
+  - Customer consumption profiling
+
+tables:
+  # ===========================================================================
+  # PRIMARY AMI TABLE
+  # ===========================================================================
+  - name: AMI_INTERVAL_READINGS
+    synonyms:
+      - AMI_READINGS
+      - METER_READINGS
+      - INTERVAL_DATA
+      - SMART_METER_DATA
+      - ENERGY_DATA
+      - USAGE_DATA
+    description: >
+      Core AMI interval readings at 15-minute granularity. Contains 7.1B rows
+      covering summer peak periods (July-August). Primary source for all
+      consumption analysis, demand patterns, and power quality events.
+    base_table:
+      database: "{{ database }}"
+      schema: PRODUCTION
+      table: AMI_INTERVAL_READINGS
+    
+    dimensions:
+      - name: METER_ID
+        synonyms: [meter, meter_number, smart_meter, meter_identifier]
+        description: Unique smart meter identifier (MTR-XXXXXXXX format)
+        expr: METER_ID
+        data_type: VARCHAR
+        sample_values: ['MTR-00000001', 'MTR-00000002', 'MTR-00597281']
+        unique: false
+      
+      - name: TRANSFORMER_ID
+        synonyms: [transformer, xfmr]
+        description: Parent transformer serving this meter
+        expr: TRANSFORMER_ID
+        data_type: VARCHAR
+      
+      - name: CIRCUIT_ID
+        synonyms: [circuit, feeder]
+        description: Distribution circuit/feeder assignment
+        expr: CIRCUIT_ID
+        data_type: VARCHAR
+      
+      - name: QUALITY_FLAG
+        synonyms: [quality, data_quality]
+        description: Reading quality indicator (VALID, ESTIMATED, MISSING)
+        expr: QUALITY_FLAG
+        data_type: VARCHAR
+        sample_values: ['VALID', 'ESTIMATED', 'MISSING']
+      
+      - name: SAG_TYPE
+        synonyms: [sag_cause, voltage_sag_type]
+        description: Type of voltage sag event if detected
+        expr: SAG_TYPE
+        data_type: VARCHAR
+        sample_values: ['TRANSFORMER_OVERLOAD', 'EQUIPMENT_FAULT', 'AGING_EQUIPMENT', null]
+      
+      - name: OUTAGE_ID
+        description: Outage event identifier if meter experienced outage
+        expr: OUTAGE_ID
+        data_type: VARCHAR
+    
+    time_dimensions:
+      - name: TIMESTAMP
+        synonyms: [reading_time, interval_time, datetime]
+        description: 15-minute interval timestamp
+        expr: TIMESTAMP
+        data_type: TIMESTAMP_NTZ
+      
+      - name: READING_DATE
+        synonyms: [date, day]
+        description: Date of reading (derived)
+        expr: DATE_TRUNC('DAY', TIMESTAMP)
+        data_type: DATE
+      
+      - name: READING_HOUR
+        synonyms: [hour]
+        description: Hour of reading (0-23)
+        expr: HOUR(TIMESTAMP)
+        data_type: NUMBER
+      
+      - name: READING_MONTH
+        synonyms: [month]
+        description: Month of reading
+        expr: MONTH(TIMESTAMP)
+        data_type: NUMBER
+      
+      - name: YEAR
+        description: Year of reading
+        expr: YEAR(TIMESTAMP)
+        data_type: NUMBER
+    
+    facts:
+      - name: USAGE_KWH
+        synonyms: [kwh, consumption, energy, usage]
+        description: Energy consumption in kilowatt-hours for the interval
+        expr: USAGE_KWH
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: VOLTAGE
+        synonyms: [volts, voltage_reading]
+        description: Voltage reading in volts
+        expr: VOLTAGE
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: CURRENT_AMPS
+        synonyms: [amps, current, amperage]
+        description: Current reading in amperes
+        expr: CURRENT_AMPS
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: POWER_FACTOR
+        synonyms: [pf]
+        description: Power factor (0-1)
+        expr: POWER_FACTOR
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: DEMAND_KW
+        synonyms: [demand, kw, power]
+        description: Demand in kilowatts
+        expr: DEMAND_KW
+        data_type: FLOAT
+        access_modifier: public_access
+    
+    filters:
+      - name: VALID_READINGS
+        description: Only validated meter readings
+        expr: QUALITY_FLAG = 'VALID'
+      
+      - name: PEAK_HOURS
+        description: Peak demand hours (2pm-7pm)
+        expr: HOUR(TIMESTAMP) BETWEEN 14 AND 19
+      
+      - name: OFF_PEAK
+        description: Off-peak hours (10pm-6am)
+        expr: HOUR(TIMESTAMP) < 6 OR HOUR(TIMESTAMP) >= 22
+      
+      - name: SUMMER_2024
+        description: July-August 2024
+        expr: YEAR(TIMESTAMP) = 2024 AND MONTH(TIMESTAMP) IN (7, 8)
+      
+      - name: SUMMER_2025
+        description: July-August 2025
+        expr: YEAR(TIMESTAMP) = 2025 AND MONTH(TIMESTAMP) IN (7, 8)
+      
+      - name: VOLTAGE_SAG_EVENTS
+        description: Readings with voltage sag detected
+        expr: SAG_TYPE IS NOT NULL
+      
+      - name: OUTAGE_AFFECTED
+        description: Readings during outage events
+        expr: OUTAGE_ID IS NOT NULL
+    
+    metrics:
+      - name: TOTAL_CONSUMPTION_KWH
+        synonyms: [total_kwh, total_usage, sum_kwh]
+        description: Total energy consumption in kWh
+        expr: SUM(USAGE_KWH)
+        access_modifier: public_access
+      
+      - name: AVG_CONSUMPTION_KWH
+        synonyms: [average_kwh, avg_usage]
+        description: Average energy consumption per interval
+        expr: AVG(USAGE_KWH)
+        access_modifier: public_access
+      
+      - name: MAX_DEMAND_KW
+        synonyms: [peak_demand]
+        description: Maximum demand in kW
+        expr: MAX(DEMAND_KW)
+        access_modifier: public_access
+      
+      - name: AVG_VOLTAGE
+        synonyms: [average_voltage]
+        description: Average voltage reading
+        expr: AVG(VOLTAGE)
+        access_modifier: public_access
+      
+      - name: MIN_VOLTAGE
+        synonyms: [lowest_voltage]
+        description: Minimum voltage (detect sags)
+        expr: MIN(VOLTAGE)
+        access_modifier: public_access
+      
+      - name: READING_COUNT
+        synonyms: [interval_count, record_count]
+        description: Number of interval readings
+        expr: COUNT(*)
+        access_modifier: public_access
+      
+      - name: METER_COUNT
+        synonyms: [meters, unique_meters]
+        description: Distinct meter count
+        expr: COUNT(DISTINCT METER_ID)
+        access_modifier: public_access
+      
+      - name: VOLTAGE_SAG_COUNT
+        synonyms: [sag_count]
+        description: Number of voltage sag events
+        expr: COUNT_IF(SAG_TYPE IS NOT NULL)
+        access_modifier: public_access
+      
+      - name: DATA_COMPLETENESS_PCT
+        description: Percentage of valid readings
+        expr: COUNT_IF(QUALITY_FLAG = 'VALID') * 100.0 / NULLIF(COUNT(*), 0)
+        access_modifier: public_access
+    
+    primary_key:
+      columns:
+        - METER_ID
+        - TIMESTAMP
+
+  # ===========================================================================
+  # MONTHLY AGGREGATES
+  # ===========================================================================
+  - name: AMI_MONTHLY_USAGE
+    synonyms:
+      - MONTHLY_USAGE
+      - MONTHLY_CONSUMPTION
+      - MONTHLY_BILLS
+    description: >
+      Monthly aggregated usage per meter. 2.4M rows for summer month analysis
+      and year-over-year comparisons.
+    base_table:
+      database: "{{ database }}"
+      schema: PRODUCTION
+      table: AMI_MONTHLY_USAGE
+    
+    dimensions:
+      - name: METER_ID
+        description: Smart meter identifier
+        expr: METER_ID
+        data_type: VARCHAR
+      
+      - name: CUSTOMER_ID
+        synonyms: [customer, account]
+        description: Customer account identifier
+        expr: CUSTOMER_ID
+        data_type: VARCHAR
+      
+      - name: CUSTOMER_SEGMENT
+        synonyms: [segment, customer_type]
+        description: Customer type (RESIDENTIAL, COMMERCIAL, INDUSTRIAL)
+        expr: CUSTOMER_SEGMENT
+        data_type: VARCHAR
+        sample_values: ['RESIDENTIAL', 'COMMERCIAL', 'INDUSTRIAL']
+    
+    time_dimensions:
+      - name: USAGE_MONTH
+        synonyms: [month, billing_month]
+        description: Month of usage
+        expr: USAGE_MONTH
+        data_type: DATE
+      
+      - name: YEAR
+        description: Year of usage
+        expr: YEAR(USAGE_MONTH)
+        data_type: NUMBER
+    
+    facts:
+      - name: TOTAL_KWH
+        synonyms: [monthly_kwh, total_consumption]
+        description: Total kWh for the month
+        expr: TOTAL_KWH
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: PEAK_DEMAND_KW
+        synonyms: [max_demand]
+        description: Peak demand during the month
+        expr: PEAK_DEMAND_KW
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: AVG_DAILY_KWH
+        synonyms: [average_daily]
+        description: Average daily consumption
+        expr: AVG_DAILY_KWH
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: VALID_READING_PCT
+        description: Percentage of valid readings
+        expr: VALID_READING_PCT
+        data_type: FLOAT
+        access_modifier: public_access
+    
+    filters:
+      - name: RESIDENTIAL
+        expr: CUSTOMER_SEGMENT = 'RESIDENTIAL'
+      
+      - name: COMMERCIAL
+        expr: CUSTOMER_SEGMENT = 'COMMERCIAL'
+      
+      - name: HIGH_USAGE
+        description: High consumption months (>2000 kWh)
+        expr: TOTAL_KWH > 2000
+    
+    metrics:
+      - name: AVG_MONTHLY_KWH
+        description: Average monthly consumption
+        expr: AVG(TOTAL_KWH)
+        access_modifier: public_access
+      
+      - name: TOTAL_MONTHLY_KWH
+        description: Sum of all monthly consumption
+        expr: SUM(TOTAL_KWH)
+        access_modifier: public_access
+      
+      - name: CUSTOMER_COUNT
+        description: Distinct customers
+        expr: COUNT(DISTINCT CUSTOMER_ID)
+        access_modifier: public_access
+    
+    primary_key:
+      columns:
+        - METER_ID
+        - USAGE_MONTH
+
+  # ===========================================================================
+  # STREAMING DATA
+  # ===========================================================================
+  - name: AMI_STREAMING_DATA
+    synonyms:
+      - REAL_TIME_DATA
+      - STREAMING_READINGS
+      - LIVE_DATA
+    description: >
+      Real-time streaming AMI data from Flux Data Forge. Updated via Snowpipe
+      Streaming SDK with <5 second latency.
+    base_table:
+      database: "{{ database }}"
+      schema: PRODUCTION
+      table: AMI_STREAMING_DATA
+    
+    dimensions:
+      - name: METER_ID
+        description: Smart meter identifier
+        expr: METER_ID
+        data_type: VARCHAR
+      
+      - name: SOURCE
+        description: Data source/pipeline
+        expr: SOURCE
+        data_type: VARCHAR
+        sample_values: ['SNOWPIPE_STREAMING', 'TASK_BASED', 'STAGE_LANDING']
+    
+    time_dimensions:
+      - name: READING_TIMESTAMP
+        synonyms: [timestamp]
+        description: Reading timestamp
+        expr: READING_TIMESTAMP
+        data_type: TIMESTAMP_NTZ
+      
+      - name: INGESTION_TIMESTAMP
+        description: When record was ingested
+        expr: INGESTION_TIMESTAMP
+        data_type: TIMESTAMP_NTZ
+    
+    facts:
+      - name: KWH_USAGE
+        synonyms: [usage, consumption]
+        description: Energy consumption kWh
+        expr: KWH_USAGE
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: VOLTAGE
+        description: Voltage reading
+        expr: VOLTAGE
+        data_type: FLOAT
+        access_modifier: public_access
+    
+    metrics:
+      - name: STREAMING_RECORD_COUNT
+        description: Count of streaming records
+        expr: COUNT(*)
+        access_modifier: public_access
+      
+      - name: AVG_LATENCY_SECONDS
+        description: Average ingestion latency
+        expr: AVG(TIMESTAMPDIFF('SECOND', READING_TIMESTAMP, INGESTION_TIMESTAMP))
+        access_modifier: public_access
+    
+    primary_key:
+      columns:
+        - METER_ID
+        - READING_TIMESTAMP
+
+# =============================================================================
+# RELATIONSHIPS
+# =============================================================================
+relationships:
+  - name: meter_to_monthly
+    left_table: AMI_INTERVAL_READINGS
+    right_table: AMI_MONTHLY_USAGE
+    relationship_type: many_to_one
+    join_columns:
+      - left_column: METER_ID
+        right_column: METER_ID
+
+# =============================================================================
+# VERIFIED QUERIES
+# =============================================================================
+verified_queries:
+  - name: daily_consumption_by_meter
+    question: "What is the daily consumption for meter MTR-00000001?"
+    sql: |
+      SELECT DATE_TRUNC('DAY', TIMESTAMP) AS date,
+             SUM(USAGE_KWH) AS total_kwh
+      FROM {{ database }}.PRODUCTION.AMI_INTERVAL_READINGS
+      WHERE METER_ID = 'MTR-00000001'
+      GROUP BY 1
+      ORDER BY 1
+    verified_by: system
+    verified_at: "2026-01-28"
+
+  - name: peak_hour_demand
+    question: "What is the total consumption during peak hours?"
+    sql: |
+      SELECT SUM(USAGE_KWH) AS peak_kwh
+      FROM {{ database }}.PRODUCTION.AMI_INTERVAL_READINGS
+      WHERE HOUR(TIMESTAMP) BETWEEN 14 AND 19
+    verified_by: system
+    verified_at: "2026-01-28"
+
+  - name: yoy_summer_comparison
+    question: "Compare July usage between 2024 and 2025"
+    sql: |
+      SELECT YEAR(USAGE_MONTH) AS year,
+             SUM(TOTAL_KWH) AS total_consumption,
+             AVG(TOTAL_KWH) AS avg_per_meter
+      FROM {{ database }}.PRODUCTION.AMI_MONTHLY_USAGE
+      WHERE MONTH(USAGE_MONTH) = 7
+      GROUP BY 1
+      ORDER BY 1
+    verified_by: system
+    verified_at: "2026-01-28"
+
+  - name: voltage_sag_analysis
+    question: "How many voltage sags occurred by type?"
+    sql: |
+      SELECT SAG_TYPE,
+             COUNT(*) AS event_count,
+             AVG(VOLTAGE) AS avg_voltage_during_sag
+      FROM {{ database }}.PRODUCTION.AMI_INTERVAL_READINGS
+      WHERE SAG_TYPE IS NOT NULL
+      GROUP BY 1
+      ORDER BY 2 DESC
+    verified_by: system
+    verified_at: "2026-01-28"

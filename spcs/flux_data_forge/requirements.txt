@@ -1,25 +1,21 @@
-# Flux Data Forge Dependencies
-
-# Web framework
+# Core web framework
 fastapi>=0.109.0
-uvicorn[standard]>=0.27.0
+uvicorn>=0.27.0
+python-multipart>=0.0.6
 
-# Snowflake
-snowflake-connector-python[pandas]
+# Snowflake connectivity
+snowflake-connector-python>=3.6.0
+snowflake-snowpark-python>=1.11.0
 
-# Data generation
-numpy>=1.24.0
+# AWS S3 for raw JSON streaming
+boto3>=1.34.0
+
+# Database connectivity
+psycopg2-binary>=2.9.9
+
+# Data processing
 pandas>=2.0.0
-faker>=22.0.0
-pyarrow>=14.0.0
-
-# Async and scheduling
-asyncio
-apscheduler>=3.10.0
+numpy>=1.24.0
 
 # Configuration
 python-dotenv>=1.0.0
-pydantic-settings>=2.0.0
-
-# Performance
-orjson>=3.9.0
