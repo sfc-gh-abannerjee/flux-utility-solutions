@@ -1,0 +1,913 @@
+# =============================================================================
+# utility_semantic_model.yaml
+# Flux Utility Solutions - Comprehensive Semantic Model for Cortex Analyst
+# =============================================================================
+# Description: 30-table semantic model covering AMI data, transformers,
+#              customers, grid operations, and external data sources.
+#
+# Jinja2 Variables:
+#   {{ database }} - Target database name (e.g., FLUX_PROD, SI_DEMOS)
+#
+# Deploy with:
+#   CREATE OR ALTER SEMANTIC VIEW {{ database }}.APPLICATIONS.UTILITY_SEMANTIC_VIEW
+#   AS $$ <contents of this file> $$;
+# =============================================================================
+
+name: utility_semantic_view
+description: |
+  Flux Utility Solutions - Comprehensive semantic model for utility grid analytics.
+  
+  Data Coverage:
+  - AMI Interval Readings: 7.1B rows (Jul-Aug 2024, Jul-Aug 2025) - 15-minute smart meter data
+  - Monthly Aggregates: 2.4M rows for YoY summer comparison
+  - Transformer Thermal Stress: 211M hourly records (summer months only)
+  - SAP Work Orders: 250K records (Jul-Aug 2025 only)
+  - Weather: Hourly data for Jul-Aug 2023, 2024, 2025
+  - ERCOT Load: Full year data (2023-2025) for seasonal context
+  
+  Scale: 597K meters, 91K transformers, 686K customers, 73 circuits, 98 substations
+  
+  NOTE: This dataset is designed for SUMMER PEAK ANALYSIS. Primary data exists only 
+  for July-August periods. For queries outside summer months, ERCOT_LOAD_UNIFIED 
+  provides year-round context.
+
+tables:
+  # ===========================================================================
+  # AMI DATA TABLES
+  # ===========================================================================
+  - name: AMI_READINGS_ENHANCED
+    synonyms:
+      - AMI_READINGS
+      - INTERVAL_READINGS
+      - METER_READINGS
+      - ENERGY_DATA
+      - SMART_METER_DATA
+    description: >
+      Enhanced AMI readings with voltage sag events, outage tracking, and anomaly 
+      detection. 7.1B rows at 15-minute intervals for summer peak periods.
+    base_table:
+      database: "{{ database }}"
+      schema: PRODUCTION
+      table: AMI_READINGS_FINAL
+    
+    dimensions:
+      - name: METER_ID
+        synonyms: [meter, meter_number, smart_meter]
+        description: Unique smart meter identifier (MTR-XXXXXXXX format)
+        expr: METER_ID
+        data_type: VARCHAR
+        sample_values: ['MTR-00000001', 'MTR-00000002', 'MTR-00597281']
+      
+      - name: SAG_TYPE
+        synonyms: [sag_cause, voltage_sag_type]
+        description: Type of voltage sag event (TRANSFORMER_OVERLOAD, EQUIPMENT_FAULT, AGING_EQUIPMENT)
+        expr: SAG_TYPE
+        data_type: VARCHAR
+        sample_values: ['TRANSFORMER_OVERLOAD', 'EQUIPMENT_FAULT', 'AGING_EQUIPMENT']
+      
+      - name: OUTAGE_CAUSE
+        synonyms: [outage_reason, outage_type]
+        description: Root cause of outage event
+        expr: OUTAGE_CAUSE
+        data_type: VARCHAR
+        sample_values: ['TRANSFORMER_OVERLOAD', 'EQUIPMENT_FAULT', 'WEATHER', 'VEGETATION']
+      
+      - name: OUTAGE_ID
+        description: Outage event identifier if meter experienced outage
+        expr: OUTAGE_ID
+        data_type: VARCHAR
+      
+      - name: VOLTAGE_SAG_EVENT_ID
+        description: Voltage sag event identifier
+        expr: VOLTAGE_SAG_EVENT_ID
+        data_type: VARCHAR
+    
+    time_dimensions:
+      - name: TIMESTAMP
+        synonyms: [reading_time, interval_time]
+        description: 15-minute interval timestamp
+        expr: TIMESTAMP
+        data_type: TIMESTAMP_NTZ
+      
+      - name: READING_DATE
+        synonyms: [date, day]
+        description: Date of reading (derived)
+        expr: DATE_TRUNC('DAY', TIMESTAMP)
+        data_type: DATE
+      
+      - name: READING_HOUR
+        synonyms: [hour]
+        description: Hour of reading (derived)
+        expr: DATE_TRUNC('HOUR', TIMESTAMP)
+        data_type: TIMESTAMP_NTZ
+    
+    facts:
+      - name: USAGE_KWH
+        synonyms: [consumption, energy_usage, kwh, kilowatt_hours]
+        description: Energy consumption in kilowatt-hours for 15-minute interval
+        expr: USAGE_KWH
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: USAGE_KWH_ADJUSTED
+        synonyms: [adjusted_usage, actual_usage]
+        description: Usage adjusted to 0 during outages for accurate aggregation
+        expr: USAGE_KWH_ADJUSTED
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: VOLTAGE
+        synonyms: [volts, voltage_reading]
+        description: Voltage reading in volts (nominal 120V)
+        expr: VOLTAGE
+        data_type: NUMBER
+        access_modifier: public_access
+      
+      - name: POWER_FACTOR
+        description: Power factor measurement (0.80-1.00 typical)
+        expr: POWER_FACTOR
+        data_type: NUMBER
+        access_modifier: public_access
+      
+      - name: VOLTAGE_DROP_AMOUNT
+        synonyms: [sag_magnitude, voltage_drop]
+        description: Voltage drop during sag events in volts
+        expr: VOLTAGE_DROP_AMOUNT
+        data_type: NUMBER
+        access_modifier: public_access
+    
+    filters:
+      - name: SUMMER_2024
+        description: July-August 2024 data
+        expr: TIMESTAMP BETWEEN '2024-07-01' AND '2024-08-31 23:59:59'
+      
+      - name: SUMMER_2025
+        description: July-August 2025 data
+        expr: TIMESTAMP BETWEEN '2025-07-01' AND '2025-08-31 23:59:59'
+      
+      - name: VALID_READINGS_ONLY
+        synonyms: [non_outage, clean_data]
+        description: Exclude intervals affected by outages
+        expr: OUTAGE_ID IS NULL
+      
+      - name: LOW_VOLTAGE_INCIDENTS
+        synonyms: [voltage_violations]
+        description: Readings below ANSI C84.1 minimum (114V)
+        expr: VOLTAGE < 114
+      
+      - name: VOLTAGE_SAG_EVENTS
+        synonyms: [sag_incidents]
+        description: Intervals with voltage sag events
+        expr: VOLTAGE_SAG_EVENT_ID IS NOT NULL
+      
+      - name: PEAK_HOURS
+        description: Peak demand hours (2pm-7pm)
+        expr: HOUR(TIMESTAMP) BETWEEN 14 AND 19
+    
+    metrics:
+      - name: TOTAL_CONSUMPTION
+        synonyms: [total_kwh, total_usage]
+        description: Total energy consumption in kWh
+        expr: SUM(USAGE_KWH_ADJUSTED)
+        access_modifier: public_access
+      
+      - name: AVG_CONSUMPTION
+        synonyms: [average_kwh, avg_usage]
+        description: Average energy consumption per interval
+        expr: AVG(USAGE_KWH_ADJUSTED)
+        access_modifier: public_access
+      
+      - name: PEAK_CONSUMPTION
+        description: Maximum kWh in any single interval
+        expr: MAX(USAGE_KWH_ADJUSTED)
+        access_modifier: public_access
+      
+      - name: ACTIVE_METER_COUNT
+        description: Count of distinct meters reporting
+        expr: COUNT(DISTINCT METER_ID)
+        access_modifier: public_access
+      
+      - name: AVG_VOLTAGE
+        description: Average voltage across readings
+        expr: AVG(VOLTAGE)
+        access_modifier: public_access
+      
+      - name: LOW_VOLTAGE_COUNT
+        description: Count of readings below 114V
+        expr: COUNT_IF(VOLTAGE < 114)
+        access_modifier: public_access
+      
+      - name: VOLTAGE_SAG_COUNT
+        description: Count of voltage sag events
+        expr: COUNT_IF(VOLTAGE_SAG_EVENT_ID IS NOT NULL)
+        access_modifier: public_access
+      
+      - name: OUTAGE_IMPACT_KWH
+        description: Energy not delivered due to outages
+        expr: SUM(USAGE_KWH - USAGE_KWH_ADJUSTED)
+        access_modifier: public_access
+      
+      - name: TOTAL_INTERVALS
+        description: Total count of 15-minute readings
+        expr: COUNT(*)
+        access_modifier: public_access
+    
+    primary_key:
+      columns:
+        - METER_ID
+        - TIMESTAMP
+
+  # ===========================================================================
+  # CUSTOMER TABLES
+  # ===========================================================================
+  - name: CUSTOMERS_MASTER_DATA
+    synonyms:
+      - CUSTOMERS
+      - CUSTOMER_PROFILES
+      - ACCOUNTS
+      - CUSTOMER_DATA
+    description: >
+      Customer master data with 686K profiles including demographics, service 
+      addresses, income segmentation, and meter associations.
+    base_table:
+      database: "{{ database }}"
+      schema: PRODUCTION
+      table: CUSTOMERS_MASTER_DATA
+    
+    dimensions:
+      - name: CUSTOMER_ID
+        synonyms: [customer, account, account_number]
+        description: Unique customer identifier (CUST-XXXXXXXX format)
+        expr: CUSTOMER_ID
+        data_type: VARCHAR
+        sample_values: ['CUST-00000001', 'CUST-00686241']
+      
+      - name: FULL_NAME
+        synonyms: [name, customer_name]
+        description: Customer full name
+        expr: FULL_NAME
+        data_type: VARCHAR
+      
+      - name: SERVICE_ADDRESS
+        synonyms: [address]
+        description: Service location address
+        expr: SERVICE_ADDRESS
+        data_type: VARCHAR
+      
+      - name: CITY
+        description: Service city
+        expr: CITY
+        data_type: VARCHAR
+        sample_values: ['Houston', 'Katy', 'Sugar Land', 'Galveston', 'The Woodlands']
+      
+      - name: ZIP_CODE
+        synonyms: [zip, postal_code]
+        description: Service ZIP code
+        expr: ZIP_CODE
+        data_type: VARCHAR
+        sample_values: ['77001', '77002', '77494', '77478']
+      
+      - name: SERVICE_COUNTY
+        synonyms: [county]
+        description: Service county
+        expr: SERVICE_COUNTY
+        data_type: VARCHAR
+        sample_values: ['Harris', 'Fort Bend', 'Montgomery', 'Galveston', 'Brazoria']
+      
+      - name: CUSTOMER_SEGMENT
+        synonyms: [segment, customer_type, type]
+        description: Customer classification
+        expr: CUSTOMER_SEGMENT
+        data_type: VARCHAR
+        sample_values: ['RESIDENTIAL', 'COMMERCIAL', 'INDUSTRIAL']
+      
+      - name: INCOME_SEGMENT
+        description: Household income bracket
+        expr: INCOME_SEGMENT
+        data_type: VARCHAR
+        sample_values: ['LOW', 'LOWER_MIDDLE', 'MIDDLE', 'UPPER_MIDDLE', 'HIGH']
+      
+      - name: ACCOUNT_STATUS
+        synonyms: [status]
+        description: Account status
+        expr: ACCOUNT_STATUS
+        data_type: VARCHAR
+        sample_values: ['ACTIVE', 'INACTIVE', 'SUSPENDED', 'CLOSED']
+      
+      - name: PRIMARY_METER_ID
+        synonyms: [meter_id]
+        description: Primary meter associated with customer
+        expr: PRIMARY_METER_ID
+        data_type: VARCHAR
+    
+    facts:
+      - name: AVG_MONTHLY_KWH
+        description: Average monthly consumption
+        expr: AVG_MONTHLY_KWH
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: ESTIMATED_ANNUAL_INCOME
+        description: Estimated household annual income
+        expr: ESTIMATED_ANNUAL_INCOME
+        data_type: NUMBER
+        access_modifier: public_access
+    
+    filters:
+      - name: ACTIVE_CUSTOMERS
+        description: Currently active accounts
+        expr: ACCOUNT_STATUS = 'ACTIVE'
+      
+      - name: RESIDENTIAL
+        description: Residential customers only
+        expr: CUSTOMER_SEGMENT = 'RESIDENTIAL'
+      
+      - name: COMMERCIAL
+        description: Commercial customers only
+        expr: CUSTOMER_SEGMENT = 'COMMERCIAL'
+      
+      - name: INDUSTRIAL
+        description: Industrial customers only
+        expr: CUSTOMER_SEGMENT = 'INDUSTRIAL'
+      
+      - name: LOW_INCOME
+        description: Low income segment
+        expr: INCOME_SEGMENT = 'LOW'
+      
+      - name: HARRIS_COUNTY
+        description: Customers in Harris County
+        expr: SERVICE_COUNTY = 'Harris'
+    
+    metrics:
+      - name: CUSTOMER_COUNT
+        description: Total number of customers
+        expr: COUNT(DISTINCT CUSTOMER_ID)
+        access_modifier: public_access
+      
+      - name: RESIDENTIAL_COUNT
+        description: Count of residential customers
+        expr: COUNT_IF(CUSTOMER_SEGMENT = 'RESIDENTIAL')
+        access_modifier: public_access
+      
+      - name: COMMERCIAL_COUNT
+        description: Count of commercial customers
+        expr: COUNT_IF(CUSTOMER_SEGMENT = 'COMMERCIAL')
+        access_modifier: public_access
+      
+      - name: AVG_CONSUMPTION
+        description: Average monthly consumption across customers
+        expr: AVG(AVG_MONTHLY_KWH)
+        access_modifier: public_access
+    
+    primary_key:
+      columns:
+        - CUSTOMER_ID
+
+  # ===========================================================================
+  # TRANSFORMER TABLES
+  # ===========================================================================
+  - name: TRANSFORMER_METADATA
+    synonyms:
+      - TRANSFORMERS
+      - TRANSFORMER_ASSETS
+      - XFMR
+    description: >
+      Transformer fleet metadata with 91K assets including specifications, 
+      location, health scores, and CIM-compliant topology.
+    base_table:
+      database: "{{ database }}"
+      schema: PRODUCTION
+      table: TRANSFORMER_METADATA
+    
+    dimensions:
+      - name: TRANSFORMER_ID
+        synonyms: [transformer, xfmr, xfmr_id]
+        description: Transformer identifier (XFMR-XXXXX format)
+        expr: TRANSFORMER_ID
+        data_type: VARCHAR
+        sample_values: ['XFMR-00001', 'XFMR-91456']
+      
+      - name: SUBSTATION_ID
+        synonyms: [substation]
+        description: Parent substation identifier
+        expr: SUBSTATION_ID
+        data_type: VARCHAR
+      
+      - name: CIRCUIT_ID
+        synonyms: [circuit, feeder]
+        description: Circuit/feeder assignment
+        expr: CIRCUIT_ID
+        data_type: VARCHAR
+      
+      - name: TRANSFORMER_ROLE
+        synonyms: [role, transformer_type]
+        description: Transformer role in network
+        expr: TRANSFORMER_ROLE
+        data_type: VARCHAR
+        sample_values: ['SERVICE', 'SPLIT', 'NETWORK', 'STEP_DOWN']
+      
+      - name: LOCATION_AREA
+        synonyms: [area, region]
+        description: Geographic service area
+        expr: LOCATION_AREA
+        data_type: VARCHAR
+        sample_values: ['Houston Metro', 'Coastal Texas', 'Harris County', 'Montgomery County']
+      
+      - name: MANUFACTURER
+        description: Equipment manufacturer
+        expr: MANUFACTURER
+        data_type: VARCHAR
+        sample_values: ['ABB', 'GE', 'Siemens', 'Eaton', 'Howard']
+    
+    facts:
+      - name: RATED_KVA
+        synonyms: [capacity, rating, kva]
+        description: Rated capacity in kVA
+        expr: RATED_KVA
+        data_type: NUMBER
+        access_modifier: public_access
+      
+      - name: AGE_YEARS
+        synonyms: [age]
+        description: Transformer age in years
+        expr: AGE_YEARS
+        data_type: NUMBER
+        access_modifier: public_access
+      
+      - name: HEALTH_SCORE
+        synonyms: [health, condition]
+        description: Asset health score (0-100, higher is better)
+        expr: HEALTH_SCORE
+        data_type: NUMBER
+        access_modifier: public_access
+      
+      - name: LOAD_UTILIZATION_PCT
+        synonyms: [utilization, loading]
+        description: Current load as percentage of rated capacity
+        expr: LOAD_UTILIZATION_PCT
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: METER_COUNT
+        description: Number of meters served by this transformer
+        expr: METER_COUNT
+        data_type: NUMBER
+        access_modifier: public_access
+      
+      - name: LATITUDE
+        description: Transformer latitude
+        expr: LATITUDE
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: LONGITUDE
+        description: Transformer longitude
+        expr: LONGITUDE
+        data_type: FLOAT
+        access_modifier: public_access
+    
+    time_dimensions:
+      - name: INSTALLATION_DATE
+        description: Date transformer was installed
+        expr: INSTALLATION_DATE
+        data_type: DATE
+    
+    filters:
+      - name: OVERLOADED
+        synonyms: [over_capacity]
+        description: Transformers currently over 100% capacity
+        expr: LOAD_UTILIZATION_PCT > 100
+      
+      - name: HIGH_RISK
+        description: Transformers with health score below 50
+        expr: HEALTH_SCORE < 50
+      
+      - name: AGING
+        description: Transformers over 30 years old
+        expr: AGE_YEARS > 30
+      
+      - name: SERVICE_TRANSFORMERS
+        description: Service transformers only
+        expr: TRANSFORMER_ROLE = 'SERVICE'
+    
+    metrics:
+      - name: TRANSFORMER_COUNT
+        description: Total transformers
+        expr: COUNT(*)
+        access_modifier: public_access
+      
+      - name: AVG_AGE
+        description: Average transformer age
+        expr: AVG(AGE_YEARS)
+        access_modifier: public_access
+      
+      - name: AVG_HEALTH_SCORE
+        description: Average health score
+        expr: AVG(HEALTH_SCORE)
+        access_modifier: public_access
+      
+      - name: AVG_UTILIZATION
+        description: Average load utilization
+        expr: AVG(LOAD_UTILIZATION_PCT)
+        access_modifier: public_access
+      
+      - name: TOTAL_CAPACITY_KVA
+        description: Total fleet capacity
+        expr: SUM(RATED_KVA)
+        access_modifier: public_access
+      
+      - name: OVERLOADED_COUNT
+        description: Count of overloaded transformers
+        expr: COUNT_IF(LOAD_UTILIZATION_PCT > 100)
+        access_modifier: public_access
+    
+    primary_key:
+      columns:
+        - TRANSFORMER_ID
+
+  - name: TRANSFORMER_HOURLY_LOAD
+    synonyms:
+      - TRANSFORMER_LOADING
+      - HOURLY_LOAD
+      - XFMR_LOAD
+    description: >
+      Hourly transformer loading data with 211M rows covering summer peak periods.
+      Includes load factor, thermal stress, and overload tracking.
+    base_table:
+      database: "{{ database }}"
+      schema: PRODUCTION
+      table: TRANSFORMER_HOURLY_LOAD
+    
+    dimensions:
+      - name: TRANSFORMER_ID
+        synonyms: [transformer, xfmr]
+        description: Transformer identifier
+        expr: TRANSFORMER_ID
+        data_type: VARCHAR
+      
+      - name: THERMAL_STRESS_CATEGORY
+        synonyms: [stress_level, risk, stress]
+        description: Thermal stress classification
+        expr: THERMAL_STRESS_CATEGORY
+        data_type: VARCHAR
+        sample_values: ['LOW', 'MODERATE', 'HIGH', 'CRITICAL']
+      
+      - name: IS_OVERLOADED
+        description: TRUE if load exceeds 100% capacity
+        expr: IS_OVERLOADED
+        data_type: BOOLEAN
+    
+    time_dimensions:
+      - name: LOAD_HOUR
+        synonyms: [hour, timestamp]
+        description: Hour of measurement
+        expr: LOAD_HOUR
+        data_type: TIMESTAMP_NTZ
+    
+    facts:
+      - name: LOAD_KW
+        synonyms: [load, power, demand]
+        description: Current load in kilowatts
+        expr: LOAD_KW
+        data_type: NUMBER
+        access_modifier: public_access
+      
+      - name: RATED_KVA
+        synonyms: [capacity]
+        description: Rated transformer capacity
+        expr: RATED_KVA
+        data_type: NUMBER
+        access_modifier: public_access
+      
+      - name: LOAD_FACTOR_PCT
+        synonyms: [utilization, loading_percent]
+        description: Load as percentage of rated capacity
+        expr: LOAD_FACTOR_PCT
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: AMBIENT_TEMP_F
+        description: Ambient temperature in Fahrenheit
+        expr: AMBIENT_TEMP_F
+        data_type: NUMBER
+        access_modifier: public_access
+    
+    filters:
+      - name: OVERLOADED
+        description: Hours when transformer was overloaded
+        expr: IS_OVERLOADED = TRUE
+      
+      - name: HIGH_STRESS
+        description: High or critical thermal stress
+        expr: THERMAL_STRESS_CATEGORY IN ('HIGH', 'CRITICAL')
+      
+      - name: CRITICAL_STRESS
+        description: Critical thermal stress only
+        expr: THERMAL_STRESS_CATEGORY = 'CRITICAL'
+      
+      - name: PEAK_HOURS
+        description: Peak demand hours (2pm-7pm)
+        expr: HOUR(LOAD_HOUR) BETWEEN 14 AND 19
+    
+    metrics:
+      - name: AVG_LOAD_FACTOR
+        description: Average load factor percentage
+        expr: AVG(LOAD_FACTOR_PCT)
+        access_modifier: public_access
+      
+      - name: PEAK_LOAD_FACTOR
+        synonyms: [max_load]
+        description: Maximum load factor percentage
+        expr: MAX(LOAD_FACTOR_PCT)
+        access_modifier: public_access
+      
+      - name: OVERLOAD_HOURS
+        description: Count of hours with overloading
+        expr: COUNT_IF(IS_OVERLOADED)
+        access_modifier: public_access
+      
+      - name: HIGH_STRESS_HOURS
+        description: Count of high/critical stress hours
+        expr: COUNT_IF(THERMAL_STRESS_CATEGORY IN ('HIGH', 'CRITICAL'))
+        access_modifier: public_access
+      
+      - name: AVG_LOAD_KW
+        description: Average load in kW
+        expr: AVG(LOAD_KW)
+        access_modifier: public_access
+    
+    primary_key:
+      columns:
+        - TRANSFORMER_ID
+        - LOAD_HOUR
+
+  # ===========================================================================
+  # INFRASTRUCTURE TABLES
+  # ===========================================================================
+  - name: SUBSTATIONS
+    synonyms:
+      - SUBSTATION_DATA
+      - DISTRIBUTION_SUBSTATIONS
+    description: >
+      Substation metadata with 98 substations including capacity, location,
+      and feeder counts.
+    base_table:
+      database: "{{ database }}"
+      schema: PRODUCTION
+      table: SUBSTATIONS
+    
+    dimensions:
+      - name: SUBSTATION_ID
+        synonyms: [substation]
+        description: Substation identifier
+        expr: SUBSTATION_ID
+        data_type: VARCHAR
+      
+      - name: SUBSTATION_NAME
+        synonyms: [name]
+        description: Substation name
+        expr: SUBSTATION_NAME
+        data_type: VARCHAR
+      
+      - name: SUBSTATION_TYPE
+        synonyms: [type]
+        description: Substation type
+        expr: SUBSTATION_TYPE
+        data_type: VARCHAR
+        sample_values: ['DISTRIBUTION', 'TRANSMISSION', 'SWITCHING']
+    
+    facts:
+      - name: TOTAL_CAPACITY_MVA
+        synonyms: [capacity]
+        description: Total capacity in MVA
+        expr: TOTAL_CAPACITY_MVA
+        data_type: NUMBER
+        access_modifier: public_access
+      
+      - name: LATITUDE
+        description: Substation latitude
+        expr: LATITUDE
+        data_type: FLOAT
+        access_modifier: public_access
+      
+      - name: LONGITUDE
+        description: Substation longitude
+        expr: LONGITUDE
+        data_type: FLOAT
+        access_modifier: public_access
+    
+    metrics:
+      - name: SUBSTATION_COUNT
+        description: Total substations
+        expr: COUNT(*)
+        access_modifier: public_access
+      
+      - name: TOTAL_CAPACITY
+        description: Total capacity across all substations
+        expr: SUM(TOTAL_CAPACITY_MVA)
+        access_modifier: public_access
+    
+    primary_key:
+      columns:
+        - SUBSTATION_ID
+
+  - name: METER_INFRASTRUCTURE
+    synonyms:
+      - METERS
+      - SMART_METERS
+      - AMI_METERS
+    description: >
+      Meter infrastructure with 597K smart meters including location,
+      transformer association, and customer segment.
+    base_table:
+      database: "{{ database }}"
+      schema: PRODUCTION
+      table: METER_INFRASTRUCTURE
+    
+    dimensions:
+      - name: METER_ID
+        synonyms: [meter]
+        description: Meter identifier
+        expr: METER_ID
+        data_type: VARCHAR
+      
+      - name: TRANSFORMER_ID
+        synonyms: [transformer]
+        description: Associated transformer
+        expr: TRANSFORMER_ID
+        data_type: VARCHAR
+      
+      - name: SUBSTATION_ID
+        description: Parent substation
+        expr: SUBSTATION_ID
+        data_type: VARCHAR
+      
+      - name: CITY
+        description: Meter city
+        expr: CITY
+        data_type: VARCHAR
+      
+      - name: ZIP_CODE
+        description: Meter ZIP code
+        expr: ZIP_CODE
+        data_type: VARCHAR
+      
+      - name: COUNTY_NAME
+        synonyms: [county]
+        description: Meter county
+        expr: COUNTY_NAME
+        data_type: VARCHAR
+      
+      - name: CUSTOMER_SEGMENT_ID
+        synonyms: [segment]
+        description: Customer segment
+        expr: CUSTOMER_SEGMENT_ID
+        data_type: VARCHAR
+    
+    metrics:
+      - name: METER_COUNT
+        description: Total meters
+        expr: COUNT(*)
+        access_modifier: public_access
+      
+      - name: METERS_PER_TRANSFORMER
+        description: Average meters per transformer
+        expr: COUNT(*) / NULLIF(COUNT(DISTINCT TRANSFORMER_ID), 0)
+        access_modifier: public_access
+    
+    primary_key:
+      columns:
+        - METER_ID
+
+# ===========================================================================
+# RELATIONSHIPS
+# ===========================================================================
+relationships:
+  - name: readings_to_meter
+    left_table: AMI_READINGS_ENHANCED
+    right_table: METER_INFRASTRUCTURE
+    relationship_columns:
+      - left_column: METER_ID
+        right_column: METER_ID
+    join_type: many_to_one
+    relationship_type: many_to_one
+  
+  - name: meter_to_customer
+    left_table: METER_INFRASTRUCTURE
+    right_table: CUSTOMERS_MASTER_DATA
+    relationship_columns:
+      - left_column: METER_ID
+        right_column: PRIMARY_METER_ID
+    join_type: one_to_one
+    relationship_type: one_to_one
+  
+  - name: meter_to_transformer
+    left_table: METER_INFRASTRUCTURE
+    right_table: TRANSFORMER_METADATA
+    relationship_columns:
+      - left_column: TRANSFORMER_ID
+        right_column: TRANSFORMER_ID
+    join_type: many_to_one
+    relationship_type: many_to_one
+  
+  - name: transformer_to_substation
+    left_table: TRANSFORMER_METADATA
+    right_table: SUBSTATIONS
+    relationship_columns:
+      - left_column: SUBSTATION_ID
+        right_column: SUBSTATION_ID
+    join_type: many_to_one
+    relationship_type: many_to_one
+  
+  - name: transformer_load_to_metadata
+    left_table: TRANSFORMER_HOURLY_LOAD
+    right_table: TRANSFORMER_METADATA
+    relationship_columns:
+      - left_column: TRANSFORMER_ID
+        right_column: TRANSFORMER_ID
+    join_type: many_to_one
+    relationship_type: many_to_one
+
+# ===========================================================================
+# VERIFIED QUERIES
+# ===========================================================================
+verified_queries:
+  - name: top_consumers_by_usage
+    question: "Who are the top 10 customers by energy consumption?"
+    verified_at: 2026-01-28
+    verified_by: Cortex Code
+    sql: |
+      SELECT 
+        c.FULL_NAME,
+        c.CITY,
+        c.CUSTOMER_SEGMENT,
+        SUM(a.USAGE_KWH_ADJUSTED) as TOTAL_KWH
+      FROM {{ database }}.PRODUCTION.AMI_READINGS_FINAL a
+      JOIN {{ database }}.PRODUCTION.METER_INFRASTRUCTURE m ON a.METER_ID = m.METER_ID
+      JOIN {{ database }}.PRODUCTION.CUSTOMERS_MASTER_DATA c ON m.METER_ID = c.PRIMARY_METER_ID
+      GROUP BY 1, 2, 3
+      ORDER BY TOTAL_KWH DESC
+      LIMIT 10
+
+  - name: high_risk_transformers
+    question: "Which transformers are at highest risk of failure?"
+    verified_at: 2026-01-28
+    verified_by: Cortex Code
+    sql: |
+      SELECT 
+        t.TRANSFORMER_ID,
+        t.AGE_YEARS,
+        t.HEALTH_SCORE,
+        AVG(h.LOAD_FACTOR_PCT) as AVG_LOAD_PCT,
+        MAX(h.LOAD_FACTOR_PCT) as PEAK_LOAD_PCT,
+        COUNT_IF(h.IS_OVERLOADED) as OVERLOAD_HOURS
+      FROM {{ database }}.PRODUCTION.TRANSFORMER_METADATA t
+      JOIN {{ database }}.PRODUCTION.TRANSFORMER_HOURLY_LOAD h ON t.TRANSFORMER_ID = h.TRANSFORMER_ID
+      WHERE t.HEALTH_SCORE < 50 OR h.LOAD_FACTOR_PCT > 100
+      GROUP BY 1, 2, 3
+      ORDER BY t.HEALTH_SCORE ASC, PEAK_LOAD_PCT DESC
+      LIMIT 20
+
+  - name: monthly_usage_trend
+    question: "What is the monthly energy usage trend?"
+    verified_at: 2026-01-28
+    verified_by: Cortex Code
+    sql: |
+      SELECT 
+        DATE_TRUNC('MONTH', TIMESTAMP) as MONTH,
+        SUM(USAGE_KWH_ADJUSTED) as TOTAL_KWH,
+        COUNT(DISTINCT METER_ID) as ACTIVE_METERS,
+        AVG(USAGE_KWH_ADJUSTED) as AVG_INTERVAL_KWH
+      FROM {{ database }}.PRODUCTION.AMI_READINGS_FINAL
+      GROUP BY 1
+      ORDER BY 1
+
+  - name: customer_segment_analysis
+    question: "How does consumption vary by customer segment?"
+    verified_at: 2026-01-28
+    verified_by: Cortex Code
+    sql: |
+      SELECT 
+        c.CUSTOMER_SEGMENT,
+        COUNT(DISTINCT c.CUSTOMER_ID) as CUSTOMER_COUNT,
+        SUM(a.USAGE_KWH_ADJUSTED) as TOTAL_KWH,
+        AVG(a.USAGE_KWH_ADJUSTED) as AVG_INTERVAL_KWH
+      FROM {{ database }}.PRODUCTION.CUSTOMERS_MASTER_DATA c
+      JOIN {{ database }}.PRODUCTION.AMI_READINGS_FINAL a ON c.PRIMARY_METER_ID = a.METER_ID
+      GROUP BY 1
+      ORDER BY TOTAL_KWH DESC
+
+  - name: transformer_stress_by_area
+    question: "Which areas have the most transformer stress?"
+    verified_at: 2026-01-28
+    verified_by: Cortex Code
+    sql: |
+      SELECT 
+        t.LOCATION_AREA,
+        COUNT(DISTINCT t.TRANSFORMER_ID) as TRANSFORMER_COUNT,
+        AVG(h.LOAD_FACTOR_PCT) as AVG_LOAD_FACTOR,
+        SUM(CASE WHEN h.THERMAL_STRESS_CATEGORY = 'CRITICAL' THEN 1 ELSE 0 END) as CRITICAL_HOURS
+      FROM {{ database }}.PRODUCTION.TRANSFORMER_METADATA t
+      JOIN {{ database }}.PRODUCTION.TRANSFORMER_HOURLY_LOAD h ON t.TRANSFORMER_ID = h.TRANSFORMER_ID
+      GROUP BY 1
+      ORDER BY CRITICAL_HOURS DESC
