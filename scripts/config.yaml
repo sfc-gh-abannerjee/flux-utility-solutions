@@ -1,0 +1,94 @@
+# =============================================================================
+# Flux Utility Solutions - Deployment Configuration
+# =============================================================================
+# This file defines environment-specific variables for Jinja2 templating.
+# Use with: snow git execute ... -D "database='FLUX_PROD'" -D "warehouse='FLUX_PROD_WH'"
+#
+# Supported Environments:
+#   - dev: Development/sandbox environment
+#   - staging: Pre-production testing
+#   - prod: Production deployment
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Development Environment
+# -----------------------------------------------------------------------------
+dev:
+  database: FLUX_DEV
+  warehouse: FLUX_DEV_WH
+  warehouse_size: XSMALL
+  admin_role: FLUX_DEV_ADMIN
+  user_role: FLUX_DEV_USER
+  postgres_instance: FLUX_DEV_POSTGRES
+  compute_pool: FLUX_DEV_POOL
+  spcs_service: FLUX_DEV_OPS_CENTER
+  
+# -----------------------------------------------------------------------------
+# Staging Environment
+# -----------------------------------------------------------------------------
+staging:
+  database: FLUX_STAGING
+  warehouse: FLUX_STAGING_WH
+  warehouse_size: SMALL
+  admin_role: FLUX_STAGING_ADMIN
+  user_role: FLUX_STAGING_USER
+  postgres_instance: FLUX_STAGING_POSTGRES
+  compute_pool: FLUX_STAGING_POOL
+  spcs_service: FLUX_STAGING_OPS_CENTER
+
+# -----------------------------------------------------------------------------
+# Production Environment
+# -----------------------------------------------------------------------------
+prod:
+  database: FLUX_PROD
+  warehouse: FLUX_PROD_WH
+  warehouse_size: MEDIUM
+  admin_role: FLUX_PROD_ADMIN
+  user_role: FLUX_PROD_USER
+  postgres_instance: FLUX_OPERATIONS_POSTGRES
+  compute_pool: FLUX_INTERACTIVE_POOL
+  spcs_service: FLUX_OPS_CENTER
+
+# -----------------------------------------------------------------------------
+# Existing SI_DEMOS Environment (for validation)
+# -----------------------------------------------------------------------------
+si_demos:
+  database: SI_DEMOS
+  warehouse: SI_DEMO_WH
+  warehouse_size: MEDIUM
+  admin_role: ACCOUNTADMIN
+  user_role: PUBLIC
+  postgres_instance: FLUX_OPERATIONS_POSTGRES
+  compute_pool: FLUX_INTERACTIVE_POOL
+  spcs_service: FLUX_OPS_CENTER
+
+# -----------------------------------------------------------------------------
+# Common Settings (shared across all environments)
+# -----------------------------------------------------------------------------
+common:
+  # Schema names (standardized)
+  production_schema: PRODUCTION
+  applications_schema: APPLICATIONS
+  raw_schema: RAW
+  ml_schema: ML
+  archive_schema: ARCHIVE
+  
+  # Cortex AI settings
+  cortex_search_warehouse: COMPUTE_WH
+  cortex_analyst_model: auto
+  cortex_agent_model: auto
+  
+  # SPCS settings
+  min_instances: 1
+  max_instances: 3
+  auto_suspend_seconds: 3600
+  
+  # PostgreSQL settings
+  postgres_size: HIGHMEM_XL
+  postgres_version: "17"
+  
+  # Data retention
+  data_retention_days: 7
+  
+  # Seed data stage
+  seed_data_stage: "@flux_seed_data"
