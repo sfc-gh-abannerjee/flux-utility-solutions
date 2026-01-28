@@ -15,53 +15,42 @@ USE SCHEMA PRODUCTION;
 -- 1. CUSTOMERS_MASTER_DATA
 -- -----------------------------------------------------------------------------
 -- 686,000 customer records with demographic and account information
+-- Schema matches SI_DEMOS.PRODUCTION.CUSTOMERS_MASTER_DATA exactly
 -- Naming convention: CUST-XXXXXXXX
 
 CREATE OR ALTER TABLE CUSTOMERS_MASTER_DATA (
     -- Primary key
-    CUSTOMER_ID VARCHAR(20) NOT NULL PRIMARY KEY,
-    
-    -- Account information
-    ACCOUNT_NUMBER VARCHAR(20),
-    PRIMARY_METER_ID VARCHAR(20),
+    CUSTOMER_ID VARCHAR(16777216),
     
     -- Personal information
     FIRST_NAME VARCHAR(50),
     LAST_NAME VARCHAR(50),
-    FULL_NAME VARCHAR(100),
-    PHONE VARCHAR(20),
-    EMAIL VARCHAR(100),
+    FULL_NAME VARCHAR(16777216),
+    PHONE VARCHAR(16777216),
+    EMAIL VARCHAR(16777216),
+    
+    -- Account information
+    PRIMARY_METER_ID VARCHAR(16777216),
+    ACCOUNT_STATUS VARCHAR(6),
+    SERVICE_START_DATE DATE,
     
     -- Service address
-    SERVICE_ADDRESS VARCHAR(200),
-    CITY VARCHAR(50),
-    STATE VARCHAR(2) DEFAULT 'TX',
-    ZIP_CODE VARCHAR(10),
-    SERVICE_COUNTY VARCHAR(50),
-    
-    -- Location
-    LATITUDE FLOAT,
-    LONGITUDE FLOAT,
-    
-    -- Account status
-    ACCOUNT_STATUS VARCHAR(20),  -- ACTIVE, INACTIVE, SUSPENDED
-    ENROLLMENT_DATE DATE,
-    DISCONNECTION_DATE DATE,
+    SERVICE_ADDRESS VARCHAR(16777216),
+    SERVICE_COUNTY VARCHAR(16777216),
+    CITY VARCHAR(100),
+    ZIP_CODE NUMBER(38,0),
     
     -- Segmentation
-    CUSTOMER_SEGMENT VARCHAR(20),  -- RESIDENTIAL, COMMERCIAL, INDUSTRIAL
-    INCOME_SEGMENT VARCHAR(20),    -- LOW, LOWER_MIDDLE, MIDDLE, UPPER_MIDDLE, HIGH
+    CUSTOMER_SEGMENT VARCHAR(14),  -- RESIDENTIAL, COMMERCIAL, etc.
     
-    -- Multi-tenant support
-    CUSTOMERS_ON_METER NUMBER(5,0) DEFAULT 1,
-    IS_MULTI_FAMILY BOOLEAN DEFAULT FALSE,
+    -- Metadata
+    DATA_SOURCE VARCHAR(18),
     
-    -- Embeddings for Cortex Search
-    CUSTOMER_EMBEDDING VECTOR(FLOAT, 1024),
+    -- Embeddings for Cortex Search (768 dimensions matches production)
+    CUSTOMER_EMBEDDING VECTOR(FLOAT, 768),
     
     -- Audit
-    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
-    UPDATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+    CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP()
 )
 CLUSTER BY (CITY, ZIP_CODE, CUSTOMER_SEGMENT)
 COMMENT = 'Customer master data - 686,000 profiles with demographics';
@@ -116,6 +105,7 @@ COMMENT = 'Income segment to load multiplier mapping';
 -- 4. ENERGY_BURDEN_ANALYSIS (View)
 -- -----------------------------------------------------------------------------
 -- Energy burden analysis view for affordability insights
+-- Updated to match PRODUCTION schema columns
 
 CREATE OR ALTER VIEW APPLICATIONS.ENERGY_BURDEN_ANALYSIS AS
 SELECT 
@@ -124,18 +114,17 @@ SELECT
     c.SERVICE_ADDRESS,
     c.CITY,
     c.ZIP_CODE,
-    c.INCOME_SEGMENT,
+    c.SERVICE_COUNTY,
     c.CUSTOMER_SEGMENT,
-    c.CUSTOMERS_ON_METER,
     m.METER_ID,
     -- This will be populated after AMI tables are created
     NULL::NUMBER(10,2) as AVG_MONTHLY_KWH,
     NULL::NUMBER(10,2) as AVG_MONTHLY_COST,
     NULL::NUMBER(5,2) as ENERGY_BURDEN_PCT,
     CASE 
-        WHEN c.INCOME_SEGMENT = 'LOW' THEN 'High Burden Risk'
-        WHEN c.INCOME_SEGMENT = 'LOWER_MIDDLE' THEN 'Moderate Burden Risk'
-        ELSE 'Low Burden Risk'
+        WHEN c.CUSTOMER_SEGMENT = 'RESIDENTIAL' THEN 'Residential'
+        WHEN c.CUSTOMER_SEGMENT = 'COMMERCIAL' THEN 'Commercial'
+        ELSE 'Other'
     END as BURDEN_CATEGORY
 FROM CUSTOMERS_MASTER_DATA c
 LEFT JOIN METER_INFRASTRUCTURE m ON c.PRIMARY_METER_ID = m.METER_ID;
