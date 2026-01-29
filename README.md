@@ -10,17 +10,16 @@
 
 ## Overview
 
-Flux Utility Solutions is a reference architecture for building utility industry applications on Snowflake's AI Data Cloud. This solution demonstrates handling large-scale workloads:
+Flux Utility Solutions is a reference architecture for building utility industry applications on Snowflake's AI Data Cloud. The repository includes seed data to get you started:
 
-| Metric | Scale |
-|--------|-------|
-| AMI Readings | 7.1 billion rows |
-| Transformers | 91,554 assets |
-| Customers | 686,359 records |
-| Meters | 596,906 indexed |
-| Feeder Lines | 66,000 visualized |
-| Operational Query | <20ms (PostgreSQL) |
-| Analytics Query | <5s (Snowflake) |
+| Included Seed Data | Records |
+|--------------------|---------|
+| Substations | 269 |
+| Transformers | 100 |
+| Meters | 100 |
+| Customers | 94 |
+
+The architecture is designed to scale to production workloads with your own data.
 
 ---
 
@@ -30,16 +29,16 @@ Flux Utility Solutions is a reference architecture for building utility industry
 
 ```
 LAYER 4: APPLICATION     SPCS (React + DeckGL + FastAPI)
-         ~3s load        Full-stack grid operations center
+                         Full-stack grid operations center
 
-LAYER 3: ANALYTICS       Snowflake Core (7.1B AMI rows)
-         <5s queries     Dynamic Tables, Cortex AI, ML Models
+LAYER 3: ANALYTICS       Snowflake Core
+                         Dynamic Tables, Cortex AI, ML Models
 
 LAYER 2: STREAMING       CDC Streams + Tasks
-         <1 min lag      Event-driven synchronization
+                         Event-driven synchronization
 
 LAYER 1: TRANSACTIONAL   Snowflake Managed PostgreSQL
-         <20ms queries   PostGIS geospatial, real-time cache
+                         PostGIS geospatial, real-time cache
 ```
 
 See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed diagrams.
