@@ -1,16 +1,51 @@
 # Flux Utility Solutions - CLI Tools
 
-Python CLI tools for automated deployment and validation.
+Command-line tools for automated deployment and validation.
+
+## Quick Start (Recommended)
+
+The fastest way to deploy Flux is with `quickstart.sh`:
+
+```bash
+cd cli
+
+# Deploy with default settings (FLUX_QUICKSTART database)
+./quickstart.sh
+
+# Deploy with custom connection
+./quickstart.sh --connection your_connection_name
+
+# Deploy to a specific database
+./quickstart.sh --database MY_FLUX_DB --warehouse MY_WH
+```
+
+**What quickstart.sh does:**
+1. Creates database and schemas (~5 sec)
+2. Creates warehouse (~3 sec)  
+3. Creates core tables (substations, transformers, meters, customers) (~10 sec)
+4. Creates time-series tables (~5 sec)
+5. Deploys Cortex AI features (optional, skips gracefully if unavailable)
+6. Loads sample seed data (~20 sec)
+
+**Total time: ~1 minute**
 
 ## Prerequisites
 
 ```bash
-pip install snowflake-cli pyyaml
+# Install Snow CLI
+pip install snowflake-cli
+
+# Or via pipx (recommended)
+pipx install snowflake-cli
 ```
 
 Configure Snow CLI connection:
 ```bash
-snow connection add --connection-name cpe_demo
+snow connection add
+# Follow prompts to create a connection
+
+# List connections
+snow connection list
 ```
 
 ## Tools

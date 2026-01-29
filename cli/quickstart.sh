@@ -108,12 +108,36 @@ run_sql() {
     if snow sql $conn_flag -f "$script" \
         -D "database=FLUX_QUICKSTART" \
         -D "warehouse=FLUX_QUICKSTART_WH" \
+        -D "warehouse_size=XSMALL" \
         -D "admin_role=ACCOUNTADMIN" \
         -D "user_role=PUBLIC" > /dev/null 2>&1; then
         log_success "$name"
     else
         log_error "Failed: $name"
         exit 1
+    fi
+}
+
+run_sql_optional() {
+    local script="$1"
+    local display_name="$2"
+    local name
+    name=$(basename "$script" .sql)
+    
+    local conn_flag=""
+    [[ -n "$CONNECTION" ]] && conn_flag="-c $CONNECTION"
+    
+    log_step "Deploying: $display_name"
+    
+    if snow sql $conn_flag -f "$script" \
+        -D "database=FLUX_QUICKSTART" \
+        -D "warehouse=FLUX_QUICKSTART_WH" \
+        -D "warehouse_size=XSMALL" \
+        -D "admin_role=ACCOUNTADMIN" \
+        -D "user_role=PUBLIC" > /dev/null 2>&1; then
+        log_success "$display_name"
+    else
+        echo -e "${YELLOW}⚠${NC} $display_name skipped (optional feature)"
     fi
 }
 
@@ -164,15 +188,20 @@ main() {
     run_sql "$REPO_ROOT/scripts/07_aggregation_tables.sql"
     echo ""
     
-    echo "Step 5/6: Deploying Cortex AI"
-    echo "─────────────────────────────────"
-    run_sql "$REPO_ROOT/scripts/08_semantic_view.sql"
-    run_sql "$REPO_ROOT/scripts/09_cortex_search_services.sql"
-    run_sql "$REPO_ROOT/scripts/10_cortex_agent.sql"
+    echo "Step 5/6: Deploying Cortex AI (optional)"
+    echo "─────────────────────────────────────────"
+    # Cortex AI features are optional - deployment continues if they fail
+    run_sql_optional "$REPO_ROOT/scripts/08_semantic_view.sql" "Semantic View"
+    run_sql_optional "$REPO_ROOT/scripts/09_cortex_search_services.sql" "Search Services"
+    run_sql_optional "$REPO_ROOT/scripts/10_cortex_agent.sql" "Cortex Agent"
     echo ""
     
     echo "Step 6/6: Loading seed data"
     echo "─────────────────────────────────"
+    
+    # Set up connection flag for direct snow sql calls
+    local conn_flag=""
+    [[ -n "$CONNECTION" ]] && conn_flag="-c $CONNECTION"
     
     # Try to load from FLUX_DATABASE first (fastest)
     log_step "Checking for FLUX_DATABASE seed data..."

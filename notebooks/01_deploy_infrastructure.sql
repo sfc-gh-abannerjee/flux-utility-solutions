@@ -26,12 +26,18 @@ SET admin_role = 'FLUX_DEV_ADMIN';
 SET user_role = 'FLUX_DEV_USER';
 SET warehouse_prefix = 'FLUX_DEV';
 
+-- Build full warehouse names (IDENTIFIER() doesn't support concatenation)
+SET wh_primary = 'FLUX_DEV_WH';
+SET wh_large = 'FLUX_DEV_LARGE_WH';
+SET wh_loading = 'FLUX_DEV_LOADING_WH';
+SET wh_cortex = 'FLUX_DEV_CORTEX_WH';
+
 -- Verify settings
 SELECT 
     $database_name AS DATABASE,
     $admin_role AS ADMIN_ROLE,
     $user_role AS USER_ROLE,
-    $warehouse_prefix AS WAREHOUSE_PREFIX;
+    $wh_primary AS PRIMARY_WAREHOUSE;
 
 -- ## 3. Create Database
 -- 
@@ -97,14 +103,14 @@ SHOW ROLES LIKE 'FLUX%';
 -- Create four warehouses for different workloads:
 
 -- Primary warehouse
-CREATE WAREHOUSE IF NOT EXISTS IDENTIFIER($warehouse_prefix || '_WH')
+CREATE WAREHOUSE IF NOT EXISTS IDENTIFIER($wh_primary)
     WAREHOUSE_SIZE = 'SMALL'
     AUTO_SUSPEND = 60
     AUTO_RESUME = TRUE
     COMMENT = 'Primary warehouse for interactive queries';
 
 -- Large warehouse for AMI queries
-CREATE WAREHOUSE IF NOT EXISTS IDENTIFIER($warehouse_prefix || '_LARGE_WH')
+CREATE WAREHOUSE IF NOT EXISTS IDENTIFIER($wh_large)
     WAREHOUSE_SIZE = 'MEDIUM'
     AUTO_SUSPEND = 120
     AUTO_RESUME = TRUE
@@ -114,14 +120,14 @@ CREATE WAREHOUSE IF NOT EXISTS IDENTIFIER($warehouse_prefix || '_LARGE_WH')
     COMMENT = 'Large warehouse for AMI analytics';
 
 -- Loading warehouse for ETL
-CREATE WAREHOUSE IF NOT EXISTS IDENTIFIER($warehouse_prefix || '_LOADING_WH')
+CREATE WAREHOUSE IF NOT EXISTS IDENTIFIER($wh_loading)
     WAREHOUSE_SIZE = 'SMALL'
     AUTO_SUSPEND = 60
     AUTO_RESUME = TRUE
     COMMENT = 'Loading warehouse for ETL operations';
 
 -- Cortex warehouse for AI
-CREATE WAREHOUSE IF NOT EXISTS IDENTIFIER($warehouse_prefix || '_CORTEX_WH')
+CREATE WAREHOUSE IF NOT EXISTS IDENTIFIER($wh_cortex)
     WAREHOUSE_SIZE = 'SMALL'
     AUTO_SUSPEND = 60
     AUTO_RESUME = TRUE
@@ -161,10 +167,10 @@ GRANT SELECT ON FUTURE SEMANTIC VIEWS IN SCHEMA APPLICATIONS
     TO ROLE IDENTIFIER($user_role);
 
 -- Warehouse grants
-GRANT USAGE ON WAREHOUSE IDENTIFIER($warehouse_prefix || '_WH') 
+GRANT USAGE ON WAREHOUSE IDENTIFIER($wh_primary) 
     TO ROLE IDENTIFIER($user_role);
 
-GRANT OPERATE ON WAREHOUSE IDENTIFIER($warehouse_prefix || '_WH') 
+GRANT OPERATE ON WAREHOUSE IDENTIFIER($wh_primary) 
     TO ROLE IDENTIFIER($admin_role);
 
 -- ## 8. Verification

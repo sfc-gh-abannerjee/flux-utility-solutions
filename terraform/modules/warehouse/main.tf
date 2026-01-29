@@ -5,8 +5,8 @@
 terraform {
   required_providers {
     snowflake = {
-      source  = "Snowflake-Labs/snowflake"
-      version = "~> 0.87"
+      source  = "snowflakedb/snowflake"
+      version = ">= 0.92"
     }
   }
 }
@@ -31,23 +31,31 @@ resource "snowflake_warehouse" "warehouses" {
 }
 
 # -----------------------------------------------------------------------------
-# Warehouse Grants
+# Warehouse Grants (using new grant resources - old ones removed June 2024)
 # -----------------------------------------------------------------------------
 
-resource "snowflake_warehouse_grant" "admin_operate" {
+resource "snowflake_grant_privileges_to_account_role" "admin_operate" {
   for_each = var.warehouses
   
-  warehouse_name = snowflake_warehouse.warehouses[each.key].name
-  privilege      = "OPERATE"
-  roles          = [var.admin_role]
+  account_role_name = var.admin_role
+  privileges        = ["OPERATE", "USAGE", "MONITOR"]
+  
+  on_account_object {
+    object_type = "WAREHOUSE"
+    object_name = snowflake_warehouse.warehouses[each.key].name
+  }
 }
 
-resource "snowflake_warehouse_grant" "user_usage" {
+resource "snowflake_grant_privileges_to_account_role" "user_usage" {
   for_each = var.warehouses
   
-  warehouse_name = snowflake_warehouse.warehouses[each.key].name
-  privilege      = "USAGE"
-  roles          = [var.user_role]
+  account_role_name = var.user_role
+  privileges        = ["USAGE"]
+  
+  on_account_object {
+    object_type = "WAREHOUSE"
+    object_name = snowflake_warehouse.warehouses[each.key].name
+  }
 }
 
 # -----------------------------------------------------------------------------

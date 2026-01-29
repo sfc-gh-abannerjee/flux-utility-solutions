@@ -208,7 +208,7 @@ $$;
 -- -----------------------------------------------------------------------------
 
 CREATE OR REPLACE PROCEDURE DEPLOY_FROM_GIT(
-    P_GIT_REPO VARCHAR DEFAULT 'github.com/Snowflake-Labs/flux-utility-solutions',
+    P_GIT_REPO VARCHAR DEFAULT 'github.com/YOUR_ORG/flux-utility-solutions',
     P_BRANCH VARCHAR DEFAULT 'main',
     P_ENVIRONMENT VARCHAR DEFAULT 'dev'
 )

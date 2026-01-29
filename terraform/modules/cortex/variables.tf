@@ -34,3 +34,25 @@ variable "compute_pool_config" {
   })
   default = null
 }
+
+# -----------------------------------------------------------------------------
+# Semantic View Configuration
+# -----------------------------------------------------------------------------
+
+variable "create_semantic_view" {
+  description = "Create the utility semantic view"
+  type        = bool
+  default     = true
+}
+
+variable "semantic_view_name" {
+  description = "Name of the semantic view"
+  type        = string
+  default     = "UTILITY_SEMANTIC_VIEW"
+}
+
+variable "user_role" {
+  description = "User role to grant SELECT on semantic view"
+  type        = string
+  default     = "PUBLIC"
+}

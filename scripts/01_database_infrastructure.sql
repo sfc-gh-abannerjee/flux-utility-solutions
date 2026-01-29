@@ -14,24 +14,7 @@
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- 1. CREATE ROLES (if not exists)
--- -----------------------------------------------------------------------------
--- Note: Role creation requires USERADMIN or higher privileges
-
-CREATE ROLE IF NOT EXISTS IDENTIFIER('<% admin_role %>')
-    COMMENT = 'Flux Utility Solutions - Administrator role for deployment and management';
-
-CREATE ROLE IF NOT EXISTS IDENTIFIER('<% user_role %>')
-    COMMENT = 'Flux Utility Solutions - End-user role for queries and dashboards';
-
--- Grant user role to admin (role hierarchy)
-GRANT ROLE IDENTIFIER('<% user_role %>') TO ROLE IDENTIFIER('<% admin_role %>');
-
--- Grant admin role to ACCOUNTADMIN for deployment flexibility
-GRANT ROLE IDENTIFIER('<% admin_role %>') TO ROLE ACCOUNTADMIN;
-
--- -----------------------------------------------------------------------------
--- 2. CREATE DATABASE
+-- 1. CREATE DATABASE (first, so we have context for scripted blocks)
 -- -----------------------------------------------------------------------------
 
 CREATE DATABASE IF NOT EXISTS IDENTIFIER('<% database %>')
@@ -39,6 +22,38 @@ CREATE DATABASE IF NOT EXISTS IDENTIFIER('<% database %>')
     COMMENT = 'Flux Utility Solutions - Utility grid analytics platform';
 
 USE DATABASE IDENTIFIER('<% database %>');
+
+-- -----------------------------------------------------------------------------
+-- 2. CREATE ROLES (if not system roles)
+-- -----------------------------------------------------------------------------
+-- Note: System roles (ACCOUNTADMIN, PUBLIC, etc.) don't need to be created
+-- This scripted block handles both custom and system roles gracefully
+
+EXECUTE IMMEDIATE $$
+DECLARE
+    v_admin_role VARCHAR := '<% admin_role %>';
+    v_user_role VARCHAR := '<% user_role %>';
+    v_system_roles ARRAY := ARRAY_CONSTRUCT('ACCOUNTADMIN', 'PUBLIC', 'SYSADMIN', 'SECURITYADMIN', 'USERADMIN', 'ORGADMIN');
+BEGIN
+    -- Create admin role if not a system role
+    IF (NOT ARRAY_CONTAINS(v_admin_role::VARIANT, v_system_roles)) THEN
+        EXECUTE IMMEDIATE 'CREATE ROLE IF NOT EXISTS IDENTIFIER(''' || v_admin_role || ''') COMMENT = ''Flux Admin Role''';
+        EXECUTE IMMEDIATE 'GRANT ROLE IDENTIFIER(''' || v_admin_role || ''') TO ROLE ACCOUNTADMIN';
+    END IF;
+    
+    -- Create user role if not a system role
+    IF (NOT ARRAY_CONTAINS(v_user_role::VARIANT, v_system_roles)) THEN
+        EXECUTE IMMEDIATE 'CREATE ROLE IF NOT EXISTS IDENTIFIER(''' || v_user_role || ''') COMMENT = ''Flux User Role''';
+    END IF;
+    
+    -- Grant user role to admin role (only if both are custom roles)
+    IF (NOT ARRAY_CONTAINS(v_admin_role::VARIANT, v_system_roles) AND NOT ARRAY_CONTAINS(v_user_role::VARIANT, v_system_roles)) THEN
+        EXECUTE IMMEDIATE 'GRANT ROLE IDENTIFIER(''' || v_user_role || ''') TO ROLE IDENTIFIER(''' || v_admin_role || ''')';
+    END IF;
+    
+    RETURN 'Roles configured successfully';
+END;
+$$;
 
 -- -----------------------------------------------------------------------------
 -- 3. CREATE SCHEMAS

@@ -2,6 +2,38 @@
 
 Snowflake Notebooks for deployment, exploration, and analysis.
 
+## Important: Variable Syntax
+
+Notebooks use **Snowflake session variables** with `$variable` syntax:
+
+```sql
+-- Set variables at the start of the notebook
+SET database = 'FLUX_DEV';
+SET warehouse_prefix = 'FLUX_DEV';
+
+-- Use with IDENTIFIER() function
+USE DATABASE IDENTIFIER($database);
+CREATE WAREHOUSE IF NOT EXISTS IDENTIFIER($wh_primary);
+```
+
+**This is NOT the same as:**
+- Snow CLI Jinja2 (`<% variable %>`) used in `/scripts/`
+- Standard Jinja2 (`{{ variable }}`) 
+- EXECUTE IMMEDIATE FROM USING clause
+
+### IDENTIFIER() Limitation
+
+`IDENTIFIER()` does **NOT** support string concatenation:
+
+```sql
+-- This WILL NOT work:
+CREATE WAREHOUSE IDENTIFIER($prefix || '_WH');
+
+-- This WORKS - use explicit variables:
+SET wh_primary = 'FLUX_DEV_WH';
+CREATE WAREHOUSE IF NOT EXISTS IDENTIFIER($wh_primary);
+```
+
 ## Notebook Format
 
 Notebooks use Snowflake's native `.sql` format with markdown cells.
@@ -47,25 +79,34 @@ SELECT * FROM table;
 
 ### Import to Snowsight
 
-1. Open Snowsight → Projects → Notebooks
-2. Click "+" → "Import from File"
+1. Open Snowsight -> Projects -> Notebooks
+2. Click "+" -> "Import from File"
 3. Select notebook `.sql` file
 4. Choose database/schema/warehouse
+5. **Edit the SET statements** at the top to match your environment
 
-### Execute from SQL
+### Run from Snowsight
+
+1. After import, click "Run All" or run cells individually
+2. Variables are set via `SET` statements in the first cell
+3. Modify variable values before running to customize deployment
+
+## Customizing Variables
+
+Edit the configuration cell at the top of each notebook:
 
 ```sql
-EXECUTE IMMEDIATE FROM '@STAGE/notebooks/01_deploy_infrastructure.sql'
-USING (database => 'FLUX_DEV', warehouse => 'SI_DEMO_WH');
+-- =============================================================================
+-- CONFIGURATION - Edit these values for your environment
+-- =============================================================================
+SET database = 'MY_DATABASE';           -- Your target database
+SET warehouse_prefix = 'MY_PREFIX';     -- Prefix for warehouse names
+SET admin_role = 'MY_ADMIN_ROLE';       -- Admin role (or ACCOUNTADMIN)
+SET user_role = 'MY_USER_ROLE';         -- User role (or PUBLIC)
 ```
 
-## Variables
+## See Also
 
-All notebooks support Jinja2 variables:
-
-| Variable | Description |
-|----------|-------------|
-| `{{ database }}` | Target database |
-| `{{ warehouse }}` | Warehouse to use |
-| `{{ admin_role }}` | Admin role |
-| `{{ user_role }}` | User role |
+- [Scripts](../scripts/README.md) - Snow CLI deployment with Jinja2 templating
+- [CLI Quick Start](../cli/README.md) - Automated deployment
+- [Terraform](../terraform/README.md) - Infrastructure as Code

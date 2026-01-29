@@ -317,7 +317,7 @@ SHOW SEMANTIC VIEWS IN SCHEMA {{ database }}.APPLICATIONS;
 ## Git Workflow
 
 ### Repository
-- **Remote**: `github.com/Snowflake-Labs/flux-utility-solutions`
+- **Remote**: `github.com/YOUR_ORG/flux-utility-solutions`
 - **Main Branch**: `main` (protected)
 - **Development**: Feature branches
 

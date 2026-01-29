@@ -2,6 +2,29 @@
 
 Deploy Flux Utility Solutions directly from GitHub using Snowflake's native Git integration.
 
+## Important: Variable Syntax Compatibility
+
+**The main scripts in `/scripts/` use Snow CLI Jinja2 templating (`<% variable %>`) which is NOT compatible with EXECUTE IMMEDIATE FROM.**
+
+EXECUTE IMMEDIATE FROM requires session variable syntax (`$variable`). Two deployment options:
+
+### Option A: Use Snow CLI (Recommended)
+```bash
+# Deploy via Snow CLI - works with current scripts
+snow sql -f scripts/01_database_infrastructure.sql \
+    -D "database=FLUX_PROD" -D "admin_role=FLUX_ADMIN" -D "user_role=FLUX_USER"
+```
+
+### Option B: Convert Scripts for Git Integration
+To use EXECUTE IMMEDIATE FROM, convert `<% variable %>` to `$variable`:
+```sql
+-- Before (Snow CLI syntax):
+CREATE DATABASE IF NOT EXISTS IDENTIFIER('<% database %>');
+
+-- After (EXECUTE IMMEDIATE FROM syntax):
+CREATE DATABASE IF NOT EXISTS IDENTIFIER($database);
+```
+
 ## Overview
 
 This deployment method uses Snowflake's `EXECUTE IMMEDIATE FROM` feature to run SQL scripts
@@ -21,16 +44,16 @@ directly from the GitHub repository - no local files or staging required.
 Run from Snowflake (requires ACCOUNTADMIN):
 
 ```sql
--- Create Git integration
+-- Create Git integration (replace YOUR_ORG with your GitHub org/user)
 CREATE OR REPLACE API INTEGRATION github_api_integration
   API_PROVIDER = git_https_api
-  API_ALLOWED_PREFIXES = ('https://github.com/Snowflake-Labs')
+  API_ALLOWED_PREFIXES = ('https://github.com/YOUR_ORG')
   ENABLED = TRUE;
 
 -- Create repository reference
 CREATE OR REPLACE GIT REPOSITORY flux_solutions_repo
   API_INTEGRATION = github_api_integration
-  ORIGIN = 'https://github.com/Snowflake-Labs/flux-utility-solutions.git';
+  ORIGIN = 'https://github.com/YOUR_ORG/flux-utility-solutions.git';
 
 -- Fetch content
 ALTER GIT REPOSITORY flux_solutions_repo FETCH;

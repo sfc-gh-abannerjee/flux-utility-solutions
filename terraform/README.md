@@ -2,6 +2,22 @@
 
 Infrastructure as Code (IaC) for deploying Flux to Snowflake.
 
+## Important: Provider Version
+
+This configuration requires **Snowflake Terraform Provider >= 0.92**.
+
+The Snowflake provider underwent a major grant resources redesign in 2024. The old grant resources (`snowflake_database_grant`, `snowflake_warehouse_grant`, `snowflake_role_grants`, etc.) were **removed on June 26, 2024**. This configuration uses the new grant resources:
+
+| Old Resource (Removed) | New Resource |
+|------------------------|--------------|
+| `snowflake_database_grant` | `snowflake_grant_privileges_to_account_role` |
+| `snowflake_warehouse_grant` | `snowflake_grant_privileges_to_account_role` |
+| `snowflake_schema_grant` | `snowflake_grant_privileges_to_account_role` |
+| `snowflake_table_grant` | `snowflake_grant_privileges_to_account_role` |
+| `snowflake_role_grants` | `snowflake_grant_account_role` |
+
+For migration guidance, see: [Snowflake Provider Grant Redesign](https://registry.terraform.io/providers/snowflakedb/snowflake/latest/docs/guides/grants_redesign_design_decisions)
+
 ## Directory Structure
 
 ```
@@ -9,31 +25,52 @@ terraform/
 ├── README.md
 ├── main.tf              # Root module
 ├── variables.tf         # Input variables
-├── outputs.tf           # Output values
-├── providers.tf         # Provider configuration
 ├── environments/        # Environment-specific configs
 │   ├── dev.tfvars
 │   ├── staging.tfvars
 │   └── prod.tfvars
+├── validate_terraform.sh # Validation script
 └── modules/
-    ├── database/        # Database and schema module
-    ├── warehouse/       # Warehouse module
-    └── cortex/          # Cortex services module
+    ├── database/        # Database, schemas, and roles
+    ├── warehouse/       # Warehouse configuration
+    └── cortex/          # Cortex infrastructure (SPCS stages, compute pools)
 ```
 
 ## Prerequisites
 
 1. **Terraform >= 1.0**
-2. **Snowflake Terraform Provider**
+2. **Snowflake Terraform Provider >= 0.92**
 
 ```bash
-# Install Terraform
+# Install Terraform (macOS)
 brew install terraform
 
-# Configure Snowflake credentials
+# Or download from https://terraform.io/downloads
+```
+
+### Snowflake Authentication
+
+Configure one of these authentication methods:
+
+**Option 1: Key Pair Authentication (Recommended)**
+```bash
+export SNOWFLAKE_USER="your_user"
+export SNOWFLAKE_ACCOUNT="your_account"  # e.g., "xy12345.us-west-2"
+export SNOWFLAKE_PRIVATE_KEY_PATH="/path/to/rsa_key.p8"
+```
+
+**Option 2: Password Authentication**
+```bash
 export SNOWFLAKE_USER="your_user"
 export SNOWFLAKE_ACCOUNT="your_account"
-export SNOWFLAKE_PRIVATE_KEY_PATH="/path/to/rsa_key.p8"
+export SNOWFLAKE_PASSWORD="your_password"
+```
+
+**Option 3: Browser-based SSO**
+```bash
+export SNOWFLAKE_USER="your_user"
+export SNOWFLAKE_ACCOUNT="your_account"
+export SNOWFLAKE_AUTHENTICATOR="externalbrowser"
 ```
 
 ## Quick Start

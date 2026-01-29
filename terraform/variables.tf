@@ -3,6 +3,35 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
+# Snowflake Connection
+# -----------------------------------------------------------------------------
+
+variable "snowflake_org" {
+  description = "Snowflake organization name"
+  type        = string
+  default     = ""
+}
+
+variable "snowflake_account" {
+  description = "Snowflake account name"
+  type        = string
+  default     = ""
+}
+
+variable "snowflake_user" {
+  description = "Snowflake username"
+  type        = string
+  default     = ""
+}
+
+variable "snowflake_password" {
+  description = "Snowflake password or programmatic key"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+# -----------------------------------------------------------------------------
 # Environment
 # -----------------------------------------------------------------------------
 
@@ -91,6 +120,16 @@ variable "compute_pool_name" {
   description = "Name of the compute pool"
   type        = string
   default     = "FLUX_INTERACTIVE_POOL"
+}
+
+# -----------------------------------------------------------------------------
+# Cortex Configuration
+# -----------------------------------------------------------------------------
+
+variable "create_semantic_view" {
+  description = "Create semantic view for Cortex Analyst"
+  type        = bool
+  default     = true
 }
 
 # -----------------------------------------------------------------------------

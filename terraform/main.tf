@@ -13,8 +13,8 @@ terraform {
   
   required_providers {
     snowflake = {
-      source  = "Snowflake-Labs/snowflake"
-      version = "~> 0.87"
+      source  = "snowflakedb/snowflake"
+      version = ">= 2.11.0"  # Required for snowflake_semantic_view resource
     }
   }
 }
@@ -22,9 +22,17 @@ terraform {
 # =============================================================================
 # PROVIDER CONFIGURATION
 # =============================================================================
+# Provider uses environment variables for credentials:
+# - SNOWFLAKE_ACCOUNT or TF_VAR_snowflake_account
+# - SNOWFLAKE_USER or TF_VAR_snowflake_user
+# - SNOWFLAKE_PASSWORD or TF_VAR_snowflake_password
 
 provider "snowflake" {
-  role = var.terraform_role
+  role              = var.terraform_role
+  organization_name = var.snowflake_org
+  account_name      = var.snowflake_account
+  user              = var.snowflake_user
+  password          = var.snowflake_password
 }
 
 # =============================================================================
@@ -101,43 +109,44 @@ module "warehouses" {
 # =============================================================================
 
 # Additional analyst role
-resource "snowflake_role" "analyst" {
+resource "snowflake_account_role" "analyst" {
   name    = "${var.admin_role}_ANALYST"
   comment = "Cortex Analyst access role"
 }
 
-resource "snowflake_role_grants" "analyst_to_user" {
-  role_name = snowflake_role.analyst.name
-  roles     = [module.database.user_role]
+resource "snowflake_grant_account_role" "analyst_to_user" {
+  role_name        = snowflake_account_role.analyst.name
+  parent_role_name = module.database.user_role
 }
 
 # ETL role
-resource "snowflake_role" "etl" {
+resource "snowflake_account_role" "etl" {
   name    = "${var.admin_role}_ETL"
   comment = "ETL and data loading role"
 }
 
-resource "snowflake_role_grants" "etl_to_admin" {
-  role_name = snowflake_role.etl.name
-  roles     = [module.database.admin_role]
+resource "snowflake_grant_account_role" "etl_to_admin" {
+  role_name        = snowflake_account_role.etl.name
+  parent_role_name = module.database.admin_role
 }
 
 # Service role for SPCS
-resource "snowflake_role" "service" {
+resource "snowflake_account_role" "service" {
   count   = var.enable_spcs ? 1 : 0
   name    = "${var.admin_role}_SERVICE"
   comment = "Service account role for SPCS"
 }
 
-resource "snowflake_role_grants" "service_to_admin" {
-  count     = var.enable_spcs ? 1 : 0
-  role_name = snowflake_role.service[0].name
-  roles     = [module.database.admin_role]
+resource "snowflake_grant_account_role" "service_to_admin" {
+  count            = var.enable_spcs ? 1 : 0
+  role_name        = snowflake_account_role.service[0].name
+  parent_role_name = module.database.admin_role
 }
 
 # =============================================================================
 # CORTEX INFRASTRUCTURE
-# Note: Search Services and Agents require SQL, not Terraform
+# Includes: Semantic Views, Search Services setup, SPCS compute
+# Note: Agents still require SQL deployment
 # =============================================================================
 
 module "cortex" {
@@ -146,6 +155,11 @@ module "cortex" {
   database_name = module.database.database_name
   warehouse     = module.warehouses.primary_warehouse_name
   admin_role    = module.database.admin_role
+  
+  # Semantic View configuration
+  create_semantic_view = var.create_semantic_view
+  semantic_view_name   = "UTILITY_SEMANTIC_VIEW"
+  user_role            = module.database.user_role
   
   # Image repository for SPCS
   create_image_repository = var.enable_spcs

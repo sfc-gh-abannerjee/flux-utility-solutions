@@ -67,34 +67,85 @@ See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed diagrams.
 
 ## Choose Your Deployment Path
 
-| Path | Best For | Time | Command |
-|------|----------|------|---------|
-| **1. SQL Scripts** | Learning, auditing, manual control | 45 min | `snow sql -f scripts/01_database_infrastructure.sql` |
-| **2. Notebooks** | POC workshops, data scientists | 30 min | Import to Snowsight |
-| **3. Git Integration** | Modern DevOps, GitOps workflows | 20 min | `CREATE GIT REPOSITORY` |
-| **4. CLI** | Quick demos, automation | 15 min | `./cli/deploy.sh` |
-| **5. Terraform** | Enterprise IaC, multi-environment | 20 min | `terraform apply` |
+| Path | Best For | Time | Getting Started |
+|------|----------|------|-----------------|
+| **1. CLI Quick Start** | Quick demos, POCs | ~1 min | `./cli/quickstart.sh` |
+| **2. SQL Scripts** | Learning, auditing, manual control | 15-30 min | [scripts/README.md](./scripts/README.md) |
+| **3. Notebooks** | POC workshops, data scientists | 20 min | [notebooks/README.md](./notebooks/README.md) |
+| **4. Git Integration** | Modern DevOps, GitOps workflows | 15 min | [git_deploy/README.md](./git_deploy/README.md) |
+| **5. Terraform** | Enterprise IaC, multi-environment | 10 min | [terraform/README.md](./terraform/README.md) |
 
-### Quick Start (Seed Data Path)
+---
+
+## Quick Start (Fastest Path)
+
+Get a working environment in under 2 minutes:
 
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/Snowflake-Labs/flux-utility-solutions.git
 cd flux-utility-solutions
 
-# Configure Snowflake connection
-cp cli/snow_connection.toml.template ~/.snowflake/connections.toml
-# Edit with your credentials
+# 2. Ensure Snow CLI is installed and configured
+snow connection list   # Should show at least one connection
 
-# Deploy with seed data (15 minutes)
+# 3. Run quick start (creates FLUX_QUICKSTART database)
 ./cli/quickstart.sh
+
+# Or specify your own database/connection:
+./cli/quickstart.sh --database MY_DB --connection my_connection
 ```
 
-### Full Deployment
+**What gets deployed:**
+- Database with PRODUCTION, APPLICATIONS, SECRETS schemas
+- Warehouse (XSMALL, auto-suspend 60s)
+- Core tables: Substations, Transformers, Meters, Customers
+- Time-series tables for AMI readings
+- Sample seed data loaded
+
+---
+
+## Important: Variable Templating
+
+Different deployment paths use **different variable syntax**:
+
+| Path | Syntax | Example |
+|------|--------|---------|
+| **Scripts** (Snow CLI) | `<% variable %>` | `CREATE DATABASE <% database %>` |
+| **Notebooks** | `$variable` | `SET db = 'X'; USE DATABASE IDENTIFIER($db)` |
+| **Git Integration** | `$variable` (USING clause) | `EXECUTE IMMEDIATE FROM ... USING (db => 'X')` |
+| **Terraform** | `var.variable` | `var.database_name` |
+
+See each path's README for detailed syntax examples.
+
+---
+
+## Manual Deployment (SQL Scripts)
+
+For more control, deploy step-by-step with Snow CLI:
 
 ```bash
-# Deploy everything including SPCS application
-./cli/deploy.sh
+cd scripts
+
+# Set your connection and target
+export CONN="your_connection_name"
+export DB="FLUX_DEV"
+export WH="FLUX_DEV_WH"
+
+# 1. Infrastructure
+snow sql -c $CONN -f 01_database_infrastructure.sql \
+    -D "database=$DB" -D "admin_role=ACCOUNTADMIN" -D "user_role=PUBLIC"
+
+snow sql -c $CONN -f 02_warehouses.sql \
+    -D "database=$DB" -D "warehouse=$WH" -D "warehouse_size=SMALL"
+
+# 2. Core tables
+snow sql -c $CONN -f 03_substations_transformers.sql -D "database=$DB" -D "warehouse=$WH"
+snow sql -c $CONN -f 04_meters_infrastructure.sql -D "database=$DB" -D "warehouse=$WH"
+snow sql -c $CONN -f 05_customers_master.sql -D "database=$DB" -D "warehouse=$WH"
+
+# 3. Load seed data
+snow sql -c $CONN -f 50_load_seed_data.sql -D "database=$DB" -D "warehouse=$WH"
 ```
 
 ---

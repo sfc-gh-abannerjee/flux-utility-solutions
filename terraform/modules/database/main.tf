@@ -5,8 +5,8 @@
 terraform {
   required_providers {
     snowflake = {
-      source  = "Snowflake-Labs/snowflake"
-      version = "~> 0.87"
+      source  = "snowflakedb/snowflake"
+      version = ">= 0.92"
     }
   }
 }
@@ -28,9 +28,8 @@ resource "snowflake_database" "flux" {
 resource "snowflake_schema" "schemas" {
   for_each = toset(var.schemas)
   
-  database            = snowflake_database.flux.name
-  name                = each.value
-  data_retention_days = var.data_retention_days
+  database = snowflake_database.flux.name
+  name     = each.value
   
   comment = lookup(var.schema_comments, each.value, "Schema for ${each.value}")
 }
@@ -39,75 +38,87 @@ resource "snowflake_schema" "schemas" {
 # Roles
 # -----------------------------------------------------------------------------
 
-resource "snowflake_role" "admin" {
+resource "snowflake_account_role" "admin" {
   name    = var.admin_role
   comment = "Flux Admin - Full database and service management"
 }
 
-resource "snowflake_role" "user" {
+resource "snowflake_account_role" "user" {
   name    = var.user_role
   comment = "Flux User - Read access to data and execute agents"
 }
 
-# Role hierarchy
-resource "snowflake_role_grants" "user_to_admin" {
-  role_name = snowflake_role.user.name
-  roles     = [snowflake_role.admin.name]
+# Role hierarchy (using new grant resources - old ones removed June 2024)
+resource "snowflake_grant_account_role" "user_to_admin" {
+  role_name        = snowflake_account_role.user.name
+  parent_role_name = snowflake_account_role.admin.name
 }
 
 # Additional roles
-resource "snowflake_role" "additional" {
+resource "snowflake_account_role" "additional" {
   for_each = { for r in var.additional_roles : r.name => r }
   
   name    = each.value.name
   comment = each.value.comment
 }
 
-resource "snowflake_role_grants" "additional_hierarchy" {
+resource "snowflake_grant_account_role" "additional_hierarchy" {
   for_each = { for r in var.additional_roles : r.name => r if r.parent != null }
   
-  role_name = snowflake_role.additional[each.key].name
-  roles     = [each.value.parent]
+  role_name        = snowflake_account_role.additional[each.key].name
+  parent_role_name = each.value.parent
 }
 
 # -----------------------------------------------------------------------------
-# Database Grants
+# Database Grants (using new grant resources - old ones removed June 2024)
 # -----------------------------------------------------------------------------
 
-resource "snowflake_database_grant" "admin_ownership" {
-  database_name = snowflake_database.flux.name
-  privilege     = "OWNERSHIP"
-  roles         = [snowflake_role.admin.name]
+resource "snowflake_grant_privileges_to_account_role" "admin_database" {
+  account_role_name = snowflake_account_role.admin.name
+  privileges        = ["CREATE SCHEMA", "MODIFY", "MONITOR", "USAGE"]
+  
+  on_account_object {
+    object_type = "DATABASE"
+    object_name = snowflake_database.flux.name
+  }
 }
 
-resource "snowflake_database_grant" "user_usage" {
-  database_name = snowflake_database.flux.name
-  privilege     = "USAGE"
-  roles         = [snowflake_role.user.name]
+resource "snowflake_grant_privileges_to_account_role" "user_database" {
+  account_role_name = snowflake_account_role.user.name
+  privileges        = ["USAGE"]
+  
+  on_account_object {
+    object_type = "DATABASE"
+    object_name = snowflake_database.flux.name
+  }
 }
 
 # -----------------------------------------------------------------------------
 # Schema Grants
 # -----------------------------------------------------------------------------
 
-resource "snowflake_schema_grant" "admin_all" {
+resource "snowflake_grant_privileges_to_account_role" "admin_schema" {
   for_each = toset(var.schemas)
   
-  database_name = snowflake_database.flux.name
-  schema_name   = each.value
-  privilege     = "ALL PRIVILEGES"
-  roles         = [snowflake_role.admin.name]
+  account_role_name = snowflake_account_role.admin.name
+  all_privileges    = true
+  
+  on_schema {
+    schema_name = "\"${snowflake_database.flux.name}\".\"${each.value}\""
+  }
   
   depends_on = [snowflake_schema.schemas]
 }
 
-resource "snowflake_schema_grant" "user_usage" {
+resource "snowflake_grant_privileges_to_account_role" "user_schema" {
   for_each = toset(var.schemas)
   
-  database_name = snowflake_database.flux.name
-  schema_name   = each.value
-  privilege     = "USAGE"
-  roles         = [snowflake_role.user.name]
+  account_role_name = snowflake_account_role.user.name
+  privileges        = ["USAGE"]
+  
+  on_schema {
+    schema_name = "\"${snowflake_database.flux.name}\".\"${each.value}\""
+  }
   
   depends_on = [snowflake_schema.schemas]
 }
@@ -116,12 +127,16 @@ resource "snowflake_schema_grant" "user_usage" {
 # Future Grants on Tables
 # -----------------------------------------------------------------------------
 
-resource "snowflake_table_grant" "user_select_future" {
-  database_name = snowflake_database.flux.name
-  schema_name   = "PRODUCTION"
-  privilege     = "SELECT"
-  roles         = [snowflake_role.user.name]
-  on_future     = true
+resource "snowflake_grant_privileges_to_account_role" "user_select_future" {
+  account_role_name = snowflake_account_role.user.name
+  privileges        = ["SELECT"]
+  
+  on_schema_object {
+    future {
+      object_type_plural = "TABLES"
+      in_schema          = "\"${snowflake_database.flux.name}\".\"PRODUCTION\""
+    }
+  }
   
   depends_on = [snowflake_schema.schemas]
 }
@@ -137,12 +152,12 @@ output "database_name" {
 
 output "admin_role" {
   description = "Admin role name"
-  value       = snowflake_role.admin.name
+  value       = snowflake_account_role.admin.name
 }
 
 output "user_role" {
   description = "User role name"
-  value       = snowflake_role.user.name
+  value       = snowflake_account_role.user.name
 }
 
 output "schemas" {
