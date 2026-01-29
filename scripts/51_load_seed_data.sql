@@ -1,0 +1,235 @@
+-- ============================================================================
+-- Flux Utility Solutions - Load Seed Data from Parquet Files
+-- ============================================================================
+-- Script: 51_load_seed_data.sql
+-- Purpose: Load production seed data from bundled parquet files
+--
+-- This script loads data from:
+--   - Git Repository stage (if using Git Integration - Path 3)
+--   - Named stage (if using manual upload)
+--
+-- Data includes:
+--   Reference: substations, circuits, transformers, poles, weather, ERCOT, PQ
+--   Operational: work orders (250K), outages (34K)
+--   Samples: 10K meters, 12K customers
+--
+-- Usage:
+--   -- Via Git Integration (recommended):
+--   EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/51_load_seed_data.sql
+--     USING (database => 'FLUX_PROD', schema => 'PRODUCTION');
+--
+--   -- Via Snow CLI:
+--   snow sql -f scripts/51_load_seed_data.sql -D "database=FLUX_PROD" -D "schema=PRODUCTION"
+-- ============================================================================
+
+-- Configuration
+SET database_name = '<% database %>';
+SET schema_name = '<% schema %>';
+SET git_repo = 'flux_utility_solutions_repo';  -- From git_deploy/setup_git_integration.sql
+
+-- Set context
+USE DATABASE IDENTIFIER($database_name);
+USE SCHEMA IDENTIFIER($schema_name);
+
+-- ============================================================================
+-- PHASE 1: Create Tables (if not exist)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS SUBSTATIONS (
+    SUBSTATION_ID VARCHAR, SUBSTATION_NAME VARCHAR,
+    LATITUDE FLOAT, LONGITUDE FLOAT, CAPACITY_MW FLOAT,
+    VOLTAGE_LEVEL_KV FLOAT, INSTALL_DATE DATE, STATUS VARCHAR, REGION VARCHAR
+);
+
+CREATE TABLE IF NOT EXISTS CIRCUIT_METADATA (
+    CIRCUIT_ID VARCHAR, CIRCUIT_NAME VARCHAR, SUBSTATION_ID VARCHAR,
+    VOLTAGE_CLASS VARCHAR, CIRCUIT_TYPE VARCHAR, TOTAL_CUSTOMERS NUMBER,
+    TOTAL_TRANSFORMERS NUMBER, LINE_MILES FLOAT, INSTALL_DATE DATE,
+    LATITUDE FLOAT, LONGITUDE FLOAT, STATUS VARCHAR
+);
+
+CREATE TABLE IF NOT EXISTS TRANSFORMER_METADATA (
+    TRANSFORMER_ID VARCHAR, TRANSFORMER_NAME VARCHAR, CIRCUIT_ID VARCHAR,
+    SUBSTATION_ID VARCHAR, KVA_RATING FLOAT, VOLTAGE_PRIMARY FLOAT,
+    VOLTAGE_SECONDARY FLOAT, PHASE_CONFIG VARCHAR, INSTALL_DATE DATE,
+    MANUFACTURER VARCHAR, LATITUDE FLOAT, LONGITUDE FLOAT, STATUS VARCHAR,
+    LOAD_FACTOR FLOAT, LAST_MAINTENANCE_DATE DATE
+);
+
+CREATE TABLE IF NOT EXISTS GRID_POLES_INFRASTRUCTURE (
+    POLE_ID VARCHAR, POLE_TYPE VARCHAR, MATERIAL VARCHAR, HEIGHT_FT NUMBER,
+    INSTALL_DATE DATE, CIRCUIT_ID VARCHAR, LATITUDE FLOAT, LONGITUDE FLOAT,
+    CONDITION_STATUS VARCHAR, LAST_INSPECTION_DATE DATE
+);
+
+CREATE TABLE IF NOT EXISTS HOUSTON_WEATHER_HOURLY (
+    TIMESTAMP TIMESTAMP_NTZ, TEMPERATURE_F FLOAT, HUMIDITY_PCT FLOAT,
+    WIND_SPEED_MPH FLOAT, PRECIPITATION_IN FLOAT, WEATHER_CONDITION VARCHAR,
+    HEAT_INDEX FLOAT, WIND_CHILL FLOAT
+);
+
+CREATE TABLE IF NOT EXISTS ERCOT_LMP_HOUSTON_ZONE (
+    TIMESTAMP TIMESTAMP_NTZ, LMP_PRICE FLOAT, ENERGY_PRICE FLOAT,
+    CONGESTION_PRICE FLOAT, LOSS_PRICE FLOAT, ZONE VARCHAR
+);
+
+CREATE TABLE IF NOT EXISTS POWER_QUALITY_READINGS (
+    READING_ID VARCHAR, METER_ID VARCHAR, TIMESTAMP TIMESTAMP_NTZ,
+    VOLTAGE FLOAT, FREQUENCY FLOAT, THD_VOLTAGE FLOAT, THD_CURRENT FLOAT,
+    POWER_FACTOR FLOAT, SAG_EVENT BOOLEAN, SWELL_EVENT BOOLEAN
+);
+
+CREATE TABLE IF NOT EXISTS SAP_WORK_ORDERS (
+    WORK_ORDER_ID VARCHAR, WORK_ORDER_TYPE VARCHAR, PRIORITY VARCHAR,
+    STATUS VARCHAR, CUSTOMER_ID VARCHAR, DESCRIPTION VARCHAR,
+    CREATED_DATE TIMESTAMP_NTZ, SCHEDULED_DATE TIMESTAMP_NTZ,
+    COMPLETED_DATE TIMESTAMP_NTZ, CREW_ID VARCHAR,
+    ESTIMATED_DURATION_HOURS FLOAT, ACTUAL_DURATION_HOURS FLOAT,
+    LABOR_COST FLOAT, PARTS_COST FLOAT
+);
+
+CREATE TABLE IF NOT EXISTS OUTAGE_EVENTS (
+    OUTAGE_ID VARCHAR, TRANSFORMER_ID VARCHAR, CIRCUIT_ID VARCHAR,
+    OUTAGE_START_TIME TIMESTAMP_NTZ, OUTAGE_END_TIME TIMESTAMP_NTZ,
+    OUTAGE_CAUSE VARCHAR, CUSTOMERS_AFFECTED NUMBER,
+    WEATHER_RELATED BOOLEAN, RESTORATION_CREW VARCHAR
+);
+
+CREATE TABLE IF NOT EXISTS METER_INFRASTRUCTURE (
+    METER_ID VARCHAR, METER_LATITUDE FLOAT, METER_LONGITUDE FLOAT,
+    COMMISSIONED_DATE DATE, METER_TYPE VARCHAR, CUSTOMER_SEGMENT_ID VARCHAR,
+    POLE_ID VARCHAR, CIRCUIT_ID VARCHAR, TRANSFORMER_ID VARCHAR,
+    SUBSTATION_ID VARCHAR, POLE_TYPE VARCHAR, POLE_MATERIAL VARCHAR,
+    POLE_HEIGHT_FT NUMBER, CONDITION_STATUS VARCHAR, ZIP_CODE VARCHAR,
+    CITY VARCHAR, COUNTY_NAME VARCHAR, HEALTH_SCORE FLOAT
+);
+
+CREATE TABLE IF NOT EXISTS CUSTOMERS_MASTER_DATA (
+    CUSTOMER_ID VARCHAR, FIRST_NAME VARCHAR, LAST_NAME VARCHAR,
+    FULL_NAME VARCHAR, PRIMARY_METER_ID VARCHAR, CUSTOMER_SEGMENT VARCHAR,
+    SERVICE_ADDRESS VARCHAR, SERVICE_COUNTY VARCHAR, PHONE VARCHAR,
+    EMAIL VARCHAR, ACCOUNT_STATUS VARCHAR, SERVICE_START_DATE DATE,
+    CREATED_AT TIMESTAMP_NTZ, DATA_SOURCE VARCHAR, ZIP_CODE NUMBER, CITY VARCHAR
+);
+
+-- ============================================================================
+-- PHASE 2: Load Reference Data
+-- ============================================================================
+
+-- Set stage path (Git repo or named stage)
+SET stage_path = '@' || $git_repo || '/branches/main/seed_data/parquet';
+
+-- Substations (275 rows)
+TRUNCATE TABLE IF EXISTS SUBSTATIONS;
+COPY INTO SUBSTATIONS
+FROM IDENTIFIER($stage_path || '/reference/substations')
+FILE_FORMAT = (TYPE = PARQUET)
+MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
+
+-- Circuits (8,842 rows)
+TRUNCATE TABLE IF EXISTS CIRCUIT_METADATA;
+COPY INTO CIRCUIT_METADATA
+FROM IDENTIFIER($stage_path || '/reference/circuit_metadata')
+FILE_FORMAT = (TYPE = PARQUET)
+MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
+
+-- Transformers (91,554 rows)
+TRUNCATE TABLE IF EXISTS TRANSFORMER_METADATA;
+COPY INTO TRANSFORMER_METADATA
+FROM IDENTIFIER($stage_path || '/reference/transformer_metadata')
+FILE_FORMAT = (TYPE = PARQUET)
+MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
+
+-- Poles (62,038 rows)
+TRUNCATE TABLE IF EXISTS GRID_POLES_INFRASTRUCTURE;
+COPY INTO GRID_POLES_INFRASTRUCTURE
+FROM IDENTIFIER($stage_path || '/reference/grid_poles')
+FILE_FORMAT = (TYPE = PARQUET)
+MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
+
+-- Weather (4,464 rows)
+TRUNCATE TABLE IF EXISTS HOUSTON_WEATHER_HOURLY;
+COPY INTO HOUSTON_WEATHER_HOURLY
+FROM IDENTIFIER($stage_path || '/reference/houston_weather')
+FILE_FORMAT = (TYPE = PARQUET)
+MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
+
+-- ERCOT Pricing (45,213 rows)
+TRUNCATE TABLE IF EXISTS ERCOT_LMP_HOUSTON_ZONE;
+COPY INTO ERCOT_LMP_HOUSTON_ZONE
+FROM IDENTIFIER($stage_path || '/reference/ercot_lmp')
+FILE_FORMAT = (TYPE = PARQUET)
+MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
+
+-- Power Quality (10,000 rows)
+TRUNCATE TABLE IF EXISTS POWER_QUALITY_READINGS;
+COPY INTO POWER_QUALITY_READINGS
+FROM IDENTIFIER($stage_path || '/reference/power_quality')
+FILE_FORMAT = (TYPE = PARQUET)
+MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
+
+-- ============================================================================
+-- PHASE 3: Load Operational Data
+-- ============================================================================
+
+-- Work Orders (250,488 rows)
+TRUNCATE TABLE IF EXISTS SAP_WORK_ORDERS;
+COPY INTO SAP_WORK_ORDERS
+FROM IDENTIFIER($stage_path || '/operational/sap_work_orders')
+FILE_FORMAT = (TYPE = PARQUET)
+MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
+
+-- Outages (34,252 rows)
+TRUNCATE TABLE IF EXISTS OUTAGE_EVENTS;
+COPY INTO OUTAGE_EVENTS
+FROM IDENTIFIER($stage_path || '/operational/outage_events')
+FILE_FORMAT = (TYPE = PARQUET)
+MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
+
+-- ============================================================================
+-- PHASE 4: Load Sample Data (10K meters subset)
+-- ============================================================================
+
+-- Meters (10,000 rows - sample)
+TRUNCATE TABLE IF EXISTS METER_INFRASTRUCTURE;
+COPY INTO METER_INFRASTRUCTURE
+FROM IDENTIFIER($stage_path || '/samples/meter_infrastructure_10k')
+FILE_FORMAT = (TYPE = PARQUET)
+MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
+
+-- Customers (11,849 rows - sample)
+TRUNCATE TABLE IF EXISTS CUSTOMERS_MASTER_DATA;
+COPY INTO CUSTOMERS_MASTER_DATA
+FROM IDENTIFIER($stage_path || '/samples/customers_master_data_10k')
+FILE_FORMAT = (TYPE = PARQUET)
+MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE;
+
+-- ============================================================================
+-- PHASE 5: Verify Load
+-- ============================================================================
+
+SELECT 'SEED DATA LOAD COMPLETE' as status;
+
+SELECT 
+    'SUBSTATIONS' as table_name, COUNT(*) as rows, 275 as expected FROM SUBSTATIONS
+UNION ALL SELECT 'CIRCUIT_METADATA', COUNT(*), 8842 FROM CIRCUIT_METADATA
+UNION ALL SELECT 'TRANSFORMER_METADATA', COUNT(*), 91554 FROM TRANSFORMER_METADATA
+UNION ALL SELECT 'GRID_POLES_INFRASTRUCTURE', COUNT(*), 62038 FROM GRID_POLES_INFRASTRUCTURE
+UNION ALL SELECT 'HOUSTON_WEATHER_HOURLY', COUNT(*), 4464 FROM HOUSTON_WEATHER_HOURLY
+UNION ALL SELECT 'ERCOT_LMP_HOUSTON_ZONE', COUNT(*), 45213 FROM ERCOT_LMP_HOUSTON_ZONE
+UNION ALL SELECT 'POWER_QUALITY_READINGS', COUNT(*), 10000 FROM POWER_QUALITY_READINGS
+UNION ALL SELECT 'SAP_WORK_ORDERS', COUNT(*), 250488 FROM SAP_WORK_ORDERS
+UNION ALL SELECT 'OUTAGE_EVENTS', COUNT(*), 34252 FROM OUTAGE_EVENTS
+UNION ALL SELECT 'METER_INFRASTRUCTURE', COUNT(*), 10000 FROM METER_INFRASTRUCTURE
+UNION ALL SELECT 'CUSTOMERS_MASTER_DATA', COUNT(*), 11849 FROM CUSTOMERS_MASTER_DATA
+ORDER BY table_name;
+
+-- ============================================================================
+-- Next Steps
+-- ============================================================================
+-- 
+-- 1. For full 597K meters: Deploy Flux Data Forge or use generators/
+-- 2. For AMI data: Run scripts/52_load_ami_from_s3.sql (requires S3 access)
+-- 3. Create views: Run scripts/20_semantic_views.sql
+-- 4. Deploy Cortex: Run scripts/08_semantic_view.sql, scripts/09_cortex_search_services.sql
+--

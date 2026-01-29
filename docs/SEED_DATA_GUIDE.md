@@ -2,7 +2,62 @@
 
 This guide explains how to load seed data into your Flux Ops Center deployment. The repository includes bundled sample data that can be loaded into any Snowflake account without requiring access to SI_DEMOS or any external data sources.
 
-## Bundled Seed Data
+## Data Options
+
+| Option | Size | Best For |
+|--------|------|----------|
+| **CSV (Minimal)** | ~100 KB | Quick testing, CI/CD |
+| **Parquet (Production)** | ~25 MB | Full demos, realistic scale |
+| **Generated (Full Scale)** | ~10+ GB | Production testing, ML training |
+
+---
+
+## Production Seed Data (Parquet)
+
+The repository includes production-scale data exported from SI_DEMOS in `seed_data/parquet/`:
+
+| Category | Table | Rows | Description |
+|----------|-------|------|-------------|
+| **Reference** | SUBSTATIONS | 275 | Grid substations |
+| | CIRCUIT_METADATA | 8,842 | Distribution circuits |
+| | TRANSFORMER_METADATA | 91,554 | Distribution transformers |
+| | GRID_POLES_INFRASTRUCTURE | 62,038 | Pole infrastructure |
+| | HOUSTON_WEATHER_HOURLY | 4,464 | Weather data |
+| | ERCOT_LMP_HOUSTON_ZONE | 45,213 | Energy pricing |
+| | POWER_QUALITY_READINGS | 10,000 | PQ events |
+| **Operational** | SAP_WORK_ORDERS | 250,488 | Maintenance work orders |
+| | OUTAGE_EVENTS | 34,252 | Historical outages |
+| **Samples** | METER_INFRASTRUCTURE | 10,000 | Smart meters (sample) |
+| | CUSTOMERS_MASTER_DATA | 11,849 | Customers (sample) |
+
+### Loading Parquet Data
+
+**Method 1: Git Integration (Recommended)**
+
+```sql
+-- First, set up Git integration (run once)
+-- See git_deploy/setup_git_integration.sql
+
+-- Then load seed data directly from repo
+EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/51_load_seed_data.sql
+  USING (database => 'FLUX_PROD', schema => 'PRODUCTION');
+```
+
+**Method 2: Snowflake Notebook**
+
+Import `notebooks/setup/02_load_seed_data.ipynb` into Snowsight and run interactively.
+
+**Method 3: Snow CLI**
+
+```bash
+snow sql -f scripts/51_load_seed_data.sql \
+    -D "database=FLUX_PROD" \
+    -D "schema=PRODUCTION"
+```
+
+---
+
+## Minimal Seed Data (CSV)
 
 The repository includes sample data files in `seed_data/csv/`:
 
