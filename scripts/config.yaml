@@ -50,11 +50,11 @@ prod:
   spcs_service: FLUX_OPS_CENTER
 
 # -----------------------------------------------------------------------------
-# Existing FLUX_DATABASE Environment (for validation)
+# Local/Demo Environment (for quick testing with existing data)
 # -----------------------------------------------------------------------------
-si_demos:
+local:
   database: FLUX_DATABASE
-  warehouse: SI_DEMO_WH
+  warehouse: FLUX_WH
   warehouse_size: MEDIUM
   admin_role: ACCOUNTADMIN
   user_role: PUBLIC

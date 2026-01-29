@@ -30,7 +30,7 @@ def load_config(env: str) -> Dict:
 
 def run_sql(sql: str, connection: str = "default") -> str:
     """Execute SQL and return output."""
-    cmd = ["snow", "sql", "-q", sql, "-c", connection, "-o", "json"]
+    cmd = ["snow", "sql", "-q", sql, "-c", connection]
     result = subprocess.run(cmd, capture_output=True, text=True)
     return result.stdout if result.returncode == 0 else result.stderr
 
@@ -151,10 +151,10 @@ def check_row_counts(config: Dict, connection: str) -> List[Dict]:
         output = run_sql(sql, connection)
         
         try:
-            # Parse count from JSON output
-            import json
-            data = json.loads(output)
-            count = int(data[0]["CNT"]) if data else 0
+            # Parse count from tabular output (look for numeric lines)
+            import re
+            numbers = re.findall(r'\|\s*(\d+)\s*\|', output)
+            count = int(numbers[0]) if numbers else 0
             
             in_range = min_rows <= count <= max_rows
             results.append({
@@ -236,8 +236,8 @@ def main():
     
     parser.add_argument(
         "--env", "-e",
-        choices=["dev", "staging", "prod", "si_demos"],
-        default="si_demos",
+        choices=["dev", "staging", "prod"],
+        default="dev",
         help="Target environment"
     )
     
