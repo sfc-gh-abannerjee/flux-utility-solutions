@@ -221,7 +221,6 @@ SHOW AGENTS IN SCHEMA APPLICATIONS;
 | dev | FLUX_DEV | XSMALL | Development |
 | staging | FLUX_STAGING | SMALL | Testing |
 | prod | FLUX_PROD | MEDIUM | Production |
-| si_demos | SI_DEMOS | SI_DEMO_WH | Demos |
 
 ## Troubleshooting
 

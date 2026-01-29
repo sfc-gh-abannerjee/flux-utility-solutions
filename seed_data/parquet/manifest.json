@@ -1,8 +1,8 @@
 {
-  "description": "Production seed data exported from SI_DEMOS.PRODUCTION for Flux Utility Solutions",
+  "description": "Production-scale seed data for Flux Utility Solutions",
   "generated_at": "2025-01-28T20:30:00Z",
   "generator_version": "2.1.0",
-  "source_database": "SI_DEMOS",
+  "source_database": "FLUX_PROD",
   "source_schema": "PRODUCTION",
   "format": "parquet",
   "total_size_mb": 25,
@@ -105,9 +105,9 @@
       "table": "AMI_INTERVAL_READINGS",
       "rows": 7105569024,
       "size_gb": 78.7,
-      "s3_location": "s3://{{ s3_bucket }}/raw/ami/ami_interval_readings/",
+      "note": "AMI data requires external S3 stage configuration - contact your administrator",
       "date_range": "2024-07-01 to 2025-08-31",
-      "description": "15-minute interval AMI readings - too large for Git",
+      "description": "15-minute interval AMI readings - too large for Git, requires external stage",
       "load_script": "scripts/52_load_ami_from_s3.sql"
     }
   },

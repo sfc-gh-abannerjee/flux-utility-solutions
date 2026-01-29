@@ -7,7 +7,7 @@
 #              following CIM (Common Information Model) standards.
 #
 # Jinja2 Variables:
-#   {{ database }} - Target database name (e.g., FLUX_PROD, SI_DEMOS)
+#   {{ database }} - Target database name (e.g., FLUX_PROD, FLUX_DEV)
 #
 # Deploy with:
 #   PUT file://models/domain_views/grid_topology_domain.yaml @{{ database }}.APPLICATIONS.SEMANTIC_MODELS;

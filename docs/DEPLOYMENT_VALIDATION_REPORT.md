@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This report compares the five deployment paths against the SI_DEMOS production baseline. Each path has been validated with step-by-step validation scripts.
+This report compares the five deployment paths against the production baseline. Each path has been validated with step-by-step validation scripts.
 
 | Path | Status | Validation Script | Objects Created |
 |------|--------|-------------------|-----------------|
@@ -14,7 +14,7 @@ This report compares the five deployment paths against the SI_DEMOS production b
 
 ---
 
-## Production Baseline (SI_DEMOS)
+## Production Baseline
 
 ### PRODUCTION Schema
 | Object Type | Count | Key Objects |
@@ -243,9 +243,9 @@ flux-utility-solutions/
 
 ---
 
-## Gap Analysis vs SI_DEMOS
+## Gap Analysis vs Production Baseline
 
-| Component | SI_DEMOS | Repo Coverage | Gap |
+| Component | Production | Repo Coverage | Gap |
 |-----------|----------|---------------|-----|
 | Core tables | 114 | 10 core + structure | Historical data not included |
 | Views | 33 | 10+ | Some specialized views missing |

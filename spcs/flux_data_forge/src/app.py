@@ -90,11 +90,25 @@ FLEET_PRESETS = {
     'Service Area (100K)': {'meters': 100000, 'desc': '~6.7K readings/min'},
 }
 
+# FDE PATTERN: Get database from environment with fallback
+def get_target_database():
+    """Get the target database from environment variable."""
+    return os.getenv('SNOWFLAKE_DATABASE', 'FLUX_PROD')
+
+def get_target_schema():
+    """Get the target schema from environment variable."""
+    return os.getenv('SNOWFLAKE_SCHEMA', 'PRODUCTION')
+
+def get_qualified_table(table_name):
+    """Get fully qualified table name using environment config."""
+    return f"{get_target_database()}.{get_target_schema()}.{table_name}"
+
 # Production table sources for real meter data
+# NOTE: These tables are dynamically qualified using get_target_database()
 PRODUCTION_DATA_SOURCES = {
     'METER_INFRASTRUCTURE': {
         'name': 'Meter Infrastructure',
-        'table': 'SI_DEMOS.PRODUCTION.METER_INFRASTRUCTURE',
+        'table_name': 'METER_INFRASTRUCTURE',
         'meter_col': 'METER_ID',
         'transformer_col': 'TRANSFORMER_ID',
         'circuit_col': 'CIRCUIT_ID',
@@ -107,7 +121,7 @@ PRODUCTION_DATA_SOURCES = {
     },
     'AMI_METADATA_SEARCH': {
         'name': 'AMI Metadata',
-        'table': 'SI_DEMOS.PRODUCTION.AMI_METADATA_SEARCH',
+        'table_name': 'AMI_METADATA_SEARCH',
         'meter_col': 'METER_ID',
         'transformer_col': 'TRANSFORMER_ID',
         'circuit_col': 'CIRCUIT_ID',
@@ -8443,7 +8457,7 @@ async def start_stream(
                 # Get AWS credentials from environment or secrets
                 aws_access_key = os.getenv('AWS_ACCESS_KEY_ID', '')
                 aws_secret_key = os.getenv('AWS_SECRET_ACCESS_KEY', '')
-                s3_bucket = os.getenv('S3_BUCKET', '{{ s3_bucket }}')
+                s3_bucket = os.getenv('S3_BUCKET', 'your-ami-bucket')
                 s3_prefix = os.getenv('S3_PREFIX', 'raw/ami/')
                 
                 # Record job in tracking table
@@ -8485,7 +8499,7 @@ async def start_stream(
                     'aws_access_key_id': aws_access_key,
                     'aws_secret_access_key': aws_secret_key,
                     'aws_region': 'us-west-2',
-                    'aws_role_arn': os.getenv('AWS_ROLE_ARN', 'arn:aws:iam::{{ aws_account_id }}:role/{{ aws_role_name }}'),
+                    'aws_role_arn': os.getenv('AWS_ROLE_ARN', ''),
                     'mechanism': 'raw_json_s3',
                 }
                 

@@ -97,7 +97,7 @@ docker build --platform linux/amd64 -t flux-data-forge:latest .
 ### 2. Upload Service Spec
 
 ```bash
-snow stage copy service_spec.yaml @SI_DEMOS.PRODUCTION.DEPLOYMENT_STAGE \
+snow stage copy service_spec.yaml @{{ database }}.{{ schema }}.DEPLOYMENT_STAGE \
   --overwrite --connection {{ connection }}
 ```
 

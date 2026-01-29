@@ -1,6 +1,6 @@
 # Seed Data Loading Guide
 
-This guide explains how to load seed data into your Flux Ops Center deployment. The repository includes bundled sample data that can be loaded into any Snowflake account without requiring access to SI_DEMOS or any external data sources.
+This guide explains how to load seed data into your Flux Ops Center deployment. The repository includes bundled sample data that can be loaded into any Snowflake account without requiring access to any external data sources.
 
 ## Data Options
 
@@ -14,7 +14,7 @@ This guide explains how to load seed data into your Flux Ops Center deployment. 
 
 ## Production Seed Data (Parquet)
 
-The repository includes production-scale data exported from SI_DEMOS in `seed_data/parquet/`:
+The repository includes production-scale sample data in `seed_data/parquet/`:
 
 | Category | Table | Rows | Description |
 |----------|-------|------|-------------|

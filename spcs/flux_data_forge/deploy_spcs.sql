@@ -1,6 +1,13 @@
 -- =============================================================================
 -- SPCS Deployment Script for FLUX Data Forge with Snowpipe Streaming
 -- =============================================================================
+-- Jinja2 Variables:
+--   {{ database }}      - Target database (e.g., FLUX_PROD)
+--   {{ schema }}        - Target schema (e.g., PRODUCTION)
+--   {{ warehouse }}     - Warehouse name
+--   {{ account }}       - Snowflake account identifier
+--   {{ postgres_host }} - PostgreSQL managed service host (optional)
+--
 -- Prerequisites:
 -- 1. RSA key pair generated (see setup_keypair_auth.sql)
 -- 2. AMI_STREAMING_USER created with RSA public key
@@ -8,17 +15,17 @@
 -- 4. Docker image built and pushed to repository
 
 USE ROLE SYSADMIN;
-USE DATABASE SI_DEMOS;
-USE SCHEMA PRODUCTION;
-USE WAREHOUSE SI_DEMO_WH;
+USE DATABASE IDENTIFIER('{{ database }}');
+USE SCHEMA IDENTIFIER('{{ schema }}');
+USE WAREHOUSE IDENTIFIER('{{ warehouse }}');
 
 -- =============================================================================
 -- Step 1: Create Image Repository (if not exists)
 -- =============================================================================
-CREATE IMAGE REPOSITORY IF NOT EXISTS AMI_STREAMING_REPO;
+CREATE IMAGE REPOSITORY IF NOT EXISTS FLUX_IMAGE_REPO;
 
 -- Get the registry URL for docker push
-SHOW IMAGE REPOSITORIES LIKE 'AMI_STREAMING_REPO' IN SCHEMA SI_DEMOS.PRODUCTION;
+SHOW IMAGE REPOSITORIES LIKE 'FLUX_IMAGE_REPO' IN SCHEMA IDENTIFIER('{{ database }}.{{ schema }}');
 
 -- =============================================================================
 -- Step 2: Create Target Table for Streaming Data
@@ -64,16 +71,16 @@ CREATE SERVICE FLUX_DATA_FORGE_SERVICE
 spec:
   containers:
     - name: flux-data-forge
-      image: /SI_DEMOS/PRODUCTION/AMI_STREAMING_REPO/flux_data_forge:latest
+      image: /{{ database }}/{{ schema }}/FLUX_IMAGE_REPO/flux_data_forge:latest
       env:
-        SNOWFLAKE_ACCOUNT: {{ account }}
+        SNOWFLAKE_ACCOUNT: "{{ account }}"
         SNOWFLAKE_USER: AMI_STREAMING_USER
-        SNOWFLAKE_DATABASE: SI_DEMOS
-        SNOWFLAKE_SCHEMA: PRODUCTION
+        SNOWFLAKE_DATABASE: "{{ database }}"
+        SNOWFLAKE_SCHEMA: "{{ schema }}"
         SNOWFLAKE_ROLE: SYSADMIN
-        SNOWFLAKE_WAREHOUSE: SI_DEMO_WH
-        # PostgreSQL Configuration - Snowflake Managed Postgres
-        POSTGRES_HOST: {{ postgres_host }}
+        SNOWFLAKE_WAREHOUSE: "{{ warehouse }}"
+        # PostgreSQL Configuration - Snowflake Managed Postgres (optional)
+        POSTGRES_HOST: "{{ postgres_host }}"
         POSTGRES_DATABASE: postgres
         POSTGRES_USER: application
         POSTGRES_PORT: "5432"
@@ -82,9 +89,9 @@ spec:
         AMI_PIPE: AMI_STREAMING_PIPE
         SERVICE_AREA: HOUSTON_METRO
       secrets:
-        - snowflakeSecret: SI_DEMOS.PRODUCTION.AMI_STREAMING_KEY
+        - snowflakeSecret: {{ database }}.{{ schema }}.AMI_STREAMING_KEY
           directoryPath: '/usr/local/creds'
-        - snowflakeSecret: SI_DEMOS.PRODUCTION.POSTGRES_CREDENTIALS
+        - snowflakeSecret: {{ database }}.{{ schema }}.POSTGRES_CREDENTIALS
           secretKeyRef: password
           envVarName: POSTGRES_PASSWORD
       resources:
@@ -99,7 +106,7 @@ spec:
       port: 8501
       public: true
 $
-    EXTERNAL_ACCESS_INTEGRATIONS = (PYPI_ACCESS_INTEGRATION, SNOWFLAKE_API_INTEGRATION, GOOGLE_FONTS_EAI, FLUX_POSTGRES_INTEGRATION)
+    EXTERNAL_ACCESS_INTEGRATIONS = (PYPI_ACCESS_INTEGRATION, SNOWFLAKE_API_INTEGRATION)
     MIN_INSTANCES = 1
     MAX_INSTANCES = 1
     COMMENT = 'FLUX Data Forge - AMI Streaming with Snowpipe and PostgreSQL support';

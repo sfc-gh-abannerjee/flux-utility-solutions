@@ -1,16 +1,30 @@
+# =============================================================================
+# Flux Data Forge - SPCS Service Specification
+# =============================================================================
+# This is a TEMPLATE file. Replace placeholders before deployment:
+#   {{ database }}     - Your target database (e.g., FLUX_PROD)
+#   {{ schema }}       - Your target schema (e.g., PRODUCTION)
+#   {{ account }}      - Your Snowflake account identifier
+#   {{ image_repo }}   - Your image repository path
+#   {{ image_tag }}    - Docker image tag
+#   {{ warehouse }}    - Warehouse name
+#   {{ aws_role_arn }} - Your AWS IAM role ARN for S3 access (if using external stages)
+#   {{ postgres_host }} - Your PostgreSQL managed service host (if enabled)
+# =============================================================================
+
 spec:
   containers:
     - name: flux-data-forge
-      image: /SI_DEMOS/PRODUCTION/AMI_STREAMING_REPO/flux_data_forge:20260121_auto_pipe_refresh
+      image: /{{ database }}/{{ schema }}/FLUX_IMAGE_REPO/flux_data_forge:{{ image_tag }}
       env:
-        SNOWFLAKE_ACCOUNT: {{ account }}
+        SNOWFLAKE_ACCOUNT: "{{ account }}"
         SNOWFLAKE_USER: AMI_STREAMING_USER
-        SNOWFLAKE_DATABASE: SI_DEMOS
-        SNOWFLAKE_SCHEMA: PRODUCTION
+        SNOWFLAKE_DATABASE: "{{ database }}"
+        SNOWFLAKE_SCHEMA: "{{ schema }}"
         SNOWFLAKE_ROLE: SYSADMIN
-        SNOWFLAKE_WAREHOUSE: SI_DEMO_WH
-        # PostgreSQL Configuration - Snowflake Managed Postgres
-        POSTGRES_HOST: {{ postgres_host }}
+        SNOWFLAKE_WAREHOUSE: "{{ warehouse }}"
+        # PostgreSQL Configuration - Snowflake Managed Postgres (optional)
+        POSTGRES_HOST: "{{ postgres_host }}"
         POSTGRES_DATABASE: postgres
         POSTGRES_USER: application
         POSTGRES_PORT: "5432"
@@ -18,20 +32,20 @@ spec:
         AMI_TABLE: AMI_STREAMING_READINGS
         AMI_PIPE: AMI_STREAMING_PIPE
         SERVICE_AREA: HOUSTON_METRO
-        # AWS Configuration for S3 External Stage streaming
+        # AWS Configuration for S3 External Stage streaming (optional)
         AWS_REGION: us-west-2
-        AWS_ROLE_ARN: arn:aws:iam::{{ aws_account_id }}:role/{{ aws_role_name }}
+        AWS_ROLE_ARN: "{{ aws_role_arn }}"
       secrets:
-        - snowflakeSecret: SI_DEMOS.PRODUCTION.AMI_STREAMING_KEY
+        - snowflakeSecret: "{{ database }}.{{ schema }}.AMI_STREAMING_KEY"
           directoryPath: '/usr/local/creds'
-        - snowflakeSecret: SI_DEMOS.PRODUCTION.POSTGRES_CREDENTIALS
+        - snowflakeSecret: "{{ database }}.{{ schema }}.POSTGRES_CREDENTIALS"
           secretKeyRef: password
           envVarName: POSTGRES_PASSWORD
-        # AWS credentials for writing to S3 external stages (IAM user that can assume the role)
-        - snowflakeSecret: SI_DEMOS.PRODUCTION.AWS_S3_CREDENTIALS
+        # AWS credentials for writing to S3 external stages (optional - if using IAM user)
+        - snowflakeSecret: "{{ database }}.{{ schema }}.AWS_S3_CREDENTIALS"
           secretKeyRef: username
           envVarName: AWS_ACCESS_KEY_ID
-        - snowflakeSecret: SI_DEMOS.PRODUCTION.AWS_S3_CREDENTIALS
+        - snowflakeSecret: "{{ database }}.{{ schema }}.AWS_S3_CREDENTIALS"
           secretKeyRef: password
           envVarName: AWS_SECRET_ACCESS_KEY
       resources:

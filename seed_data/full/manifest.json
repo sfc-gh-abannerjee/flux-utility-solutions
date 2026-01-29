@@ -1,8 +1,8 @@
 {
-  "description": "Full production seed data exported from SI_DEMOS in Parquet format",
+  "description": "Full production seed data for Flux Utility Solutions in Parquet format",
   "generated_at": "2025-01-28T01:10:00Z",
   "generator_version": "2.0.0",
-  "source_database": "SI_DEMOS",
+  "source_database": "FLUX_PROD",
   "source_schema": "PRODUCTION",
   "format": "parquet",
   "total_size_mb": 102,
@@ -95,7 +95,7 @@
       "rows": 7105569024,
       "files": 385,
       "size_gb": 78.7,
-      "s3_location": "s3://{{ s3_bucket }}/raw/ami/ami_interval_readings/",
+      "note": "AMI data requires external S3 stage configuration - contact your administrator",
       "date_range": "2024-07-01 to 2025-08-31",
       "description": "15-minute interval AMI readings for 597K meters over 14 months",
       "load_script": "scripts/52_load_ami_from_s3.sql"

@@ -80,7 +80,7 @@ BEGIN
     
     -- Get config values (from parameter or defaults)
     v_database := COALESCE(:P_CONFIG:database::VARCHAR, CURRENT_DATABASE());
-    v_warehouse := COALESCE(:P_CONFIG:warehouse::VARCHAR, 'SI_DEMO_WH');
+    v_warehouse := COALESCE(:P_CONFIG:warehouse::VARCHAR, 'FLUX_WH');
     v_admin_role := COALESCE(:P_CONFIG:admin_role::VARCHAR, 'ACCOUNTADMIN');
     v_user_role := COALESCE(:P_CONFIG:user_role::VARCHAR, 'PUBLIC');
     
@@ -145,7 +145,7 @@ BEGIN
         ELSE -- dev
             v_config := OBJECT_CONSTRUCT(
                 'database', 'FLUX_DEV',
-                'warehouse', 'SI_DEMO_WH',
+                'warehouse', 'FLUX_WH',
                 'admin_role', 'ACCOUNTADMIN',
                 'user_role', 'PUBLIC'
             );
