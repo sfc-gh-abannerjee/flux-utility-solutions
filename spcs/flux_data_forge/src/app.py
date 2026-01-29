@@ -26,6 +26,22 @@ import time
 import random
 import uuid
 
+# FDE: Import correlated data generators for work orders, outages, power quality
+try:
+    from generators import (
+        generate_work_orders_batch,
+        generate_outages_batch,
+        generate_power_quality_batch,
+        generate_transformer_load_batch,
+        NARRATIVE_TEMPLATES,
+        get_narrative_config,
+    )
+    GENERATORS_AVAILABLE = True
+except ImportError:
+    GENERATORS_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("generators module not available - extended data generation disabled")
+
 # AWS S3 for raw JSON streaming
 try:
     import boto3
@@ -8599,6 +8615,294 @@ async def start_stream(
     </body>
     </html>
     """)
+
+
+@app.post("/api/generate-correlated")
+async def generate_correlated_data(
+    meters: int = Form(1000),
+    days: int = Form(90),
+    start_date: str = Form(None),
+    seasonal_pattern: str = Form("SUMMER"),
+    gen_work_orders: str = Form(None),
+    gen_power_quality: str = Form(None),
+    gen_erm: str = Form(None),
+    gen_transformer_load: str = Form(None),
+    work_order_count: int = Form(500),
+    outage_count: int = Form(100),
+    pq_event_count: int = Form(200),
+):
+    """
+    FDE: Generate correlated operational data (work orders, outages, power quality).
+    This creates realistic data that correlates with meters, transformers, and weather.
+    """
+    global snowflake_session
+    
+    if not GENERATORS_AVAILABLE:
+        return JSONResponse({
+            "status": "error",
+            "message": "Generators module not available. Ensure generators.py is in the src/ directory."
+        }, status_code=500)
+    
+    session = get_valid_session()
+    if not session:
+        return JSONResponse({
+            "status": "error",
+            "message": "Not connected to Snowflake"
+        }, status_code=503)
+    
+    try:
+        # Parse dates
+        if start_date:
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        else:
+            start_dt = datetime.now() - timedelta(days=days)
+        end_dt = datetime.now()
+        
+        results = {"generated": [], "errors": []}
+        
+        # Load reference data for correlation
+        logger.info("Loading reference data for correlated generation...")
+        
+        # Load transformers
+        transformers = []
+        try:
+            tf_result = session.sql("""
+                SELECT TRANSFORMER_ID, CIRCUIT_ID, SUBSTATION_ID, KVA_RATING
+                FROM SI_DEMOS.PRODUCTION.TRANSFORMER_METADATA
+                ORDER BY RANDOM() LIMIT 1000
+            """).collect()
+            transformers = [dict(r.asDict()) for r in tf_result]
+            logger.info(f"Loaded {len(transformers)} transformers for correlation")
+        except Exception as e:
+            logger.warning(f"Could not load transformers: {e}")
+        
+        # Load circuits
+        circuits = []
+        try:
+            c_result = session.sql("""
+                SELECT CIRCUIT_ID, SUBSTATION_ID
+                FROM SI_DEMOS.PRODUCTION.CIRCUIT_METADATA
+                ORDER BY RANDOM() LIMIT 500
+            """).collect()
+            circuits = [dict(r.asDict()) for r in c_result]
+            logger.info(f"Loaded {len(circuits)} circuits for correlation")
+        except Exception as e:
+            logger.warning(f"Could not load circuits: {e}")
+        
+        # Load customers
+        customers = []
+        try:
+            cust_result = session.sql("""
+                SELECT CUSTOMER_ID, PRIMARY_METER_ID
+                FROM SI_DEMOS.PRODUCTION.CUSTOMERS_MASTER_DATA
+                ORDER BY RANDOM() LIMIT 1000
+            """).collect()
+            customers = [dict(r.asDict()) for r in cust_result]
+            logger.info(f"Loaded {len(customers)} customers for correlation")
+        except Exception as e:
+            logger.warning(f"Could not load customers: {e}")
+        
+        # Load meters
+        meters_data = []
+        try:
+            m_result = session.sql(f"""
+                SELECT METER_ID, TRANSFORMER_ID
+                FROM SI_DEMOS.PRODUCTION.METER_INFRASTRUCTURE
+                ORDER BY RANDOM() LIMIT {min(meters, 5000)}
+            """).collect()
+            meters_data = [dict(r.asDict()) for r in m_result]
+            logger.info(f"Loaded {len(meters_data)} meters for correlation")
+        except Exception as e:
+            logger.warning(f"Could not load meters: {e}")
+        
+        # Generate Work Orders
+        if gen_work_orders == 'on' and customers and transformers:
+            logger.info(f"Generating {work_order_count} work orders...")
+            try:
+                work_orders = generate_work_orders_batch(
+                    count=work_order_count,
+                    customers=customers,
+                    transformers=transformers,
+                    circuits=circuits,
+                    start_date=start_dt,
+                    end_date=end_dt,
+                    seasonal_pattern=seasonal_pattern,
+                )
+                
+                # Insert into Snowflake
+                if work_orders:
+                    # Build INSERT statement
+                    columns = ['WORK_ORDER_ID', 'WORK_ORDER_TYPE', 'PRIORITY', 'STATUS', 
+                               'CUSTOMER_ID', 'DESCRIPTION', 'CREATED_DATE', 'SCHEDULED_DATE',
+                               'COMPLETED_DATE', 'CREW_ID', 'ESTIMATED_DURATION_HOURS',
+                               'ACTUAL_DURATION_HOURS', 'LABOR_COST', 'PARTS_COST']
+                    
+                    values_list = []
+                    for wo in work_orders:
+                        vals = []
+                        for col in columns:
+                            v = wo.get(col)
+                            if v is None:
+                                vals.append('NULL')
+                            elif isinstance(v, datetime):
+                                vals.append(f"'{v.strftime('%Y-%m-%d %H:%M:%S')}'")
+                            elif isinstance(v, (int, float)):
+                                vals.append(str(v))
+                            else:
+                                vals.append(f"'{str(v).replace(chr(39), chr(39)+chr(39))}'")
+                        values_list.append(f"({', '.join(vals)})")
+                    
+                    # Insert in batches
+                    batch_size = 100
+                    for i in range(0, len(values_list), batch_size):
+                        batch = values_list[i:i+batch_size]
+                        insert_sql = f"""
+                            INSERT INTO SI_DEMOS.PRODUCTION.SAP_WORK_ORDERS 
+                            ({', '.join(columns)}) VALUES {', '.join(batch)}
+                        """
+                        session.sql(insert_sql).collect()
+                    
+                    results["generated"].append({
+                        "type": "work_orders",
+                        "count": len(work_orders),
+                        "table": "SI_DEMOS.PRODUCTION.SAP_WORK_ORDERS"
+                    })
+                    logger.info(f"Inserted {len(work_orders)} work orders")
+            except Exception as e:
+                logger.error(f"Error generating work orders: {e}")
+                results["errors"].append({"type": "work_orders", "error": str(e)})
+        
+        # Generate Outage Events
+        if gen_erm == 'on' and transformers:
+            logger.info(f"Generating {outage_count} outage events...")
+            try:
+                outages = generate_outages_batch(
+                    count=outage_count,
+                    transformers=transformers,
+                    circuits=circuits,
+                    start_date=start_dt,
+                    end_date=end_dt,
+                    seasonal_pattern=seasonal_pattern,
+                )
+                
+                if outages:
+                    columns = ['OUTAGE_ID', 'TRANSFORMER_ID', 'CIRCUIT_ID', 
+                               'OUTAGE_START_TIME', 'OUTAGE_END_TIME', 'OUTAGE_CAUSE',
+                               'CUSTOMERS_AFFECTED', 'WEATHER_RELATED', 'RESTORATION_CREW']
+                    
+                    values_list = []
+                    for out in outages:
+                        vals = []
+                        for col in columns:
+                            v = out.get(col)
+                            if v is None:
+                                vals.append('NULL')
+                            elif isinstance(v, datetime):
+                                vals.append(f"'{v.strftime('%Y-%m-%d %H:%M:%S')}'")
+                            elif isinstance(v, bool):
+                                vals.append('TRUE' if v else 'FALSE')
+                            elif isinstance(v, (int, float)):
+                                vals.append(str(v))
+                            else:
+                                vals.append(f"'{str(v).replace(chr(39), chr(39)+chr(39))}'")
+                        values_list.append(f"({', '.join(vals)})")
+                    
+                    batch_size = 100
+                    for i in range(0, len(values_list), batch_size):
+                        batch = values_list[i:i+batch_size]
+                        insert_sql = f"""
+                            INSERT INTO SI_DEMOS.PRODUCTION.OUTAGE_EVENTS 
+                            ({', '.join(columns)}) VALUES {', '.join(batch)}
+                        """
+                        session.sql(insert_sql).collect()
+                    
+                    results["generated"].append({
+                        "type": "outage_events",
+                        "count": len(outages),
+                        "table": "SI_DEMOS.PRODUCTION.OUTAGE_EVENTS"
+                    })
+                    logger.info(f"Inserted {len(outages)} outage events")
+            except Exception as e:
+                logger.error(f"Error generating outages: {e}")
+                results["errors"].append({"type": "outage_events", "error": str(e)})
+        
+        # Generate Power Quality Events
+        if gen_power_quality == 'on' and meters_data:
+            logger.info(f"Generating {pq_event_count} power quality events...")
+            try:
+                pq_events = generate_power_quality_batch(
+                    count=pq_event_count,
+                    meters=meters_data,
+                    transformers=transformers,
+                    start_date=start_dt,
+                    end_date=end_dt,
+                )
+                
+                if pq_events:
+                    columns = ['EVENT_ID', 'METER_ID', 'TRANSFORMER_ID', 'TIMESTAMP',
+                               'EVENT_TYPE', 'DESCRIPTION', 'DURATION_MS', 'VOLTAGE', 'SEVERITY']
+                    
+                    values_list = []
+                    for ev in pq_events:
+                        vals = []
+                        for col in columns:
+                            v = ev.get(col)
+                            if v is None:
+                                vals.append('NULL')
+                            elif isinstance(v, datetime):
+                                vals.append(f"'{v.strftime('%Y-%m-%d %H:%M:%S')}'")
+                            elif isinstance(v, (int, float)):
+                                vals.append(str(v))
+                            else:
+                                vals.append(f"'{str(v).replace(chr(39), chr(39)+chr(39))}'")
+                        values_list.append(f"({', '.join(vals)})")
+                    
+                    # Create power quality events table if not exists
+                    session.sql("""
+                        CREATE TABLE IF NOT EXISTS SI_DEMOS.PRODUCTION.POWER_QUALITY_EVENTS (
+                            EVENT_ID VARCHAR,
+                            METER_ID VARCHAR,
+                            TRANSFORMER_ID VARCHAR,
+                            TIMESTAMP TIMESTAMP_NTZ,
+                            EVENT_TYPE VARCHAR,
+                            DESCRIPTION VARCHAR,
+                            DURATION_MS FLOAT,
+                            VOLTAGE FLOAT,
+                            SEVERITY VARCHAR
+                        )
+                    """).collect()
+                    
+                    batch_size = 100
+                    for i in range(0, len(values_list), batch_size):
+                        batch = values_list[i:i+batch_size]
+                        insert_sql = f"""
+                            INSERT INTO SI_DEMOS.PRODUCTION.POWER_QUALITY_EVENTS 
+                            ({', '.join(columns)}) VALUES {', '.join(batch)}
+                        """
+                        session.sql(insert_sql).collect()
+                    
+                    results["generated"].append({
+                        "type": "power_quality_events",
+                        "count": len(pq_events),
+                        "table": "SI_DEMOS.PRODUCTION.POWER_QUALITY_EVENTS"
+                    })
+                    logger.info(f"Inserted {len(pq_events)} power quality events")
+            except Exception as e:
+                logger.error(f"Error generating power quality events: {e}")
+                results["errors"].append({"type": "power_quality_events", "error": str(e)})
+        
+        return JSONResponse({
+            "status": "success",
+            "message": f"Generated correlated data with seasonal pattern: {seasonal_pattern}",
+            "results": results
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in generate_correlated_data: {e}")
+        return JSONResponse({
+            "status": "error",
+            "message": str(e)
+        }, status_code=500)
 
 
 @app.post("/api/generate")
