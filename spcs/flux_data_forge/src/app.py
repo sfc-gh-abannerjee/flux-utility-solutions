@@ -3550,6 +3550,49 @@ async def generate_page(
                 </div>
             </div>
             
+            <div class="section-header" style="margin-top: 20px;">
+                <span class="section-num">7</span>
+                Narrative Configuration
+            </div>
+            <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 12px;">
+                Configure the "story" your data tells - seasonal patterns affect work orders, outages, and load profiles.
+            </p>
+            <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+                <div class="form-group">
+                    <label class="form-label">Seasonal Pattern</label>
+                    <select name="seasonal_pattern" id="seasonal_pattern">
+                        <option value="SUMMER" selected>Summer (Storm Season, High AC Load)</option>
+                        <option value="WINTER">Winter (Ice Storms, Heating Load)</option>
+                        <option value="SPRING">Spring (Mild Weather, PM Focus)</option>
+                        <option value="FALL">Fall (Hurricane Season Prep)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Narrative Preset</label>
+                    <select name="narrative_preset" id="narrative_preset" onchange="applyNarrativePreset(this.value)">
+                        <option value="">-- Custom Settings --</option>
+                        <option value="SUMMER_STORM">Summer Storm Season (June-Aug)</option>
+                        <option value="WINTER_FREEZE">Winter Freeze Event (Jan-Feb)</option>
+                        <option value="HURRICANE_SEASON">Hurricane Season (Aug-Oct)</option>
+                        <option value="NORMAL_OPERATIONS">Normal Operations (Mar-May)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+                <div class="form-group">
+                    <label class="form-label">Work Order Count</label>
+                    <input type="number" name="work_order_count" id="work_order_count" value="500" min="0" max="10000">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Outage Event Count</label>
+                    <input type="number" name="outage_count" id="outage_count" value="100" min="0" max="5000">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Power Quality Event Count</label>
+                    <input type="number" name="pq_event_count" id="pq_event_count" value="200" min="0" max="5000">
+                </div>
+            </div>
+            
             <button type="submit" class="btn-primary">{get_material_icon('rocket_launch', '20px')} Generate Batch Data</button>
         </form>
         
@@ -3658,6 +3701,53 @@ async def generate_page(
             table = table || 'AMI_INTERVAL_READINGS';
             
             document.getElementById('full_table_path').value = `${{db}}.${{schema}}.${{table}}`;
+        }}
+        
+        // FDE: Narrative preset configuration
+        function applyNarrativePreset(preset) {{
+            const presets = {{
+                'SUMMER_STORM': {{
+                    seasonal: 'SUMMER',
+                    work_orders: 750,
+                    outages: 200,
+                    pq_events: 300,
+                    description: 'Houston summer with frequent thunderstorms and high AC load'
+                }},
+                'WINTER_FREEZE': {{
+                    seasonal: 'WINTER',
+                    work_orders: 1000,
+                    outages: 500,
+                    pq_events: 400,
+                    description: 'Texas winter storm with equipment failures and heating load'
+                }},
+                'HURRICANE_SEASON': {{
+                    seasonal: 'SUMMER',
+                    work_orders: 1500,
+                    outages: 800,
+                    pq_events: 500,
+                    description: 'Gulf Coast hurricane preparation and recovery'
+                }},
+                'NORMAL_OPERATIONS': {{
+                    seasonal: 'SPRING',
+                    work_orders: 300,
+                    outages: 50,
+                    pq_events: 100,
+                    description: 'Typical operations with routine maintenance'
+                }}
+            }};
+            
+            if (preset && presets[preset]) {{
+                const cfg = presets[preset];
+                document.getElementById('seasonal_pattern').value = cfg.seasonal;
+                document.getElementById('work_order_count').value = cfg.work_orders;
+                document.getElementById('outage_count').value = cfg.outages;
+                document.getElementById('pq_event_count').value = cfg.pq_events;
+                
+                // Auto-check the relevant boxes
+                document.getElementById('gen_work_orders').checked = cfg.work_orders > 0;
+                document.getElementById('gen_erm').checked = cfg.outages > 0;
+                document.getElementById('gen_power_quality').checked = cfg.pq_events > 0;
+            }}
         }}
         
         // Update path when inputs change
