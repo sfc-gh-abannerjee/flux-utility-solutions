@@ -1,0 +1,159 @@
+{
+  "description": "Production seed data exported from SI_DEMOS.PRODUCTION for Flux Utility Solutions",
+  "generated_at": "2025-01-28T20:30:00Z",
+  "generator_version": "2.1.0",
+  "source_database": "SI_DEMOS",
+  "source_schema": "PRODUCTION",
+  "format": "parquet",
+  "total_size_mb": 25,
+  "git_lfs_compatible": true,
+  "categories": {
+    "reference": {
+      "description": "Core grid infrastructure reference data",
+      "path": "parquet/reference/",
+      "tables": [
+        {
+          "file_pattern": "substations*.parquet",
+          "table": "SUBSTATIONS",
+          "rows": 275,
+          "description": "Distribution substations with capacity and location"
+        },
+        {
+          "file_pattern": "circuit_metadata*.parquet",
+          "table": "CIRCUIT_METADATA",
+          "rows": 8842,
+          "description": "Distribution circuits linked to substations"
+        },
+        {
+          "file_pattern": "transformer_metadata*.parquet",
+          "table": "TRANSFORMER_METADATA",
+          "rows": 91554,
+          "description": "Distribution transformers with health scores"
+        },
+        {
+          "file_pattern": "grid_poles*.parquet",
+          "table": "GRID_POLES_INFRASTRUCTURE",
+          "rows": 62038,
+          "description": "Pole infrastructure with inspection data"
+        },
+        {
+          "file_pattern": "houston_weather*.parquet",
+          "table": "HOUSTON_WEATHER_HOURLY",
+          "rows": 4464,
+          "description": "Hourly weather data for Houston area"
+        },
+        {
+          "file_pattern": "ercot_lmp*.parquet",
+          "table": "ERCOT_LMP_HOUSTON_ZONE",
+          "rows": 45213,
+          "description": "ERCOT locational marginal pricing data"
+        },
+        {
+          "file_pattern": "power_quality*.parquet",
+          "table": "POWER_QUALITY_READINGS",
+          "rows": 10000,
+          "description": "Power quality events (sags, swells, harmonics)"
+        }
+      ]
+    },
+    "operational": {
+      "description": "Operational data - work orders, outages, events",
+      "path": "parquet/operational/",
+      "tables": [
+        {
+          "file_pattern": "sap_work_orders*.parquet",
+          "table": "SAP_WORK_ORDERS",
+          "rows": 250488,
+          "description": "SAP-style maintenance work orders"
+        },
+        {
+          "file_pattern": "outage_events*.parquet",
+          "table": "OUTAGE_EVENTS",
+          "rows": 34252,
+          "description": "Historical outage events with causes"
+        },
+        {
+          "file_pattern": "technical_manuals*.parquet",
+          "table": "TECHNICAL_MANUALS_PDF_CHUNKS",
+          "rows": 20000,
+          "description": "PDF chunks for RAG/Cortex Search"
+        }
+      ]
+    },
+    "samples": {
+      "description": "Sample subset of meter and customer data (10K meters)",
+      "path": "parquet/samples/",
+      "note": "Use Flux Data Forge to generate full 597K meter dataset",
+      "tables": [
+        {
+          "file_pattern": "meter_infrastructure_10k*.parquet",
+          "table": "METER_INFRASTRUCTURE",
+          "rows": 10000,
+          "description": "Smart meter infrastructure (sample)"
+        },
+        {
+          "file_pattern": "customers_master_data_10k*.parquet",
+          "table": "CUSTOMERS_MASTER_DATA",
+          "rows": 11849,
+          "description": "Customer master data linked to meters"
+        }
+      ]
+    }
+  },
+  "external_data": {
+    "ami_interval_readings": {
+      "table": "AMI_INTERVAL_READINGS",
+      "rows": 7105569024,
+      "size_gb": 78.7,
+      "s3_location": "s3://{{ s3_bucket }}/raw/ami/ami_interval_readings/",
+      "date_range": "2024-07-01 to 2025-08-31",
+      "description": "15-minute interval AMI readings - too large for Git",
+      "load_script": "scripts/52_load_ami_from_s3.sql"
+    }
+  },
+  "load_order": [
+    "SUBSTATIONS",
+    "CIRCUIT_METADATA", 
+    "TRANSFORMER_METADATA",
+    "GRID_POLES_INFRASTRUCTURE",
+    "HOUSTON_WEATHER_HOURLY",
+    "ERCOT_LMP_HOUSTON_ZONE",
+    "POWER_QUALITY_READINGS",
+    "SAP_WORK_ORDERS",
+    "OUTAGE_EVENTS",
+    "METER_INFRASTRUCTURE",
+    "CUSTOMERS_MASTER_DATA"
+  ],
+  "referential_integrity": {
+    "hierarchy": "SUBSTATION → CIRCUIT → TRANSFORMER → METER → CUSTOMER",
+    "notes": [
+      "All circuits reference valid substations",
+      "All transformers reference valid circuits and substations",
+      "Sample meters reference valid transformers in the full dataset",
+      "Customers link to meters via PRIMARY_METER_ID"
+    ]
+  },
+  "deployment_options": [
+    {
+      "method": "Snowflake Git Integration",
+      "script": "scripts/00_git_integration.sql",
+      "notebook": "notebooks/setup/02_load_seed_data.ipynb",
+      "description": "Recommended - loads directly from Git repository stage"
+    },
+    {
+      "method": "Python Script",
+      "script": "generators/load_seed_data.py",
+      "description": "Load via snowflake-connector-python with progress tracking"
+    },
+    {
+      "method": "SQL Script",
+      "script": "scripts/51_load_seed_data.sql",
+      "description": "Pure SQL using PUT/COPY commands"
+    },
+    {
+      "method": "CLI Quickstart",
+      "script": "cli/quickstart.sh",
+      "description": "Automated deployment including seed data"
+    }
+  ]
+}
