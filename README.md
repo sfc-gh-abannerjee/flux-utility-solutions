@@ -1,16 +1,16 @@
 # Flux Utility Solutions
 
-## Production-Grade Reference Architecture for Utilities on Snowflake
+## Reference Architecture for Utilities on Snowflake
 
 > **One solution, five deployment paths.**
 >
-> Whether your team prefers SQL scripts, interactive notebooks, GitOps workflows, CLI automation, or enterprise-grade Terraform - Flux has you covered.
+> Whether your team prefers SQL scripts, interactive notebooks, GitOps workflows, CLI automation, or Terraform - Flux has you covered.
 
 ---
 
 ## Overview
 
-Flux Utility Solutions is the definitive reference architecture for building utility industry applications on Snowflake's AI Data Cloud. Unlike sample demos, this solution was architected to handle **production-scale** workloads:
+Flux Utility Solutions is a reference architecture for building utility industry applications on Snowflake's AI Data Cloud. This solution demonstrates handling large-scale workloads:
 
 | Metric | Scale |
 |--------|-------|

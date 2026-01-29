@@ -1,15 +1,15 @@
 # Flux Data Forge - SPCS Application
 
-> **Two Applications in One**: Enterprise-scale synthetic data generation + Real-time streaming pipelines demo
+> **Two Applications in One**: Synthetic data generation + Real-time streaming pipelines demo
 
 ## Overview
 
-Flux Data Forge is a production-grade SPCS (Snowpark Container Services) application that serves two critical purposes:
+Flux Data Forge is an SPCS (Snowpark Container Services) application that serves two purposes:
 
-1. **Synthetic Data Generator**: Creates realistic utility grid data at enterprise scale (up to 350M+ rows)
+1. **Synthetic Data Generator**: Creates realistic utility grid data (up to 350M+ rows)
 2. **Pipelines Streaming Demo**: Demonstrates 4 different data ingestion patterns with varying latency characteristics
 
-This enables competitive demos against Palantir Grid 360 and other platforms by showcasing Snowflake's real-time streaming capabilities.
+This enables demos showcasing Snowflake's real-time streaming capabilities.
 
 ## Key Capabilities
 
