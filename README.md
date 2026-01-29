@@ -10,16 +10,36 @@
 
 ## Overview
 
-Flux Utility Solutions is a reference architecture for building utility industry applications on Snowflake's AI Data Cloud. The repository includes seed data to get you started:
+Flux Utility Solutions is a reference architecture for building utility industry applications on Snowflake's AI Data Cloud.
 
-| Included Seed Data | Records |
-|--------------------|---------|
-| Substations | 269 |
-| Transformers | 100 |
-| Meters | 100 |
-| Customers | 94 |
+### Seed Data (Included)
 
-The architecture is designed to scale to production workloads with your own data.
+Get started immediately with bundled sample data:
+
+| Dataset | Records | Description |
+|---------|---------|-------------|
+| Substations | 269 | Houston metro transmission/distribution |
+| Transformers | 100 | Asset health and specifications |
+| Meters | 100 | AMI infrastructure |
+| Customers | 94 | Customer master data |
+
+### Scale It Up
+
+Generate larger datasets for POCs and demos using the included tools:
+
+| Tool | Location | Scale | Use Case |
+|------|----------|-------|----------|
+| **Flux Data Forge** | `spcs/flux_data_forge/` | Up to 350M+ rows | SPCS app with streaming demos |
+| **Python Generators** | `generators/` | Up to 28M rows | Local generation scripts |
+| **SQL Generator** | `scripts/51_generate_ami_sample.sql` | Configurable | In-Snowflake generation |
+
+```bash
+# Example: Generate 8.6M rows for SE demo
+python generators/generate_all.py --size full
+
+# Example: Deploy Flux Data Forge for streaming demos
+cd spcs/flux_data_forge && ./build_and_push.sh
+```
 
 ---
 
