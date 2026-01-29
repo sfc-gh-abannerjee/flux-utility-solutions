@@ -15,7 +15,7 @@ USE SCHEMA PRODUCTION;
 -- 1. CUSTOMERS_MASTER_DATA
 -- -----------------------------------------------------------------------------
 -- 686,000 customer records with demographic and account information
--- Schema matches SI_DEMOS.PRODUCTION.CUSTOMERS_MASTER_DATA exactly
+-- Schema matches PRODUCTION.CUSTOMERS_MASTER_DATA exactly
 -- Naming convention: CUST-XXXXXXXX
 
 CREATE OR ALTER TABLE CUSTOMERS_MASTER_DATA (
@@ -126,8 +126,8 @@ SELECT
         WHEN c.CUSTOMER_SEGMENT = 'COMMERCIAL' THEN 'Commercial'
         ELSE 'Other'
     END as BURDEN_CATEGORY
-FROM CUSTOMERS_MASTER_DATA c
-LEFT JOIN METER_INFRASTRUCTURE m ON c.PRIMARY_METER_ID = m.METER_ID;
+FROM PRODUCTION.CUSTOMERS_MASTER_DATA c
+LEFT JOIN PRODUCTION.METER_INFRASTRUCTURE m ON c.PRIMARY_METER_ID = m.METER_ID;
 
 -- -----------------------------------------------------------------------------
 -- 5. VERIFICATION

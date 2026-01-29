@@ -1,6 +1,6 @@
 -- =============================================================================
 -- export_seed_data.sql
--- Export seed data from SI_DEMOS to a stage for redistribution
+-- Export seed data from SOURCE_DATABASE to a stage for redistribution
 -- =============================================================================
 -- Purpose: Create seed data files that can be loaded into new deployments
 -- Run this ONCE to generate seed data files
@@ -10,7 +10,7 @@
 -- =============================================================================
 
 USE ROLE ACCOUNTADMIN;
-USE DATABASE SI_DEMOS;
+USE DATABASE SOURCE_DATABASE;
 USE SCHEMA PRODUCTION;
 USE WAREHOUSE SI_DEMO_WH;
 
@@ -18,7 +18,7 @@ USE WAREHOUSE SI_DEMO_WH;
 -- Step 1: Create export stage
 -- =============================================================================
 
-CREATE STAGE IF NOT EXISTS SI_DEMOS.PRODUCTION.FLUX_SEED_EXPORT
+CREATE STAGE IF NOT EXISTS SOURCE_DATABASE.PRODUCTION.FLUX_SEED_EXPORT
   DIRECTORY = (ENABLE = TRUE)
   COMMENT = 'Stage for exporting seed data';
 
@@ -156,7 +156,7 @@ LS @FLUX_SEED_EXPORT/;
 
 SELECT OBJECT_CONSTRUCT(
     'exported_at', CURRENT_TIMESTAMP(),
-    'source_database', 'SI_DEMOS',
+    'source_database', 'SOURCE_DATABASE',
     'files', ARRAY_CONSTRUCT(
         OBJECT_CONSTRUCT('path', 'substations/', 'table', 'SUBSTATIONS', 'rows', 275),
         OBJECT_CONSTRUCT('path', 'transformers/', 'table', 'TRANSFORMER_METADATA', 'rows', 91554),

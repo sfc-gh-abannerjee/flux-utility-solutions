@@ -6,7 +6,7 @@
 -- Dependencies: All previous scripts (01-16)
 -- Jinja2 Variables:
 --   <% database %>    - Target database name
---   <% source_db %>   - Source database to compare against (e.g., SI_DEMOS)
+--   <% source_db %>   - Source database to compare against (e.g., SOURCE_DB)
 -- =============================================================================
 
 USE DATABASE IDENTIFIER('<% database %>');

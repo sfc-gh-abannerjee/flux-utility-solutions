@@ -60,7 +60,7 @@ COMMENT = 'Distribution and transmission substations - 275 assets serving Housto
 -- ~91,000 distribution transformers
 -- Naming convention: XFMR-HOU-XXXXXX or SYNTH-XFMR-XXX
 -- Note: Uses CREATE TABLE IF NOT EXISTS because CREATE OR ALTER doesn't support computed columns
--- Schema matches SI_DEMOS.PRODUCTION.TRANSFORMER_METADATA exactly
+-- Schema matches PRODUCTION.TRANSFORMER_METADATA exactly
 
 CREATE TABLE IF NOT EXISTS TRANSFORMER_METADATA (
     -- Primary key

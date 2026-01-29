@@ -3,7 +3,7 @@
 FLUX UTILITY SOLUTIONS - FULL PRODUCTION SEED DATA LOADING SCRIPT
 ================================================================================
 This script loads the complete production seed data from Parquet files.
-Data exported from SI_DEMOS.PRODUCTION with ~1.4M total records across 9 tables.
+Data exported from SOURCE_DATABASE.PRODUCTION with ~1.4M total records across 9 tables.
 
 USAGE WITH SNOWFLAKE CLI:
   # Step 1: Upload parquet files to stage

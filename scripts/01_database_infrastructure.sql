@@ -27,13 +27,16 @@ CREATE ROLE IF NOT EXISTS IDENTIFIER('<% user_role %>')
 -- Grant user role to admin (role hierarchy)
 GRANT ROLE IDENTIFIER('<% user_role %>') TO ROLE IDENTIFIER('<% admin_role %>');
 
+-- Grant admin role to ACCOUNTADMIN for deployment flexibility
+GRANT ROLE IDENTIFIER('<% admin_role %>') TO ROLE ACCOUNTADMIN;
+
 -- -----------------------------------------------------------------------------
 -- 2. CREATE DATABASE
 -- -----------------------------------------------------------------------------
 
 CREATE DATABASE IF NOT EXISTS IDENTIFIER('<% database %>')
     DATA_RETENTION_TIME_IN_DAYS = 7
-    COMMENT = 'Flux Utility Solutions - Production-grade utility grid analytics platform';
+    COMMENT = 'Flux Utility Solutions - Utility grid analytics platform';
 
 USE DATABASE IDENTIFIER('<% database %>');
 
@@ -71,10 +74,7 @@ CREATE SCHEMA IF NOT EXISTS ARCHIVE
 -- 4. GRANT DATABASE PRIVILEGES
 -- -----------------------------------------------------------------------------
 
--- Admin role gets full control
-GRANT OWNERSHIP ON DATABASE IDENTIFIER('<% database %>') 
-    TO ROLE IDENTIFIER('<% admin_role %>') COPY CURRENT GRANTS;
-
+-- Admin role gets full control (keep ACCOUNTADMIN as owner for deployment flexibility)
 GRANT ALL PRIVILEGES ON DATABASE IDENTIFIER('<% database %>') 
     TO ROLE IDENTIFIER('<% admin_role %>');
 
