@@ -42,7 +42,7 @@ LAYER 1: TRANSACTIONAL   Snowflake Managed PostgreSQL
          <20ms queries   PostGIS geospatial, real-time cache
 ```
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed diagrams.
+See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed diagrams.
 
 ---
 
@@ -160,7 +160,7 @@ flux-utility-solutions/
 
 | Document | Description |
 |----------|-------------|
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | System architecture diagrams |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System architecture diagrams |
 | [docs/DEMO_PLAYBOOK.md](./docs/DEMO_PLAYBOOK.md) | What to show, what to say |
 | [docs/USE_CASE_MAP.md](./docs/USE_CASE_MAP.md) | Customer need → module mapping |
 | [docs/PATH_COMPARISON.md](./docs/PATH_COMPARISON.md) | When to use each deployment path |
