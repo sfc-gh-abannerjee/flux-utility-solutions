@@ -17,7 +17,7 @@
 
 USE DATABASE <% database %>;
 USE SCHEMA PRODUCTION;
-USE WAREHOUSE SI_DEMO_WH_LARGE;
+USE WAREHOUSE <% warehouse %>_LARGE;
 
 -- ## 3. Fleet Overview
 -- 

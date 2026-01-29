@@ -12,7 +12,7 @@
 USE ROLE ACCOUNTADMIN;
 USE DATABASE SOURCE_DATABASE;
 USE SCHEMA PRODUCTION;
-USE WAREHOUSE SI_DEMO_WH;
+USE WAREHOUSE <% warehouse %>;
 
 -- =============================================================================
 -- Step 1: Create export stage

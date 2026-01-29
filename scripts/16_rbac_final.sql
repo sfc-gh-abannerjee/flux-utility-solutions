@@ -48,9 +48,12 @@ GRANT ROLE FLUX_SERVICE_ROLE TO ROLE IDENTIFIER('<% admin_role %>');
 -- 2. DATABASE AND SCHEMA GRANTS
 -- -----------------------------------------------------------------------------
 
--- Admin: Full database control
-GRANT OWNERSHIP ON DATABASE IDENTIFIER('<% database %>') 
-    TO ROLE IDENTIFIER('<% admin_role %>') COPY CURRENT GRANTS;
+-- Admin: Full database control (keep ACCOUNTADMIN as owner for deployment flexibility)
+-- Grant admin role to ACCOUNTADMIN so it can be used
+GRANT ROLE IDENTIFIER('<% admin_role %>') TO ROLE ACCOUNTADMIN;
+
+GRANT ALL PRIVILEGES ON DATABASE IDENTIFIER('<% database %>') 
+    TO ROLE IDENTIFIER('<% admin_role %>');
 
 GRANT ALL PRIVILEGES ON ALL SCHEMAS IN DATABASE IDENTIFIER('<% database %>') 
     TO ROLE IDENTIFIER('<% admin_role %>');
@@ -166,10 +169,10 @@ GRANT OPERATE ON WAREHOUSE IDENTIFIER('<% warehouse %>')
     TO ROLE IDENTIFIER('<% admin_role %>');
 
 -- Large warehouse for admins only
-GRANT USAGE ON WAREHOUSE IDENTIFIER('<% warehouse_ %>LARGE') 
+GRANT USAGE ON WAREHOUSE IDENTIFIER('<% warehouse %>_LARGE') 
     TO ROLE IDENTIFIER('<% admin_role %>');
 
-GRANT OPERATE ON WAREHOUSE IDENTIFIER('<% warehouse_ %>LARGE') 
+GRANT OPERATE ON WAREHOUSE IDENTIFIER('<% warehouse %>_LARGE') 
     TO ROLE IDENTIFIER('<% admin_role %>');
 
 -- -----------------------------------------------------------------------------

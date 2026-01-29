@@ -17,7 +17,7 @@
 
 USE DATABASE <% database %>;
 USE SCHEMA PRODUCTION;
-USE WAREHOUSE SI_DEMO_WH;
+USE WAREHOUSE <% warehouse %>;
 
 -- ## 3. Data Scale
 -- 

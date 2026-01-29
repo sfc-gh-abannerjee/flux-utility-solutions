@@ -134,9 +134,11 @@ SHOW WAREHOUSES LIKE 'FLUX%';
 -- 
 -- Set up RBAC with future grants for new objects.
 
--- Database grants
-GRANT OWNERSHIP ON DATABASE IDENTIFIER($database_name) 
-    TO ROLE IDENTIFIER($admin_role) COPY CURRENT GRANTS;
+-- Database grants (keep ACCOUNTADMIN as owner for deployment flexibility)
+GRANT ROLE IDENTIFIER($admin_role) TO ROLE ACCOUNTADMIN;
+
+GRANT ALL PRIVILEGES ON DATABASE IDENTIFIER($database_name) 
+    TO ROLE IDENTIFIER($admin_role);
 
 GRANT USAGE ON DATABASE IDENTIFIER($database_name) 
     TO ROLE IDENTIFIER($user_role);
