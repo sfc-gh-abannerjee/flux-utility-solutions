@@ -70,7 +70,7 @@ SELECT '=== Phase 3: AMI and Operational Data ===' AS phase;
 
 -- AMI readings pipeline
 EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/06_ami_readings_pipeline.sql
-  USING (database => $database);
+  USING (database => $database, warehouse => $warehouse);
 
 -- Aggregation tables (hourly load, outages, voltage sags)
 EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/07_aggregation_tables.sql
@@ -118,7 +118,7 @@ SELECT '=== Phase 6: Security Setup ===' AS phase;
 
 -- Final RBAC grants
 EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/16_rbac_final.sql
-  USING (database => $database, admin_role => $admin_role, user_role => $user_role);
+  USING (database => $database, admin_role => $admin_role, user_role => $user_role, warehouse => $warehouse);
 
 SELECT 'Phase 6 complete: RBAC configured' AS status;
 
@@ -128,15 +128,15 @@ SELECT 'Phase 6 complete: RBAC configured' AS status;
 
 SELECT '=== Phase 7: Seed Data Loading ===' AS phase;
 
--- Load seed data from SI_DEMOS (if in same account)
+-- Load seed data from source database (if configured)
 -- This copies reference tables and generates sample AMI data
 BEGIN
     EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/50_load_seed_data.sql
       USING (database => $database, warehouse => $warehouse);
-    SELECT 'Seed data loaded from SI_DEMOS' AS status;
+    SELECT 'Seed data loaded from source' AS status;
 EXCEPTION
     WHEN OTHER THEN
-        SELECT 'SI_DEMOS not accessible - tables created but empty. Run load_seed_data.sh separately.' AS status;
+        SELECT 'Source database not accessible - tables created but empty. Load seed data manually.' AS status;
 END;
 
 -- Generate AMI sample data
