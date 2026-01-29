@@ -4,7 +4,7 @@
 -- =============================================================================
 -- Purpose: Load the full 7.1B row AMI time-series dataset from S3
 -- 
--- Data Location: s3://{{ s3_bucket }}/raw/ami/ami_interval_readings/
+-- Data Location: s3://your-s3-bucket/raw/ami/ami_interval_readings/
 -- Total Size: ~78.7 GB (385 parquet files)
 -- Row Count: 7,105,569,024 rows
 -- Date Range: July 2024 - August 2025 (14 months)
@@ -30,7 +30,7 @@ USE SCHEMA PRODUCTION;
 -- The bucket is publicly readable for Flux deployments
 
 CREATE STAGE IF NOT EXISTS AMI_EXTERNAL_STAGE
-    URL = 's3://{{ s3_bucket }}/raw/ami/ami_interval_readings/'
+    URL = 's3://your-s3-bucket/raw/ami/ami_interval_readings/'
     FILE_FORMAT = (TYPE = PARQUET)
     COMMENT = 'External stage for AMI interval readings (7.1B rows, 78.7GB)';
 

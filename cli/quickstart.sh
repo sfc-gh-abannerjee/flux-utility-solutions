@@ -174,11 +174,11 @@ main() {
     echo "Step 6/6: Loading seed data"
     echo "─────────────────────────────────"
     
-    # Try to load from SI_DEMOS first (fastest)
-    log_step "Checking for SI_DEMOS seed data..."
+    # Try to load from FLUX_DATABASE first (fastest)
+    log_step "Checking for FLUX_DATABASE seed data..."
     
-    if snow sql $conn_flag -q "SELECT 1 FROM SI_DEMOS.PRODUCTION.SUBSTATIONS LIMIT 1" > /dev/null 2>&1; then
-        log_success "SI_DEMOS accessible"
+    if snow sql $conn_flag -q "SELECT 1 FROM FLUX_DATABASE.PRODUCTION.SUBSTATIONS LIMIT 1" > /dev/null 2>&1; then
+        log_success "FLUX_DATABASE accessible"
         
         log_step "Loading reference tables..."
         snow sql $conn_flag -f "$REPO_ROOT/scripts/50_load_seed_data.sql" \
@@ -192,7 +192,7 @@ main() {
             -D "days=7" > /dev/null 2>&1 && \
             log_success "AMI data generated" || log_success "AMI data skipped"
     else
-        log_success "SI_DEMOS not in this account - using generators"
+        log_success "FLUX_DATABASE not in this account - using generators"
         if [[ -f "$REPO_ROOT/generators/load_seed_data.py" ]]; then
             log_step "Loading sample data..."
             python3 "$REPO_ROOT/generators/load_seed_data.py" --source small --quick 2>/dev/null || \

@@ -321,7 +321,7 @@ def create_snowflake_session() -> Session:
             'authenticator': 'oauth',
             'token': get_login_token(),
             'warehouse': os.getenv('SNOWFLAKE_WAREHOUSE', 'SI_DEMO_WH'),
-            'database': os.getenv('SNOWFLAKE_DATABASE', 'SI_DEMOS'),
+            'database': os.getenv('SNOWFLAKE_DATABASE', 'FLUX_DATABASE'),
             'schema': os.getenv('SNOWFLAKE_SCHEMA', 'PRODUCTION'),
         }
         conn = snowflake.connector.connect(**creds)
@@ -439,7 +439,7 @@ def snowpipe_streaming_worker(job_id: str, config: dict):
     service_area = config.get('service_area', 'TEXAS_GULF_COAST')
     emission_pattern = config.get('emission_pattern', 'STAGGERED_REALISTIC')
     production_source = config.get('production_source', 'SYNTHETIC')
-    target_table = config.get('target_table', 'SI_DEMOS.PRODUCTION.AMI_STREAMING_DATA')
+    target_table = config.get('target_table', 'FLUX_DATABASE.PRODUCTION.AMI_STREAMING_DATA')
     
     # Initialize stats
     stats = {
@@ -618,7 +618,7 @@ def raw_json_s3_streaming_worker(job_id: str, config: dict):
     production_source = config.get('production_source', 'SYNTHETIC')
     
     # S3 config
-    s3_bucket = config.get('s3_bucket', '{{ s3_bucket }}')
+    s3_bucket = config.get('s3_bucket', 'your-s3-bucket')
     s3_prefix = config.get('s3_prefix', 'raw/ami/')
     aws_access_key = config.get('aws_access_key_id', os.getenv('AWS_ACCESS_KEY_ID', ''))
     aws_secret_key = config.get('aws_secret_access_key', os.getenv('AWS_SECRET_ACCESS_KEY', ''))
@@ -853,7 +853,7 @@ def internal_stage_streaming_worker(job_id: str, config: dict):
     service_area = config.get('service_area', 'TEXAS_GULF_COAST')
     emission_pattern = config.get('emission_pattern', 'STAGGERED_REALISTIC')
     production_source = config.get('production_source', 'SYNTHETIC')
-    stage_name = config.get('stage_name', 'SI_DEMOS.PRODUCTION.STG_AMI_RAW_JSON')
+    stage_name = config.get('stage_name', 'FLUX_DATABASE.PRODUCTION.STG_AMI_RAW_JSON')
     file_format = config.get('stage_file_format', 'json')
     
     # Initialize stats
@@ -1122,7 +1122,7 @@ def external_stage_streaming_worker(job_id: str, config: dict):
     try:
         session = get_valid_session()
         if session:
-            for schema_path in ["SI_DEMOS.PRODUCTION", "SI_DEMOS.DEV"]:
+            for schema_path in ["FLUX_DATABASE.PRODUCTION", "FLUX_DATABASE.DEV"]:
                 try:
                     result = session.sql(f"SHOW PIPES IN SCHEMA {schema_path}").collect()
                     for row in result:
@@ -1536,7 +1536,7 @@ def preload_dependencies_background():
         try:
             pipes = []
             seen_pipes = set()
-            schemas_to_check = ["SI_DEMOS.PRODUCTION", "SI_DEMOS.DEV"]
+            schemas_to_check = ["FLUX_DATABASE.PRODUCTION", "FLUX_DATABASE.DEV"]
             
             for schema_path in schemas_to_check:
                 try:
@@ -1624,7 +1624,7 @@ def preload_dependencies_background():
                 FROM SNOWFLAKE.ACCOUNT_USAGE.TABLES 
                 WHERE DELETED IS NULL 
                 AND table_schema IN ('PRODUCTION', 'DEV')
-                AND table_catalog = 'SI_DEMOS'
+                AND table_catalog = 'FLUX_DATABASE'
                 AND (UPPER(table_name) LIKE '%BRONZE%' OR UPPER(table_name) LIKE '%RAW%' OR UPPER(table_name) LIKE '%AMI%')
                 ORDER BY table_schema, table_name
             """).collect()
@@ -1680,7 +1680,7 @@ async def lifespan(app: FastAPI):
                 SELECT JOB_ID, MECHANISM, TARGET_TABLE, METERS, ROWS_PER_SEC, BATCH_SIZE_MB,
                        SERVICE_AREA, PRODUCTION_SOURCE, EMISSION_PATTERN, PRODUCTION_MATCHED,
                        STATUS, ROWS_PER_BATCH, BATCH_INTERVAL_SEC, STAGE_NAME
-                FROM SI_DEMOS.PRODUCTION.STREAMING_JOBS 
+                FROM FLUX_DATABASE.PRODUCTION.STREAMING_JOBS 
                 WHERE STATUS IN ('RUNNING', 'PAUSED')
                 ORDER BY CREATED_AT DESC
                 LIMIT 5
@@ -1754,7 +1754,7 @@ async def lifespan(app: FastAPI):
                 else:
                     logger.warning(f"Unknown mechanism {mechanism} for job {job_id}, marking as STALE")
                     snowflake_session.sql(f"""
-                        UPDATE SI_DEMOS.PRODUCTION.STREAMING_JOBS 
+                        UPDATE FLUX_DATABASE.PRODUCTION.STREAMING_JOBS 
                         SET STATUS = 'STALE', UPDATED_AT = CURRENT_TIMESTAMP()
                         WHERE JOB_ID = '{job_id}'
                     """).collect()
@@ -1770,7 +1770,7 @@ async def lifespan(app: FastAPI):
         try:
             if snowflake_session:
                 snowflake_session.sql("""
-                    UPDATE SI_DEMOS.PRODUCTION.STREAMING_JOBS 
+                    UPDATE FLUX_DATABASE.PRODUCTION.STREAMING_JOBS 
                     SET STATUS = 'STALE', UPDATED_AT = CURRENT_TIMESTAMP()
                     WHERE STATUS = 'RUNNING'
                 """).collect()
@@ -2711,7 +2711,7 @@ def get_header_html():
 def get_status_bar_html():
     env_info = {
         "account": os.getenv('SNOWFLAKE_ACCOUNT', 'N/A'),
-        "database": os.getenv('SNOWFLAKE_DATABASE', 'SI_DEMOS'),
+        "database": os.getenv('SNOWFLAKE_DATABASE', 'FLUX_DATABASE'),
         "schema": os.getenv('SNOWFLAKE_SCHEMA', 'PRODUCTION'),
     }
     return f"""
@@ -3518,7 +3518,7 @@ async def generate_page(
                     </label>
                 </div>
             </div>
-            <input type="hidden" name="table" id="full_table_path" value="SI_DEMOS.PRODUCTION.AMI_INTERVAL_READINGS">
+            <input type="hidden" name="table" id="full_table_path" value="FLUX_DATABASE.PRODUCTION.AMI_INTERVAL_READINGS">
             
             <div class="form-row" style="grid-template-columns: 1fr 1fr;">
                 <div class="form-group">
@@ -3629,7 +3629,7 @@ async def generate_page(
                     const opt = document.createElement('option');
                     opt.value = db;
                     opt.textContent = db;
-                    if (db === 'SI_DEMOS') opt.selected = true;
+                    if (db === 'FLUX_DATABASE') opt.selected = true;
                     select.appendChild(opt);
                 }});
                 // Load schemas for default selection
@@ -3710,7 +3710,7 @@ async def generate_page(
                 ? document.getElementById('new_table').value 
                 : document.getElementById('sf_table').value;
             
-            db = db || 'SI_DEMOS';
+            db = db || 'FLUX_DATABASE';
             schema = schema || 'PRODUCTION';
             table = table || 'AMI_INTERVAL_READINGS';
             
@@ -4525,7 +4525,7 @@ async def generate_page(
                         const opt = document.createElement('option');
                         opt.value = db;
                         opt.textContent = db;
-                        if (db === 'SI_DEMOS') opt.selected = true;
+                        if (db === 'FLUX_DATABASE') opt.selected = true;
                         select.appendChild(opt);
                     }});
                     
@@ -4889,7 +4889,7 @@ async def generate_page(
                 
                 try {{
                     // Fetch external stages from PRODUCTION (shared) + current schema
-                    const resp = await fetch('/api/stages/SI_DEMOS/PRODUCTION');
+                    const resp = await fetch('/api/stages/FLUX_DATABASE/PRODUCTION');
                     const data = await resp.json();
                     
                     select.innerHTML = '<option value="">Select source stage...</option>';
@@ -5003,13 +5003,13 @@ async def generate_page(
                 
                 if (!previewEl) return;
                 
-                let stageName = stageSelect?.value || 'SI_DEMOS.PRODUCTION.STG_AMI_RAW';
+                let stageName = stageSelect?.value || 'FLUX_DATABASE.PRODUCTION.STG_AMI_RAW';
                 const pipeName = pipeNameInput?.value || 'PIPE_AMI_RAW_INGEST';
                 // Use the new target_table select, fall back to legacy pipe_target_table
                 let targetTable = targetSelect?.value;
                 if (!targetTable || targetTable === '__create_new__') {{
                     const legacyInput = document.getElementById('pipe_target_table');
-                    targetTable = legacyInput?.value || 'SI_DEMOS.PRODUCTION.AMI_BRONZE_RAW';
+                    targetTable = legacyInput?.value || 'FLUX_DATABASE.PRODUCTION.AMI_BRONZE_RAW';
                 }}
                 const autoIngest = autoIngestCheckbox?.checked ?? true;
                 const fileFormat = (formatSelect?.value || 'json').toUpperCase();
@@ -5452,7 +5452,7 @@ FILE_FORMAT = (TYPE = ${{fileFormat}});`;
                     const opt = document.createElement('option');
                     opt.value = db;
                     opt.textContent = db;
-                    if (db === 'SI_DEMOS') opt.selected = true;
+                    if (db === 'FLUX_DATABASE') opt.selected = true;
                     select.appendChild(opt);
                 }});
                 if (select.value) loadStreamSchemas(select.value);
@@ -5779,7 +5779,7 @@ async def monitor_page():
         if session:
             # ========== SECTION 1: SNOWFLAKE TASKS ==========
             result = session.sql("""
-                SHOW TASKS LIKE '%AMI_STREAMING%' IN SCHEMA SI_DEMOS.PRODUCTION
+                SHOW TASKS LIKE '%AMI_STREAMING%' IN SCHEMA FLUX_DATABASE.PRODUCTION
             """).collect()
             
             started_tasks = []
@@ -5808,7 +5808,7 @@ async def monitor_page():
             # FDE: Check for pipes in BOTH PRODUCTION and DEV schemas
             try:
                 seen_pipes = set()
-                for schema_path in ["SI_DEMOS.PRODUCTION", "SI_DEMOS.DEV"]:
+                for schema_path in ["FLUX_DATABASE.PRODUCTION", "FLUX_DATABASE.DEV"]:
                     try:
                         result = session.sql(f"""
                             SHOW PIPES IN SCHEMA {schema_path}
@@ -5823,7 +5823,7 @@ async def monitor_page():
                                 definition = row_dict.get('definition', '') or ''
                                 pipes_info.append({
                                     'name': pipe_name,
-                                    'full_name': f"SI_DEMOS.{schema_name}.{pipe_name}",
+                                    'full_name': f"FLUX_DATABASE.{schema_name}.{pipe_name}",
                                     'schema': schema_name,
                                     'definition': definition,  # FDE: Keep full definition for target table parsing
                                     'notification_channel': row_dict.get('notification_channel', ''),
@@ -5869,7 +5869,7 @@ async def monitor_page():
                     SELECT JOB_ID, MECHANISM, TARGET_TABLE, METERS, INTERVAL_MINUTES, 
                            ROWS_PER_SEC, BATCH_SIZE_MB, SERVICE_AREA, STATUS, CREATED_AT,
                            PRODUCTION_SOURCE, EMISSION_PATTERN, PRODUCTION_MATCHED
-                    FROM SI_DEMOS.PRODUCTION.STREAMING_JOBS
+                    FROM FLUX_DATABASE.PRODUCTION.STREAMING_JOBS
                     ORDER BY CREATED_AT DESC
                     LIMIT 10
                 """).collect()
@@ -5911,13 +5911,13 @@ async def monitor_page():
             for table_name in ['AMI_STREAMING_DATA', 'AMI_STREAMING_READINGS', 'AMI_STREAMING_READINGS_TEXAS_GULF_COAST', 'AMI_STREAMING_READINGS_HOUSTON_METRO']:
                 try:
                     result = session.sql(f"""
-                        SELECT COUNT(*) as cnt FROM SI_DEMOS.PRODUCTION.{table_name}
+                        SELECT COUNT(*) as cnt FROM FLUX_DATABASE.PRODUCTION.{table_name}
                         WHERE CREATED_AT >= DATEADD(HOUR, -1, CURRENT_TIMESTAMP())
                     """).collect()
                     recent_rows_1h += result[0]['CNT'] if result else 0
                     
                     result = session.sql(f"""
-                        SELECT COUNT(*) as cnt FROM SI_DEMOS.PRODUCTION.{table_name}
+                        SELECT COUNT(*) as cnt FROM FLUX_DATABASE.PRODUCTION.{table_name}
                     """).collect()
                     total_rows += result[0]['CNT'] if result else 0
                 except:
@@ -6529,7 +6529,7 @@ async def monitor_page():
                     # Ensure the table name is fully qualified
                     target_table = active_target
                     if '.' not in target_table:
-                        target_table = f"SI_DEMOS.PRODUCTION.{target_table}"
+                        target_table = f"FLUX_DATABASE.PRODUCTION.{target_table}"
                     
                     result = session.sql(f"""
                         SELECT METER_ID, READING_TIMESTAMP, USAGE_KWH, VOLTAGE, CUSTOMER_SEGMENT, DATA_QUALITY, PRODUCTION_MATCHED, CREATED_AT
@@ -6640,7 +6640,7 @@ async def monitor_page():
                     # No active jobs - show default table with guidance
                     result = session.sql("""
                         SELECT METER_ID, READING_TIMESTAMP, USAGE_KWH, VOLTAGE, CUSTOMER_SEGMENT, DATA_QUALITY, PRODUCTION_MATCHED, CREATED_AT
-                        FROM SI_DEMOS.PRODUCTION.AMI_STREAMING_DATA
+                        FROM FLUX_DATABASE.PRODUCTION.AMI_STREAMING_DATA
                         ORDER BY CREATED_AT DESC
                         LIMIT 10
                     """).collect()
@@ -7540,7 +7540,7 @@ async def monitor_page():
                                                 </div>
                                                 <div>
                                                     <label style="color: #94a3b8; font-size: 0.8rem; display: block; margin-bottom: 4px;">Source Stage</label>
-                                                    <input type="text" id="new-pipe-stage" value="${{stageInfo.name || 'SI_DEMOS.PRODUCTION.EXT_RAW_AMI'}}" readonly style="width: 100%; padding: 8px; background: rgba(15,23,42,0.5); border: 1px solid rgba(100,116,139,0.2); border-radius: 6px; color: #94a3b8;">
+                                                    <input type="text" id="new-pipe-stage" value="${{stageInfo.name || 'FLUX_DATABASE.PRODUCTION.EXT_RAW_AMI'}}" readonly style="width: 100%; padding: 8px; background: rgba(15,23,42,0.5); border: 1px solid rgba(100,116,139,0.2); border-radius: 6px; color: #94a3b8;">
                                                 </div>
                                             </div>
                                             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
@@ -7607,7 +7607,7 @@ async def monitor_page():
                 try {{
                     const formData = new FormData();
                     formData.append('pipe_name', pipeName);
-                    formData.append('target_database', 'SI_DEMOS');
+                    formData.append('target_database', 'FLUX_DATABASE');
                     formData.append('target_schema', schema);
                     formData.append('target_table', table);
                     formData.append('source_stage', stage);
@@ -7771,7 +7771,7 @@ async def validate_page():
             result = snowflake_session.sql("SHOW DATABASES").collect()
             databases = [r['name'] for r in result if not r['name'].startswith('SNOWFLAKE')]
     except:
-        databases = ['SI_DEMOS']
+        databases = ['FLUX_DATABASE']
     
     db_options = "".join([f'<option value="{db}">{db}</option>' for db in databases])
     
@@ -7847,7 +7847,7 @@ async def history_page():
             result = snowflake_session.sql("""
                 SELECT JOB_ID, CREATED_AT, MODE, DATABASE_NAME, SCHEMA_NAME, TABLE_NAME,
                        METERS, DAYS, ROWS_GENERATED, DURATION_SECONDS, STATUS
-                FROM SI_DEMOS.APPLICATIONS.FLUX_GENERATION_HISTORY
+                FROM FLUX_DATABASE.APPLICATIONS.FLUX_GENERATION_HISTORY
                 ORDER BY CREATED_AT DESC
                 LIMIT 50
             """).collect()
@@ -7993,7 +7993,7 @@ async def suspend_task(task_name: str = Form(...)):
     try:
         session = get_valid_session()
         if session:
-            session.sql(f"ALTER TASK SI_DEMOS.PRODUCTION.{task_name} SUSPEND").collect()
+            session.sql(f"ALTER TASK FLUX_DATABASE.PRODUCTION.{task_name} SUSPEND").collect()
             return RedirectResponse(url="/monitor", status_code=303)
     except Exception as e:
         logger.error(f"Failed to suspend task {task_name}: {e}")
@@ -8006,7 +8006,7 @@ async def resume_task(task_name: str = Form(...)):
     try:
         session = get_valid_session()
         if session:
-            session.sql(f"ALTER TASK SI_DEMOS.PRODUCTION.{task_name} RESUME").collect()
+            session.sql(f"ALTER TASK FLUX_DATABASE.PRODUCTION.{task_name} RESUME").collect()
             return RedirectResponse(url="/monitor", status_code=303)
     except Exception as e:
         logger.error(f"Failed to resume task {task_name}: {e}")
@@ -8029,7 +8029,7 @@ async def stop_streaming_job(job_id: str = Form(...)):
         if session:
             try:
                 session.sql(f"""
-                    UPDATE SI_DEMOS.PRODUCTION.STREAMING_JOBS 
+                    UPDATE FLUX_DATABASE.PRODUCTION.STREAMING_JOBS 
                     SET STATUS = 'STOPPED', UPDATED_AT = CURRENT_TIMESTAMP()
                     WHERE JOB_ID = '{job_id}'
                 """).collect()
@@ -8066,7 +8066,7 @@ async def pause_streaming_job(job_id: str = Form(...)):
         if session:
             try:
                 session.sql(f"""
-                    UPDATE SI_DEMOS.PRODUCTION.STREAMING_JOBS 
+                    UPDATE FLUX_DATABASE.PRODUCTION.STREAMING_JOBS 
                     SET STATUS = 'PAUSED', UPDATED_AT = CURRENT_TIMESTAMP()
                     WHERE JOB_ID = '{job_id}'
                 """).collect()
@@ -8103,7 +8103,7 @@ async def resume_streaming_job(job_id: str = Form(...)):
         if session:
             try:
                 session.sql(f"""
-                    UPDATE SI_DEMOS.PRODUCTION.STREAMING_JOBS 
+                    UPDATE FLUX_DATABASE.PRODUCTION.STREAMING_JOBS 
                     SET STATUS = 'RUNNING', UPDATED_AT = CURRENT_TIMESTAMP()
                     WHERE JOB_ID = '{job_id}'
                 """).collect()
@@ -8153,7 +8153,7 @@ async def start_stream(
     rows_per_sec: int = Form(1000),
     batch_size_mb: int = Form(10),
     max_client_lag: int = Form(1),
-    table: str = Form("SI_DEMOS.PRODUCTION.AMI_STREAMING_DATA"),
+    table: str = Form("FLUX_DATABASE.PRODUCTION.AMI_STREAMING_DATA"),
     new_table: str = Form(None),
     # New production matching parameters
     production_source: str = Form("METER_INFRASTRUCTURE"),
@@ -8191,7 +8191,7 @@ async def start_stream(
     
     if snowflake_session:
         try:
-            database = "SI_DEMOS"
+            database = "FLUX_DATABASE"
             schema = "PRODUCTION"
             
             # Get emission pattern config
@@ -8772,7 +8772,7 @@ async def generate_correlated_data(
         try:
             tf_result = session.sql("""
                 SELECT TRANSFORMER_ID, CIRCUIT_ID, SUBSTATION_ID, KVA_RATING
-                FROM SI_DEMOS.PRODUCTION.TRANSFORMER_METADATA
+                FROM FLUX_DATABASE.PRODUCTION.TRANSFORMER_METADATA
                 ORDER BY RANDOM() LIMIT 1000
             """).collect()
             transformers = [dict(r.asDict()) for r in tf_result]
@@ -8785,7 +8785,7 @@ async def generate_correlated_data(
         try:
             c_result = session.sql("""
                 SELECT CIRCUIT_ID, SUBSTATION_ID
-                FROM SI_DEMOS.PRODUCTION.CIRCUIT_METADATA
+                FROM FLUX_DATABASE.PRODUCTION.CIRCUIT_METADATA
                 ORDER BY RANDOM() LIMIT 500
             """).collect()
             circuits = [dict(r.asDict()) for r in c_result]
@@ -8798,7 +8798,7 @@ async def generate_correlated_data(
         try:
             cust_result = session.sql("""
                 SELECT CUSTOMER_ID, PRIMARY_METER_ID
-                FROM SI_DEMOS.PRODUCTION.CUSTOMERS_MASTER_DATA
+                FROM FLUX_DATABASE.PRODUCTION.CUSTOMERS_MASTER_DATA
                 ORDER BY RANDOM() LIMIT 1000
             """).collect()
             customers = [dict(r.asDict()) for r in cust_result]
@@ -8811,7 +8811,7 @@ async def generate_correlated_data(
         try:
             m_result = session.sql(f"""
                 SELECT METER_ID, TRANSFORMER_ID
-                FROM SI_DEMOS.PRODUCTION.METER_INFRASTRUCTURE
+                FROM FLUX_DATABASE.PRODUCTION.METER_INFRASTRUCTURE
                 ORDER BY RANDOM() LIMIT {min(meters, 5000)}
             """).collect()
             meters_data = [dict(r.asDict()) for r in m_result]
@@ -8861,7 +8861,7 @@ async def generate_correlated_data(
                     for i in range(0, len(values_list), batch_size):
                         batch = values_list[i:i+batch_size]
                         insert_sql = f"""
-                            INSERT INTO SI_DEMOS.PRODUCTION.SAP_WORK_ORDERS 
+                            INSERT INTO FLUX_DATABASE.PRODUCTION.SAP_WORK_ORDERS 
                             ({', '.join(columns)}) VALUES {', '.join(batch)}
                         """
                         session.sql(insert_sql).collect()
@@ -8869,7 +8869,7 @@ async def generate_correlated_data(
                     results["generated"].append({
                         "type": "work_orders",
                         "count": len(work_orders),
-                        "table": "SI_DEMOS.PRODUCTION.SAP_WORK_ORDERS"
+                        "table": "FLUX_DATABASE.PRODUCTION.SAP_WORK_ORDERS"
                     })
                     logger.info(f"Inserted {len(work_orders)} work orders")
             except Exception as e:
@@ -8915,7 +8915,7 @@ async def generate_correlated_data(
                     for i in range(0, len(values_list), batch_size):
                         batch = values_list[i:i+batch_size]
                         insert_sql = f"""
-                            INSERT INTO SI_DEMOS.PRODUCTION.OUTAGE_EVENTS 
+                            INSERT INTO FLUX_DATABASE.PRODUCTION.OUTAGE_EVENTS 
                             ({', '.join(columns)}) VALUES {', '.join(batch)}
                         """
                         session.sql(insert_sql).collect()
@@ -8923,7 +8923,7 @@ async def generate_correlated_data(
                     results["generated"].append({
                         "type": "outage_events",
                         "count": len(outages),
-                        "table": "SI_DEMOS.PRODUCTION.OUTAGE_EVENTS"
+                        "table": "FLUX_DATABASE.PRODUCTION.OUTAGE_EVENTS"
                     })
                     logger.info(f"Inserted {len(outages)} outage events")
             except Exception as e:
@@ -8963,7 +8963,7 @@ async def generate_correlated_data(
                     
                     # Create power quality events table if not exists
                     session.sql("""
-                        CREATE TABLE IF NOT EXISTS SI_DEMOS.PRODUCTION.POWER_QUALITY_EVENTS (
+                        CREATE TABLE IF NOT EXISTS FLUX_DATABASE.PRODUCTION.POWER_QUALITY_EVENTS (
                             EVENT_ID VARCHAR,
                             METER_ID VARCHAR,
                             TRANSFORMER_ID VARCHAR,
@@ -8980,7 +8980,7 @@ async def generate_correlated_data(
                     for i in range(0, len(values_list), batch_size):
                         batch = values_list[i:i+batch_size]
                         insert_sql = f"""
-                            INSERT INTO SI_DEMOS.PRODUCTION.POWER_QUALITY_EVENTS 
+                            INSERT INTO FLUX_DATABASE.PRODUCTION.POWER_QUALITY_EVENTS 
                             ({', '.join(columns)}) VALUES {', '.join(batch)}
                         """
                         session.sql(insert_sql).collect()
@@ -8988,7 +8988,7 @@ async def generate_correlated_data(
                     results["generated"].append({
                         "type": "power_quality_events",
                         "count": len(pq_events),
-                        "table": "SI_DEMOS.PRODUCTION.POWER_QUALITY_EVENTS"
+                        "table": "FLUX_DATABASE.PRODUCTION.POWER_QUALITY_EVENTS"
                     })
                     logger.info(f"Inserted {len(pq_events)} power quality events")
             except Exception as e:
@@ -9020,7 +9020,7 @@ async def generate_batch(
     start_date: str = Form(None),
     service_area: str = Form("TEXAS_GULF_COAST"),
     meter_prefix: str = Form("MTR"),
-    table: str = Form("SI_DEMOS.PRODUCTION.AMI_INTERVAL_READINGS"),
+    table: str = Form("FLUX_DATABASE.PRODUCTION.AMI_INTERVAL_READINGS"),
     include_variant: str = Form("false"),
     gen_asset360: str = Form(None),
     gen_work_orders: str = Form(None),
@@ -9138,7 +9138,7 @@ async def list_databases():
         return {"databases": databases, "count": len(databases)}
     except Exception as e:
         logger.warning(f"Failed to list databases: {e}")
-        return {"databases": ["SI_DEMOS"], "error": str(e)}
+        return {"databases": ["FLUX_DATABASE"], "error": str(e)}
 
 
 @app.get("/api/schemas/{database}")
@@ -9204,7 +9204,7 @@ async def list_bronze_tables():
     
     try:
         # Query for tables with VARIANT columns (typical bronze table pattern)
-        # Check common locations: SI_DEMOS.PRODUCTION and current database/schema
+        # Check common locations: FLUX_DATABASE.PRODUCTION and current database/schema
         bronze_tables = []
         
         # Get current context
@@ -9213,15 +9213,15 @@ async def list_bronze_tables():
             current_db = ctx[0]
             current_schema = ctx[1]
         except:
-            current_db = "SI_DEMOS"
+            current_db = "FLUX_DATABASE"
             current_schema = "PRODUCTION"
         
         # Search in current database/schema plus all accessible schemas in current database
         # This ensures we find tables in DEV, PRODUCTION, and any other schemas
         search_locations = [
             (current_db, current_schema),
-            ("SI_DEMOS", "PRODUCTION"),
-            ("SI_DEMOS", "DEV"),
+            ("FLUX_DATABASE", "PRODUCTION"),
+            ("FLUX_DATABASE", "DEV"),
         ]
         
         # Dynamically discover all schemas in the current database
@@ -9308,7 +9308,7 @@ async def get_bronze_tables_for_monitor():
         seen_tables = set()
         
         # Search in both PRODUCTION and DEV schemas
-        for schema_path in ["SI_DEMOS.PRODUCTION", "SI_DEMOS.DEV"]:
+        for schema_path in ["FLUX_DATABASE.PRODUCTION", "FLUX_DATABASE.DEV"]:
             try:
                 db, schema = schema_path.split('.')
                 result = session.sql(f"SHOW TABLES IN {schema_path}").collect()
@@ -9931,7 +9931,7 @@ async def list_all_resources():
         ])
     except Exception as e:
         resources["errors"].append(f"Databases: {str(e)}")
-        resources["databases"] = ["SI_DEMOS"]
+        resources["databases"] = ["FLUX_DATABASE"]
     
     # Get warehouses
     try:
@@ -10553,7 +10553,7 @@ async def get_monitor_metrics():
             # Count active tasks
             try:
                 result = session.sql("""
-                    SHOW TASKS LIKE '%AMI_STREAMING%' IN SCHEMA SI_DEMOS.PRODUCTION
+                    SHOW TASKS LIKE '%AMI_STREAMING%' IN SCHEMA FLUX_DATABASE.PRODUCTION
                 """).collect()
                 for row in result:
                     row_dict = row.asDict() if hasattr(row, 'asDict') else dict(row)
@@ -10574,13 +10574,13 @@ async def get_monitor_metrics():
             for table_name in ['AMI_STREAMING_DATA', 'AMI_STREAMING_READINGS', 'AMI_STREAMING_READINGS_TEXAS_GULF_COAST', 'AMI_STREAMING_READINGS_HOUSTON_METRO']:
                 try:
                     result = session.sql(f"""
-                        SELECT COUNT(*) as cnt FROM SI_DEMOS.PRODUCTION.{table_name}
+                        SELECT COUNT(*) as cnt FROM FLUX_DATABASE.PRODUCTION.{table_name}
                         WHERE CREATED_AT >= DATEADD(HOUR, -1, CURRENT_TIMESTAMP())
                     """).collect()
                     recent_rows_1h += result[0]['CNT'] if result else 0
                     
                     result = session.sql(f"""
-                        SELECT COUNT(*) as cnt FROM SI_DEMOS.PRODUCTION.{table_name}
+                        SELECT COUNT(*) as cnt FROM FLUX_DATABASE.PRODUCTION.{table_name}
                     """).collect()
                     total_rows += result[0]['CNT'] if result else 0
                 except:
@@ -10712,7 +10712,7 @@ async def external_stage_diagnostics():
         "detail": f"Access Key: {aws_access_key[:8]}...{aws_access_key[-4:]}" if has_creds else "No AWS credentials found"
     }
     if not has_creds:
-        check2["fix"] = "Update Snowflake secret SI_DEMOS.PRODUCTION.AWS_S3_CREDENTIALS with valid IAM user credentials"
+        check2["fix"] = "Update Snowflake secret FLUX_DATABASE.PRODUCTION.AWS_S3_CREDENTIALS with valid IAM user credentials"
         all_passed = False
     diagnostics["checks"].append(check2)
     
@@ -10774,7 +10774,7 @@ async def external_stage_diagnostics():
             )
     
     # Check 5: External stage metadata
-    stage_name = "SI_DEMOS.PRODUCTION.EXT_RAW_AMI"
+    stage_name = "FLUX_DATABASE.PRODUCTION.EXT_RAW_AMI"
     s3_bucket = None
     s3_prefix = ""
     
@@ -11146,7 +11146,7 @@ async def preview_stage_files(stage_name: str, limit: int = 10):
                             $1:meter:service_area::VARCHAR AS SERVICE_AREA,
                             METADATA$FILENAME AS SOURCE_FILE,
                             METADATA$FILE_ROW_NUMBER AS ROW_NUM
-                        FROM {stage_name} (FILE_FORMAT => 'SI_DEMOS.PRODUCTION.FF_JSON', PATTERN => '.*{first_recent_file}.*')
+                        FROM {stage_name} (FILE_FORMAT => 'FLUX_DATABASE.PRODUCTION.FF_JSON', PATTERN => '.*{first_recent_file}.*')
                         LIMIT {limit}
                     """
                 else:
@@ -11162,7 +11162,7 @@ async def preview_stage_files(stage_name: str, limit: int = 10):
                             $1:SERVICE_AREA::VARCHAR AS SERVICE_AREA,
                             METADATA$FILENAME AS SOURCE_FILE,
                             METADATA$FILE_ROW_NUMBER AS ROW_NUM
-                        FROM {stage_name} (FILE_FORMAT => 'SI_DEMOS.PRODUCTION.FF_JSON', PATTERN => '.*{first_recent_file}.*')
+                        FROM {stage_name} (FILE_FORMAT => 'FLUX_DATABASE.PRODUCTION.FF_JSON', PATTERN => '.*{first_recent_file}.*')
                         LIMIT {limit}
                     """
             else:
@@ -11177,7 +11177,7 @@ async def preview_stage_files(stage_name: str, limit: int = 10):
                         $1:SERVICE_AREA::VARCHAR AS SERVICE_AREA,
                         METADATA$FILENAME AS SOURCE_FILE,
                         METADATA$FILE_ROW_NUMBER AS ROW_NUM
-                    FROM {stage_name} (FILE_FORMAT => 'SI_DEMOS.PRODUCTION.FF_JSON')
+                    FROM {stage_name} (FILE_FORMAT => 'FLUX_DATABASE.PRODUCTION.FF_JSON')
                     LIMIT {limit}
                 """
             result = session.sql(json_query).collect()
@@ -11328,8 +11328,8 @@ async def list_pipes():
         
         # FDE: Check multiple schemas explicitly to ensure DEV pipes are included
         schemas_to_check = [
-            "SI_DEMOS.PRODUCTION",
-            "SI_DEMOS.DEV"
+            "FLUX_DATABASE.PRODUCTION",
+            "FLUX_DATABASE.DEV"
         ]
         
         for schema_path in schemas_to_check:
@@ -11456,12 +11456,12 @@ def get_session_context(session) -> tuple:
         result = session.sql("SELECT CURRENT_DATABASE(), CURRENT_SCHEMA()").collect()
         if result:
             row = result[0]
-            database = row[0] or "SI_DEMOS"
+            database = row[0] or "FLUX_DATABASE"
             schema = row[1] or "PRODUCTION"
             return (database, schema)
     except Exception as e:
         logger.warning(f"Could not get session context, using defaults: {e}")
-    return ("SI_DEMOS", "PRODUCTION")
+    return ("FLUX_DATABASE", "PRODUCTION")
 
 
 def check_object_exists(session, object_type: str, object_name: str) -> dict:
@@ -12217,7 +12217,7 @@ async def get_streaming_architectures():
 @app.post("/api/streaming/generate-ddl")
 async def generate_streaming_ddl(
     architecture: str = Form(...),  # 'classic' or 'hp'
-    database: str = Form("SI_DEMOS"),
+    database: str = Form("FLUX_DATABASE"),
     schema: str = Form("PRODUCTION"),
     table_name: str = Form("AMI_STREAMING_READINGS"),
     pipe_name: str = Form("AMI_STREAMING_PIPE"),
@@ -12306,7 +12306,7 @@ async def generate_streaming_ddl(
 @app.post("/api/streaming/deploy-ddl")
 async def deploy_streaming_ddl(
     architecture: str = Form(...),
-    database: str = Form("SI_DEMOS"),
+    database: str = Form("FLUX_DATABASE"),
     schema: str = Form("PRODUCTION"),
     table_name: str = Form("AMI_STREAMING_READINGS"),
     pipe_name: str = Form("AMI_STREAMING_PIPE")
@@ -12461,7 +12461,7 @@ async def check_streaming_prerequisites(architecture: str):
 @app.get("/api/streaming/python-client-code")
 async def get_python_client_code(
     architecture: str,
-    database: str = "SI_DEMOS",
+    database: str = "FLUX_DATABASE",
     schema: str = "PRODUCTION",
     table_name: str = "AMI_STREAMING_READINGS",
     pipe_name: str = "AMI_STREAMING_PIPE"
@@ -12662,7 +12662,7 @@ async def create_pipe(request: Request):
     form = await request.form()
     
     pipe_name = form.get('pipe_name', '').strip().upper()
-    target_database = form.get('target_database', 'SI_DEMOS').strip().upper()
+    target_database = form.get('target_database', 'FLUX_DATABASE').strip().upper()
     target_schema = form.get('target_schema', 'DEV').strip().upper()
     target_table = form.get('target_table', '').strip().upper()
     source_stage = form.get('source_stage', '').strip()
@@ -12992,7 +12992,7 @@ async def pipes_management_page():
     if session:
         try:
             # Get schemas
-            result = session.sql("SHOW SCHEMAS IN DATABASE SI_DEMOS").collect()
+            result = session.sql("SHOW SCHEMAS IN DATABASE FLUX_DATABASE").collect()
             for row in result:
                 row_dict = row.asDict() if hasattr(row, 'asDict') else dict(row)
                 schema_name = row_dict.get('name', '')
@@ -13170,7 +13170,7 @@ async def pipes_management_page():
                             
                             <div class="form-group">
                                 <label>Target Database</label>
-                                <input type="text" name="target_database" id="target_database" value="SI_DEMOS">
+                                <input type="text" name="target_database" id="target_database" value="FLUX_DATABASE">
                             </div>
                             
                             <div class="form-group">

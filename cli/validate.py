@@ -37,7 +37,7 @@ def run_sql(sql: str, connection: str = "default") -> str:
 
 def check_tables(config: Dict, connection: str) -> List[Dict]:
     """Check that all required tables exist."""
-    database = config.get("database", "SI_DEMOS")
+    database = config.get("database", "FLUX_DATABASE")
     
     expected_tables = [
         "SUBSTATIONS",
@@ -71,7 +71,7 @@ def check_tables(config: Dict, connection: str) -> List[Dict]:
 
 def check_semantic_views(config: Dict, connection: str) -> List[Dict]:
     """Check semantic views exist."""
-    database = config.get("database", "SI_DEMOS")
+    database = config.get("database", "FLUX_DATABASE")
     
     results = []
     sql = f"SHOW SEMANTIC VIEWS IN {database}.APPLICATIONS"
@@ -91,7 +91,7 @@ def check_semantic_views(config: Dict, connection: str) -> List[Dict]:
 
 def check_search_services(config: Dict, connection: str) -> List[Dict]:
     """Check Cortex Search services exist."""
-    database = config.get("database", "SI_DEMOS")
+    database = config.get("database", "FLUX_DATABASE")
     
     results = []
     sql = f"SHOW CORTEX SEARCH SERVICES IN {database}.APPLICATIONS"
@@ -116,7 +116,7 @@ def check_search_services(config: Dict, connection: str) -> List[Dict]:
 
 def check_agents(config: Dict, connection: str) -> List[Dict]:
     """Check Cortex Agents exist."""
-    database = config.get("database", "SI_DEMOS")
+    database = config.get("database", "FLUX_DATABASE")
     
     results = []
     sql = f"SHOW AGENTS IN {database}.APPLICATIONS"
@@ -136,7 +136,7 @@ def check_agents(config: Dict, connection: str) -> List[Dict]:
 
 def check_row_counts(config: Dict, connection: str) -> List[Dict]:
     """Check key tables have expected row counts."""
-    database = config.get("database", "SI_DEMOS")
+    database = config.get("database", "FLUX_DATABASE")
     
     expectations = [
         ("TRANSFORMER_METADATA", 90000, 92000),

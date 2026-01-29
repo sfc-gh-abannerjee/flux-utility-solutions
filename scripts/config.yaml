@@ -50,10 +50,10 @@ prod:
   spcs_service: FLUX_OPS_CENTER
 
 # -----------------------------------------------------------------------------
-# Existing SI_DEMOS Environment (for validation)
+# Existing FLUX_DATABASE Environment (for validation)
 # -----------------------------------------------------------------------------
 si_demos:
-  database: SI_DEMOS
+  database: FLUX_DATABASE
   warehouse: SI_DEMO_WH
   warehouse_size: MEDIUM
   admin_role: ACCOUNTADMIN

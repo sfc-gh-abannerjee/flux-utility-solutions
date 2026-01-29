@@ -2,18 +2,18 @@
 ================================================================================
 FLUX UTILITY SOLUTIONS - DATA EXPORT SCRIPT
 ================================================================================
-This script exports all production data from SI_DEMOS to compressed Parquet files
+This script exports all production data from FLUX_DATABASE to compressed Parquet files
 that can be bundled with the repository.
 
 RUN THIS SCRIPT TO EXPORT ALL DATA:
   snow sql -f seed_data/export_all_data.sql -c <your_connection>
 
 The exported files will be in the @FLUX_EXPORT_STAGE stage.
-Download them using: snow stage get @SI_DEMOS.PRODUCTION.FLUX_EXPORT_STAGE/ seed_data/full/
+Download them using: snow stage get @FLUX_DATABASE.PRODUCTION.FLUX_EXPORT_STAGE/ seed_data/full/
 ================================================================================
 */
 
-USE DATABASE SI_DEMOS;
+USE DATABASE FLUX_DATABASE;
 USE SCHEMA PRODUCTION;
 USE WAREHOUSE SI_DEMO_WH;
 
@@ -218,11 +218,11 @@ DOWNLOAD INSTRUCTIONS
 After running this script, download the Parquet files using Snowflake CLI:
 
   cd flux-utility-solutions
-  snow stage get @SI_DEMOS.PRODUCTION.FLUX_EXPORT_STAGE/ seed_data/full/ --recursive
+  snow stage get @FLUX_DATABASE.PRODUCTION.FLUX_EXPORT_STAGE/ seed_data/full/ --recursive
 
 Or using SnowSQL:
   
-  GET @SI_DEMOS.PRODUCTION.FLUX_EXPORT_STAGE/ file://seed_data/full/;
+  GET @FLUX_DATABASE.PRODUCTION.FLUX_EXPORT_STAGE/ file://seed_data/full/;
 
 The Parquet files can then be loaded into any Snowflake account using:
   

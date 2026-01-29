@@ -61,7 +61,7 @@ Environments are defined in `scripts/config.yaml`:
 | dev | FLUX_DEV | SI_DEMO_WH |
 | staging | FLUX_STAGING | FLUX_STAGING_WH |
 | prod | FLUX_PROD | FLUX_PROD_WH |
-| si_demos | SI_DEMOS | SI_DEMO_WH |
+| si_demos | FLUX_DATABASE | SI_DEMO_WH |
 
 ## Workflow
 

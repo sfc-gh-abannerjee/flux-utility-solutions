@@ -35,11 +35,11 @@ This document captures the comprehensive plan for building Flux Utility Solution
 ### Target Snowflake Account
 | Attribute | Value |
 |-----------|-------|
-| Account | {{ account }} |
+| Account | YOUR_ACCOUNT |
 | Connection | cpe_demo_CLI |
-| Database | SI_DEMOS |
-| Production Schema | SI_DEMOS.PRODUCTION |
-| Applications Schema | SI_DEMOS.APPLICATIONS |
+| Database | FLUX_DATABASE |
+| Production Schema | FLUX_DATABASE.PRODUCTION |
+| Applications Schema | FLUX_DATABASE.APPLICATIONS |
 | PostgreSQL Instance | FLUX_OPERATIONS_POSTGRES |
 | SPCS Service | FLUX_OPS_CENTER |
 
@@ -284,7 +284,7 @@ Write demo playbooks and guides.
 ## Testing Strategy
 
 ### Sandbox Environment
-- **Schema**: `SI_DEMOS.FLUX_SANDBOX`
+- **Schema**: `FLUX_DATABASE.FLUX_SANDBOX`
 - **Purpose**: Test all deployment paths before production
 - **Cleanup**: Drop schema after validation
 
