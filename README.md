@@ -52,9 +52,8 @@ snow connection list
 ## Architecture
 
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph APP["APPLICATION LAYER"]
-        direction LR
         A1["Streamlit Apps"]
         A2["Cortex Agents"]
         A3["Notebooks"]
@@ -62,7 +61,6 @@ flowchart TB
     end
     
     subgraph ANALYTICS["ANALYTICS LAYER"]
-        direction LR
         B1["Dynamic Tables"]
         B2["Cortex Analyst"]
         B3["Cortex Search"]
@@ -70,7 +68,6 @@ flowchart TB
     end
     
     subgraph DATA["DATA LAYER"]
-        direction LR
         C1["AMI Readings"]
         C2["Grid Topology"]
         C3["Customers"]
