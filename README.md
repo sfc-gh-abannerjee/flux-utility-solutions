@@ -1,51 +1,48 @@
 # Flux Utility Solutions
 
-**Reference Architecture for Utilities on Snowflake**
-
-A comprehensive solution accelerator demonstrating how utility companies can leverage Snowflake's AI Data Cloud for grid operations, customer analytics, and predictive maintenance.
-
 [![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?logo=snowflake&logoColor=white)](https://www.snowflake.com)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
+**A production-ready reference architecture for electric utilities on Snowflake's AI Data Cloud.**
+
+Transform grid operations with real-time monitoring, predictive maintenance, and AI-powered analytics - all running natively in Snowflake.
+
 ---
 
-## What is Flux?
+## Why Flux?
 
-Flux Utility Solutions provides a **production-ready reference architecture** for electric utilities, featuring:
+| Challenge | Flux Solution |
+|-----------|---------------|
+| Siloed AMI, GIS, and customer data | **Unified data platform** with single source of truth |
+| Manual SQL for business questions | **Natural language queries** via Cortex Analyst |
+| Reactive maintenance | **Predictive risk scoring** with Snowpark ML |
+| Complex deployment requirements | **5 deployment paths** - choose your workflow |
 
-- **Grid Operations** - Real-time monitoring, outage management, restoration tracking
-- **Customer Analytics** - 360-degree customer views, consumption analysis, billing insights  
-- **Asset Management** - Transformer health monitoring, predictive maintenance, risk scoring
-- **AI-Powered Insights** - Natural language queries, intelligent search, conversational agents
-
-> **One solution, five deployment paths.** Whether your team prefers SQL scripts, interactive notebooks, GitOps workflows, CLI automation, or Terraform - Flux has you covered.
+> **One solution. Five deployment paths.** SQL scripts, notebooks, Git integration, CLI, or Terraform - Flux works the way your team works.
 
 ---
 
 ## Quick Start
 
-Get a working environment in under 2 minutes:
+Get a working demo environment in under 2 minutes:
 
 ```bash
-# 1. Clone the repository
+# Clone and deploy
 git clone https://github.com/Snowflake-Labs/flux-utility-solutions.git
 cd flux-utility-solutions
-
-# 2. Ensure Snow CLI is installed and configured
-snow connection list
-
-# 3. Run quick start
 ./cli/quickstart.sh
-
-# Or specify your own database/connection:
-./cli/quickstart.sh --database MY_DB --connection my_connection
 ```
 
-**What gets deployed:**
-- Database with PRODUCTION, APPLICATIONS, SECRETS schemas
-- Warehouse (XSMALL, auto-suspend 60s)
-- Core tables: Substations, Transformers, Meters, Customers
-- Sample seed data loaded and ready to query
+**What you get:**
+- Database with schemas (PRODUCTION, APPLICATIONS, SECRETS)
+- Core tables: Substations, Circuits, Transformers, Meters, Customers
+- Sample data loaded and ready to query
+- Warehouse configured with auto-suspend
+
+```bash
+# Custom deployment
+./cli/quickstart.sh --database MY_FLUX_DB --connection my_connection
+```
 
 ---
 
@@ -54,15 +51,15 @@ snow connection list
 ```mermaid
 flowchart TB
     subgraph APP["APPLICATION LAYER"]
-        A1["Streamlit Apps"] ~~~ A2["Cortex Agents"] ~~~ A3["Notebooks"] ~~~ A4["SPCS Services"]
+        A1["Streamlit"] ~~~ A2["Cortex Agents"] ~~~ A3["Notebooks"] ~~~ A4["SPCS"]
     end
     
     subgraph ANALYTICS["ANALYTICS LAYER"]
-        B1["Dynamic Tables"] ~~~ B2["Cortex Analyst"] ~~~ B3["Cortex Search"] ~~~ B4["ML Models"]
+        B1["Dynamic Tables"] ~~~ B2["Cortex Analyst"] ~~~ B3["Cortex Search"] ~~~ B4["Snowpark ML"]
     end
     
     subgraph DATA["DATA LAYER"]
-        C1["AMI Readings"] ~~~ C2["Grid Topology"] ~~~ C3["Customers"] ~~~ C4["Asset Metadata"]
+        C1["AMI Readings"] ~~~ C2["Grid Topology"] ~~~ C3["Customers"] ~~~ C4["Assets"]
     end
     
     APP --> ANALYTICS --> DATA
@@ -72,68 +69,89 @@ flowchart TB
     style DATA fill:#2e7d32,color:#fff,stroke:#1b5e20
 ```
 
-See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed diagrams and design decisions.
+### AI Capabilities
+
+```mermaid
+flowchart TB
+    subgraph Analyst["CORTEX ANALYST"]
+        A1["Natural Language"] ~~~ A2["Semantic Model"] ~~~ A3["SQL Generation"]
+    end
+    
+    subgraph Search["CORTEX SEARCH"]
+        S1["Customers"] ~~~ S2["Meters"] ~~~ S3["Documents"]
+    end
+    
+    subgraph Agent["CORTEX AGENT"]
+        G1["Multi-Tool"] ~~~ G2["Orchestration"] ~~~ G3["Cascading"]
+    end
+    
+    Analyst --> Search --> Agent
+    
+    style Analyst fill:#1565c0,color:#fff
+    style Search fill:#ef6c00,color:#fff
+    style Agent fill:#7b1fa2,color:#fff
+```
+
+See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed design documentation.
 
 ---
 
 ## Deployment Paths
 
-Choose the deployment method that fits your team:
+Choose the method that fits your team:
 
-| Path | Best For | Time | Guide |
-|------|----------|------|-------|
-| **CLI Quick Start** | Quick demos, POCs | ~2 min | `./cli/quickstart.sh` |
-| **SQL Scripts** | Learning, auditing, manual control | 15-30 min | [scripts/README.md](./scripts/README.md) |
-| **Notebooks** | POC workshops, data scientists | 20 min | [notebooks/README.md](./notebooks/README.md) |
-| **Git Integration** | Modern DevOps, GitOps workflows | 15 min | [git_deploy/README.md](./git_deploy/README.md) |
-| **Terraform** | Enterprise IaC, multi-environment | 10 min | [terraform/README.md](./terraform/README.md) |
+| Path | Best For | Guide |
+|------|----------|-------|
+| **CLI Quick Start** | Demos, POCs, fastest setup | `./cli/quickstart.sh` |
+| **SQL Scripts** | Learning, auditing, step-by-step control | [scripts/](./scripts/) |
+| **Notebooks** | Workshops, data science teams | [notebooks/](./notebooks/) |
+| **Git Integration** | GitOps, CI/CD pipelines | [git_deploy/](./git_deploy/) |
+| **Terraform** | Enterprise IaC, multi-environment | [terraform/](./terraform/) |
 
-All paths deploy **identical infrastructure** - choose based on your preferences and workflow.
-
----
-
-## Snowflake Capabilities
-
-### Cortex AI
-| Feature | Description |
-|---------|-------------|
-| **Cortex Analyst** | Natural language SQL with semantic models |
-| **Cortex Search** | Vector search for customers, meters, documents |
-| **Cortex Agent** | Multi-tool conversational AI assistant |
-
-### Data Engineering
-| Feature | Description |
-|---------|-------------|
-| **Dynamic Tables** | Declarative Bronze → Silver → Gold pipelines |
-| **Streams & Tasks** | Real-time CDC and scheduled processing |
-| **Stages** | Git integration and file management |
-
-### Machine Learning
-| Feature | Description |
-|---------|-------------|
-| **Snowpark ML** | XGBoost transformer risk prediction |
-| **Model Registry** | Versioned models with governance |
-| **Feature Store** | Centralized feature management |
-
-### Applications
-| Feature | Description |
-|---------|-------------|
-| **Streamlit** | Interactive dashboards and visualizations |
-| **Notebooks** | Collaborative data exploration |
-| **SPCS** | Containerized full-stack applications |
+All paths deploy **identical infrastructure**.
 
 ---
 
 ## Use Cases
 
-| Use Case | Solution | Location |
-|----------|----------|----------|
-| **AMI Analytics** | Time-series analysis of smart meter data | `scripts/04_*`, `notebooks/demos/` |
-| **Grid Visualization** | H3 hexagonal maps with PyDeck | `streamlit/geospatial/` |
-| **Customer 360** | Unified customer view with search | `scripts/07_*` |
+| Use Case | What It Does | Location |
+|----------|--------------|----------|
+| **Grid Visualization** | H3 hexagonal maps with real-time topology | `streamlit/geospatial/` |
+| **AMI Analytics** | Smart meter time-series analysis | `notebooks/demos/` |
+| **Customer 360** | Unified customer view with semantic search | `scripts/07_*` |
 | **Predictive Maintenance** | ML-based transformer risk scoring | `scripts/08-09_*` |
-| **Conversational Analytics** | Natural language grid intelligence | `agents/`, `models/` |
+| **Conversational Analytics** | Natural language grid intelligence | `agents/` |
 | **Outage Management** | Real-time tracking and restoration | `streamlit/outage_dashboard/` |
+
+---
+
+## Snowflake Features Used
+
+| Category | Features |
+|----------|----------|
+| **Cortex AI** | Analyst, Search, Agent, LLM Functions |
+| **Data Engineering** | Dynamic Tables, Streams, Tasks, Stages |
+| **Machine Learning** | Snowpark ML, Model Registry, Feature Store |
+| **Applications** | Streamlit, Notebooks, SPCS |
+
+---
+
+## Sample Data
+
+Bundled data for immediate exploration:
+
+| Dataset | Records | Description |
+|---------|---------|-------------|
+| Substations | 269 | Grid infrastructure |
+| Transformers | 100 | Asset health data |
+| Meters | 100 | AMI metadata |
+| Customers | 94 | Customer records |
+
+Scale up with included generators:
+
+```bash
+python generators/generate_all.py --size full
+```
 
 ---
 
@@ -142,55 +160,29 @@ All paths deploy **identical infrastructure** - choose based on your preferences
 ```
 flux-utility-solutions/
 ├── cli/               # Quick start scripts
-├── scripts/           # SQL deployment scripts (01-99)
+├── scripts/           # SQL deployment (01-99)
 ├── notebooks/         # Snowflake Notebooks
-├── git_deploy/        # Git integration (EXECUTE IMMEDIATE FROM)
+├── git_deploy/        # Git integration
 ├── terraform/         # Infrastructure as Code
 │
-├── streamlit/         # Streamlit in Snowflake apps
+├── streamlit/         # Streamlit apps
 ├── agents/            # Cortex Agent definitions
-├── models/            # Cortex Analyst semantic models
+├── models/            # Semantic models
 │
-├── seed_data/         # Sample data (CSV, Parquet)
-├── generators/        # Synthetic data generation
-├── spcs/              # Container services
-│
+├── seed_data/         # Sample data
+├── generators/        # Data generation
 └── docs/              # Documentation
-```
-
----
-
-## Sample Data
-
-Get started immediately with bundled sample data:
-
-| Dataset | Records | Description |
-|---------|---------|-------------|
-| Substations | 269 | Transmission/distribution infrastructure |
-| Transformers | 100 | Asset specifications and health data |
-| Meters | 100 | AMI smart meter metadata |
-| Customers | 94 | Customer master records |
-
-**Need more data?** Scale up with included generators:
-
-```bash
-# Generate larger datasets locally
-python generators/generate_all.py --size full
-
-# Or use SQL-based generation in Snowflake
-snow sql -f scripts/51_generate_ami_sample.sql -D "days=30"
 ```
 
 ---
 
 ## Prerequisites
 
-| Requirement | Purpose |
-|-------------|---------|
+| Requirement | Notes |
+|-------------|-------|
 | Snowflake account | ACCOUNTADMIN role recommended |
-| [Snow CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index) | Script deployment and management |
+| [Snow CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index) | Required for CLI deployment |
 | Python 3.10+ | Optional: data generators |
-| Docker | Optional: SPCS deployment |
 | Terraform 1.5+ | Optional: IaC deployment |
 
 ---
@@ -199,36 +191,18 @@ snow sql -f scripts/51_generate_ami_sample.sql -D "days=30"
 
 | Document | Description |
 |----------|-------------|
-| [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System architecture and design |
-| [DATA_MODEL.md](./docs/DATA_MODEL.md) | Database schema documentation |
-| [DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Step-by-step deployment guide |
-| [CORTEX_GUIDE.md](./docs/CORTEX_GUIDE.md) | AI features configuration |
-| [TERRAFORM_GUIDE.md](./docs/TERRAFORM_GUIDE.md) | Infrastructure as Code guide |
-| [SEED_DATA_GUIDE.md](./docs/SEED_DATA_GUIDE.md) | Loading sample data |
-
----
-
-## Variable Templating
-
-Different deployment paths use different variable syntax:
-
-| Path | Syntax | Example |
-|------|--------|---------|
-| SQL Scripts (Snow CLI) | `<% var %>` | `CREATE DATABASE <% database %>` |
-| Git Integration | `$var` + USING | `EXECUTE IMMEDIATE FROM ... USING (db => 'X')` |
-| Terraform | `var.name` | `var.database_name` |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System design and diagrams |
+| [AI_ARCHITECTURE.md](./docs/AI_ARCHITECTURE.md) | Cortex AI configuration |
+| [DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Step-by-step deployment |
+| [DATA_MODEL.md](./docs/DATA_MODEL.md) | Schema documentation |
+| [SECURITY.md](./docs/SECURITY.md) | Roles and permissions |
+| [SCALABILITY.md](./docs/SCALABILITY.md) | Sizing guidance |
 
 ---
 
 ## License
 
 Apache 2.0 - See [LICENSE](./LICENSE)
-
----
-
-## Contributing
-
-Contributions welcome! Please ensure all changes pass validation tests before submitting.
 
 ---
 
