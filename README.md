@@ -2,6 +2,8 @@
 
 ## Reference Architecture for Utilities on Snowflake
 
+A comprehensive solution accelerator demonstrating how utility companies can leverage Snowflake's AI Data Cloud for grid operations, customer analytics, and predictive maintenance.
+
 > **One solution, five deployment paths.**
 >
 > Whether your team prefers SQL scripts, interactive notebooks, GitOps workflows, CLI automation, or Terraform - Flux has you covered.
@@ -154,21 +156,19 @@ snow sql -c $CONN -f 50_load_seed_data.sql -D "database=$DB" -D "warehouse=$WH"
 
 ```
 flux-utility-solutions/
-├── scripts/           # Path 1: Numbered SQL files (01-99)
-├── notebooks/         # Path 2: Snowflake Notebooks (.ipynb)
-├── git_deploy/        # Path 3: Git integration setup
-├── cli/               # Path 4: Shell deployment scripts
-├── terraform/         # Path 5: Infrastructure as Code
+├── scripts/           # SQL deployment scripts (01-99)
+├── notebooks/         # Snowflake Notebooks (.ipynb)
+├── git_deploy/        # Git integration deployment
+├── cli/               # Shell automation scripts
+├── terraform/         # Infrastructure as Code
 ├── models/            # Cortex Analyst semantic models
 ├── agents/            # Cortex Agent definitions
-├── seed_data/         # Bundled CSV seed data + PostgreSQL scripts
-│   ├── csv/           # Sample data (substations, transformers, meters, customers)
-│   └── postgresql/    # PostgreSQL schema and loading scripts
-├── generators/        # Synthetic data generation (optional)
-├── sync/              # PostgreSQL sync scripts
-├── app/               # SPCS application source
-├── docs/              # Demo playbooks and guides
-└── comparison/        # vs. other solutions
+├── streamlit/         # Streamlit in Snowflake apps
+├── seed_data/         # Sample data (CSV, Parquet)
+├── generators/        # Synthetic data generation
+├── spcs/              # Container services (SPCS)
+├── sync/              # External sync scripts
+└── docs/              # Documentation
 ```
 
 ---
@@ -231,12 +231,13 @@ flux-utility-solutions/
 | Document | Description |
 |----------|-------------|
 | [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System architecture diagrams |
-| [docs/DEMO_PLAYBOOK.md](./docs/DEMO_PLAYBOOK.md) | What to show, what to say |
-| [docs/USE_CASE_MAP.md](./docs/USE_CASE_MAP.md) | Customer need → module mapping |
-| [docs/PATH_COMPARISON.md](./docs/PATH_COMPARISON.md) | When to use each deployment path |
-| [docs/TERRAFORM_GUIDE.md](./docs/TERRAFORM_GUIDE.md) | Infrastructure as Code deep-dive |
-| [docs/SEED_DATA_GUIDE.md](./docs/SEED_DATA_GUIDE.md) | Loading seed data into Snowflake/PostgreSQL |
-| [docs/KNOWN_GAPS.md](./docs/KNOWN_GAPS.md) | Data limitations and workarounds |
+| [DATA_MODEL.md](./docs/DATA_MODEL.md) | Database schema and relationships |
+| [USE_CASE_MAP.md](./docs/USE_CASE_MAP.md) | Customer need → module mapping |
+| [PATH_COMPARISON.md](./docs/PATH_COMPARISON.md) | When to use each deployment path |
+| [TERRAFORM_GUIDE.md](./docs/TERRAFORM_GUIDE.md) | Infrastructure as Code deep-dive |
+| [SEED_DATA_GUIDE.md](./docs/SEED_DATA_GUIDE.md) | Loading seed data into Snowflake |
+| [CORTEX_GUIDE.md](./docs/CORTEX_GUIDE.md) | Cortex AI features and configuration |
+| [DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Detailed deployment instructions |
 
 ---
 
