@@ -99,34 +99,65 @@ EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/10_cor
 SELECT 'Phase 4 complete: Cortex AI services configured' AS status;
 
 -- ============================================================================
--- Phase 5: ML and Advanced Features (Optional)
+-- Phase 5: Streamlit Applications
 -- ============================================================================
 
-SELECT '=== Phase 5: ML Features ===' AS phase;
+SELECT '=== Phase 5: Streamlit Applications ===' AS phase;
+
+-- Setup Streamlit stage
+EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/24_streamlit_stage_setup.sql
+  USING (database => $database);
+
+-- Note: Streamlit app files need to be uploaded to the stage before deploying apps
+-- For Git Integration deployment, files are copied from the repo to the stage
+BEGIN
+    -- Copy Streamlit files from Git repo to stage
+    COPY FILES INTO @IDENTIFIER($database || '.APPLICATIONS.STREAMLIT_STAGE')
+    FROM @flux_utility_solutions_repo/branches/main/streamlit/
+    PATTERN = '.*[.]py';
+    
+    COPY FILES INTO @IDENTIFIER($database || '.APPLICATIONS.STREAMLIT_STAGE/geospatial')
+    FROM @flux_utility_solutions_repo/branches/main/streamlit/geospatial/;
+    
+    -- Deploy Streamlit apps
+    EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/25_streamlit_apps.sql
+      USING (database => $database, warehouse => $warehouse);
+    
+    SELECT 'Phase 5 complete: Streamlit apps deployed' AS status;
+EXCEPTION
+    WHEN OTHER THEN
+        SELECT 'Streamlit deployment skipped - can be deployed manually using scripts/25_streamlit_apps.sql' AS status;
+END;
+
+-- ============================================================================
+-- Phase 6: ML and Advanced Features (Optional)
+-- ============================================================================
+
+SELECT '=== Phase 6: ML Features ===' AS phase;
 
 -- ML Feature tables
 EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/11_ml_feature_tables.sql
   USING (database => $database);
 
-SELECT 'Phase 5 complete: ML feature tables created' AS status;
+SELECT 'Phase 6 complete: ML feature tables created' AS status;
 
 -- ============================================================================
--- Phase 6: Security and RBAC
+-- Phase 7: Security and RBAC
 -- ============================================================================
 
-SELECT '=== Phase 6: Security Setup ===' AS phase;
+SELECT '=== Phase 7: Security Setup ===' AS phase;
 
 -- Final RBAC grants
 EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/16_rbac_final.sql
   USING (database => $database, admin_role => $admin_role, user_role => $user_role, warehouse => $warehouse);
 
-SELECT 'Phase 6 complete: RBAC configured' AS status;
+SELECT 'Phase 7 complete: RBAC configured' AS status;
 
 -- ============================================================================
--- Phase 7: Seed Data Loading
+-- Phase 8: Seed Data Loading
 -- ============================================================================
 
-SELECT '=== Phase 7: Seed Data Loading ===' AS phase;
+SELECT '=== Phase 8: Seed Data Loading ===' AS phase;
 
 -- Load seed data from source database (if configured)
 -- This copies reference tables and generates sample AMI data
@@ -149,13 +180,13 @@ EXCEPTION
         SELECT 'AMI generation skipped - can be run separately' AS status;
 END;
 
-SELECT 'Phase 7 complete: Seed data loaded' AS status;
+SELECT 'Phase 8 complete: Seed data loaded' AS status;
 
 -- ============================================================================
--- Phase 8: Validation
+-- Phase 9: Validation
 -- ============================================================================
 
-SELECT '=== Phase 8: Validation ===' AS phase;
+SELECT '=== Phase 9: Validation ===' AS phase;
 
 EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/99_validate_deployment.sql
   USING (database => $database);
