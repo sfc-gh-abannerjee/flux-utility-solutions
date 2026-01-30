@@ -1,230 +1,329 @@
 # Flux Utility Solutions - Architecture
 
-System architecture and design decisions.
+A comprehensive reference architecture for utility companies building grid operations and analytics solutions on Snowflake's AI Data Cloud.
 
 ## Overview
 
-Flux Utility Solutions is a **4-layer hybrid platform** for utility grid analytics:
+Flux Utility Solutions demonstrates a **modern data platform architecture** that combines real-time operations, large-scale analytics, and AI capabilities in a unified solution.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     APPLICATION LAYER                            │
-│    Flux Ops Center (Streamlit) │ Grid Intelligence Agent        │
-├─────────────────────────────────────────────────────────────────┤
-│                      ANALYTICS LAYER                             │
-│  Snowflake │ 7.1B AMI rows │ Semantic Views │ Cortex AI         │
-├─────────────────────────────────────────────────────────────────┤
-│                      STREAMING LAYER                             │
-│            CDC Sync │ PostgreSQL → Snowflake                     │
-├─────────────────────────────────────────────────────────────────┤
-│                    TRANSACTIONAL LAYER                           │
-│    PostgreSQL 17.7 │ <20ms latency │ Real-time operations       │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          APPLICATION LAYER                                   │
+│                                                                              │
+│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
+│   │  Streamlit   │  │   Cortex     │  │  Notebooks   │  │    SPCS      │   │
+│   │    Apps      │  │   Agents     │  │              │  │  Services    │   │
+│   └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                           ANALYTICS LAYER                                    │
+│                                                                              │
+│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
+│   │   Dynamic    │  │   Cortex     │  │   Cortex     │  │   Snowpark   │   │
+│   │   Tables     │  │   Analyst    │  │   Search     │  │     ML       │   │
+│   └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                             DATA LAYER                                       │
+│                                                                              │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                     Snowflake Data Cloud                             │   │
+│   │  AMI Readings │ Grid Topology │ Customer Data │ Asset Metadata      │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Layer Details
+---
 
-### Layer 1: Transactional (PostgreSQL)
+## Core Components
 
-**Purpose**: Real-time operations with <20ms latency
+### Data Layer
 
-| Component | Description |
-|-----------|-------------|
-| PostgreSQL 17.7 | Native Snowflake PostgreSQL instance |
-| Schemas | operations, scada, work_orders |
-| Latency | <20ms for real-time queries |
-| Retention | 24 hours (hot data) |
+The foundation layer stores and manages all utility data in Snowflake:
 
-**Tables**:
-- `meter_readings_realtime` - Last 24h readings
-- `outage_events` - Active outage tracking
-- `work_orders.field_orders` - Field service management
+| Schema | Purpose | Key Objects |
+|--------|---------|-------------|
+| **PRODUCTION** | Core operational data | Substations, Transformers, Meters, Customers |
+| **APPLICATIONS** | AI services and apps | Semantic Views, Search Services, Streamlit Apps |
+| **SECRETS** | Credentials and configs | API keys, connection strings |
 
-### Layer 2: Streaming (CDC)
+**Key Data Domains:**
 
-**Purpose**: Continuous data sync from PostgreSQL to Snowflake
+```
+┌─────────────────┐
+│   SUBSTATIONS   │ ── Grid infrastructure backbone
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│    CIRCUITS     │ ── Distribution feeders
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  TRANSFORMERS   │ ── Asset fleet with load data
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│     METERS      │ ── AMI smart meter network
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│   CUSTOMERS     │ ── Customer master data
+└─────────────────┘
+```
 
-| Component | Description |
-|-----------|-------------|
-| CDC Type | Incremental change capture |
-| Frequency | 1-15 minutes depending on table |
-| Pattern | Staging tables → MERGE into production |
+### Analytics Layer
 
-### Layer 3: Analytics (Snowflake)
+Leverages Snowflake's native capabilities for advanced analytics:
 
-**Purpose**: Large-scale analytics and AI workloads
+| Capability | Use Case | Implementation |
+|------------|----------|----------------|
+| **Dynamic Tables** | Bronze → Silver → Gold pipelines | Declarative transformations |
+| **Cortex Analyst** | Natural language SQL | Semantic models with relationships |
+| **Cortex Search** | RAG and document search | Customer, meter, and document indices |
+| **Snowpark ML** | Predictive maintenance | XGBoost transformer risk models |
 
-| Component | Scale | Description |
-|-----------|-------|-------------|
-| AMI Readings | 7.1B rows | 15-minute interval data |
-| Transformers | 211M rows | Hourly load data |
-| Customers | 686K | Master profiles |
-| Meters | 597K | Smart meter metadata |
+### Application Layer
 
-**Schemas**:
-- `PRODUCTION` - Core data tables
-- `APPLICATIONS` - Semantic views, agents, services
+Multiple interfaces for different user personas:
 
-### Layer 4: Application (SPCS)
+| Application | Technology | Purpose |
+|-------------|------------|---------|
+| **Geospatial H3 App** | Streamlit | H3 hexagonal grid visualization |
+| **Grid Map App** | Streamlit | Real-time topology monitoring |
+| **Load Analytics** | Streamlit | Transformer capacity analysis |
+| **Outage Dashboard** | Streamlit | Outage tracking and restoration |
+| **Grid Intelligence Agent** | Cortex Agent | Conversational analytics assistant |
+| **Notebooks** | Snowflake Notebooks | Interactive data exploration |
 
-**Purpose**: User-facing applications and services
-
-| Component | Description |
-|-----------|-------------|
-| Flux Ops Center | Streamlit dashboard |
-| Grid Intelligence Agent | Cortex AI assistant |
-| Data Forge | ETL and data generation |
+---
 
 ## AI Architecture
 
-### Cortex Analyst
+### Cortex Analyst (Natural Language SQL)
+
+Enables business users to query data using natural language:
 
 ```
-User Question
-     │
-     ▼
-┌─────────────────┐
-│ Semantic View   │◄── utility_semantic_model.yaml
-│ (Owner's Rights)│    30 tables, relationships
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ SQL Generation  │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Query Execution │
-└────────┬────────┘
-         │
-         ▼
-    Response
+┌─────────────────────────────────────────────────────────────────┐
+│                        User Question                             │
+│              "What's the total load on substation 5?"           │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      SEMANTIC VIEW                               │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │   Tables    │  │ Relationships│  │   Metrics   │              │
+│  │   (30+)     │  │   & Joins   │  │ & Measures  │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     SQL Generation                               │
+│         Automatic query construction with proper joins           │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Query Results                               │
+│                  Formatted response to user                      │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Cortex Search (RAG)
 
-```
-┌─────────────────────────────────────────────────────┐
-│                 SEARCH SERVICES                      │
-├─────────────────┬─────────────────┬─────────────────┤
-│ Customer Search │ Meter Search    │ Tech Docs       │
-│ 686K profiles   │ 597K meters     │ 20K chunks      │
-│ Name, Address   │ ID, Location    │ Manuals, Guides │
-└────────┬────────┴────────┬────────┴────────┬────────┘
-         │                 │                 │
-         └─────────────────┼─────────────────┘
-                           │
-                           ▼
-                  ┌─────────────────┐
-                  │ Grid Intel Agent│
-                  │ Tool Selection  │
-                  └─────────────────┘
-```
+Multiple search services for different data domains:
 
-### Agent Tool Selection
+| Search Service | Content | Use Case |
+|----------------|---------|----------|
+| Customer Search | Customer profiles | "Find John Smith on Oak Street" |
+| Meter Search | Meter metadata | "Look up meter MTR-12345" |
+| Asset Search | Equipment specs | "Find transformer specifications" |
+| Document Search | Technical manuals | "How to maintain transformers" |
 
-| Question Type | Tool | Examples |
-|--------------|------|----------|
-| Aggregations | Cortex Analyst | "Total consumption", "Average load" |
-| Rankings | Cortex Analyst | "Top 10 customers", "Worst transformers" |
-| Lookups | Cortex Search | "Find John Smith", "Meter MTR-12345" |
-| Technical | Cortex Search | "How to maintain transformer" |
+### Cortex Agent (Multi-Tool)
 
-## Data Model
-
-### Entity Relationships
+Orchestrates multiple AI capabilities:
 
 ```
-SUBSTATIONS (98)
-     │
-     ▼
-CIRCUITS (73) ──────────► CIRCUIT_METADATA
-     │
-     ▼
-TRANSFORMERS (91K) ─────► TRANSFORMER_HOURLY_LOAD (211M)
-     │
-     ▼
-METERS (597K) ──────────► AMI_READINGS (7.1B)
-     │
-     ▼
-CUSTOMERS (686K)
+┌─────────────────────────────────────────────────────────────────┐
+│                    GRID INTELLIGENCE AGENT                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│   User: "Show high-risk transformers near substation 5"         │
+│                                                                  │
+│   ┌─────────────────┐                                           │
+│   │  Tool Selection │                                           │
+│   └────────┬────────┘                                           │
+│            │                                                     │
+│   ┌────────┴────────┬────────────────┬────────────────┐        │
+│   ▼                 ▼                ▼                ▼        │
+│ ┌─────────┐   ┌─────────────┐  ┌──────────┐  ┌────────────┐   │
+│ │ Analyst │   │   Search    │  │Procedures│  │  External  │   │
+│ │  (SQL)  │   │   (RAG)     │  │ (Cascade)│  │   APIs     │   │
+│ └─────────┘   └─────────────┘  └──────────┘  └────────────┘   │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Key Tables
-
-| Table | Rows | Purpose |
-|-------|------|---------|
-| AMI_INTERVAL_READINGS | 7.1B | Raw 15-min readings |
-| AMI_READINGS_FINAL | 7.1B | Enhanced with sags/outages |
-| TRANSFORMER_HOURLY_LOAD | 211M | Hourly transformer loading |
-| TRANSFORMER_METADATA | 91K | Fleet specifications |
-| CUSTOMERS_MASTER_DATA | 686K | Customer profiles |
-| METER_INFRASTRUCTURE | 597K | Meter specifications |
-
-## Security Model
-
-### RBAC Hierarchy
-
-```
-ACCOUNTADMIN
-     │
-     ▼
-FLUX_ADMIN_ROLE ─────────┬─────────┐
-     │                   │         │
-     ▼                   ▼         ▼
-FLUX_USER_ROLE    FLUX_ETL_ROLE   FLUX_SERVICE_ROLE
-     │
-     ▼
-FLUX_ANALYST_ROLE
-```
-
-### Permissions
-
-| Role | Database | Warehouse | Semantic Views | Agents |
-|------|----------|-----------|----------------|--------|
-| Admin | OWNERSHIP | OPERATE | ALL | ALL |
-| User | USAGE | USAGE | SELECT | USAGE |
-| Analyst | USAGE | USAGE | SELECT | - |
-| ETL | USAGE | USAGE | - | - |
+---
 
 ## Deployment Architecture
 
-### 5 Deployment Paths
+### Five Deployment Paths
+
+All paths deploy identical infrastructure - choose based on your team's preferences:
 
 ```
-                    ┌─────────────────┐
-                    │  flux-utility-  │
-                    │   solutions/    │
-                    └────────┬────────┘
-                             │
-        ┌────────────────────┼────────────────────┐
-        │          │         │         │          │
-        ▼          ▼         ▼         ▼          ▼
-   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
-   │  SQL   │ │Notebook│ │  Git   │ │  CLI   │ │Terraform│
-   │Scripts │ │        │ │        │ │        │ │        │
-   └────────┘ └────────┘ └────────┘ └────────┘ └────────┘
+                        ┌──────────────────────┐
+                        │  flux-utility-       │
+                        │  solutions/          │
+                        └──────────┬───────────┘
+                                   │
+        ┌──────────┬───────────┬───┴───┬───────────┬──────────┐
+        │          │           │       │           │          │
+        ▼          ▼           ▼       ▼           ▼          ▼
+   ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+   │   SQL   │ │Notebooks│ │   Git   │ │   CLI   │ │Terraform│
+   │ Scripts │ │         │ │  Integ  │ │         │ │   IaC   │
+   ├─────────┤ ├─────────┤ ├─────────┤ ├─────────┤ ├─────────┤
+   │ Manual  │ │Workshop │ │ GitOps  │ │  Quick  │ │Enterprise│
+   │ Control │ │  POCs   │ │Workflows│ │  Start  │ │Multi-env│
+   └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘
 ```
 
-All paths deploy identical infrastructure with zero delta.
+| Path | Best For | Key Feature |
+|------|----------|-------------|
+| **SQL Scripts** | Learning, auditing | Full visibility into each step |
+| **Notebooks** | POC workshops | Interactive, documented execution |
+| **Git Integration** | Modern DevOps | EXECUTE IMMEDIATE FROM repository |
+| **CLI** | Quick demos | Single-command deployment |
+| **Terraform** | Enterprise | Multi-environment, state management |
 
-## Performance Considerations
+### Deployment Phases
 
-### Query Optimization
+Regardless of path chosen, deployment follows these phases:
 
-| Pattern | Optimization |
-|---------|-------------|
-| AMI aggregations | Clustered by (TIMESTAMP, METER_ID) |
-| Transformer lookups | Clustered by (TRANSFORMER_ID) |
-| Customer search | Cortex Search index |
-| Time-series | Micro-partitions by date |
+```
+Phase 1: Infrastructure    ─► Database, Schemas, Warehouses
+Phase 2: Reference Data    ─► Substations, Circuits
+Phase 3: Core Tables       ─► Transformers, Meters, Customers
+Phase 4: Views & Analytics ─► Dynamic Tables, Semantic Views
+Phase 5: Streamlit Apps    ─► H3 Geospatial, Grid Map, Dashboards
+Phase 6: Notebooks         ─► Setup, Demo, Advanced notebooks
+Phase 7: ML Features       ─► Feature tables, Model registry
+Phase 8: Security          ─► RBAC roles and grants
+Phase 9: Seed Data         ─► Sample data loading
+Phase 10: Validation       ─► Deployment verification
+```
 
-### Warehouse Sizing
+---
 
-| Workload | Recommended Size |
-|----------|------------------|
-| Interactive queries | SMALL |
-| AMI aggregations | MEDIUM-LARGE |
-| Search index refresh | SMALL |
-| ML training | GPU (FLUX_ML_POOL) |
+## Security Model
+
+### Role-Based Access Control (RBAC)
+
+```
+                    ACCOUNTADMIN
+                         │
+                         ▼
+                 ┌───────────────┐
+                 │  FLUX_ADMIN   │ ── Full ownership
+                 └───────┬───────┘
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+        ▼                ▼                ▼
+┌───────────────┐ ┌───────────────┐ ┌───────────────┐
+│  FLUX_USER    │ │  FLUX_ETL     │ │ FLUX_SERVICE  │
+│  (Analytics)  │ │  (Data Load)  │ │   (SPCS)      │
+└───────┬───────┘ └───────────────┘ └───────────────┘
+        │
+        ▼
+┌───────────────┐
+│ FLUX_ANALYST  │ ── Cortex Analyst access
+└───────────────┘
+```
+
+### Permission Matrix
+
+| Role | Database | Warehouse | Semantic Views | Search | Agents |
+|------|----------|-----------|----------------|--------|--------|
+| Admin | OWNERSHIP | OPERATE | ALL | ALL | ALL |
+| User | USAGE | USAGE | SELECT | QUERY | USAGE |
+| Analyst | USAGE | USAGE | SELECT | QUERY | - |
+| ETL | MODIFY | USAGE | - | - | - |
+| Service | USAGE | USAGE | - | - | USAGE |
+
+---
+
+## Scalability
+
+### Data Volume Guidelines
+
+| Table Type | Expected Scale | Optimization |
+|------------|----------------|--------------|
+| AMI Readings | Billions of rows | Clustered by (timestamp, meter_id) |
+| Transformer Load | Hundreds of millions | Clustered by (transformer_id, hour) |
+| Customer Data | Hundreds of thousands | Cortex Search indexed |
+| Asset Metadata | Thousands | Standard tables |
+
+### Warehouse Sizing Recommendations
+
+| Workload | Warehouse Size | Notes |
+|----------|----------------|-------|
+| Interactive queries | X-SMALL to SMALL | Auto-suspend 60s |
+| AMI aggregations | MEDIUM to LARGE | Date-range queries |
+| ML training | MEDIUM with GPU | Model fitting |
+| Search indexing | SMALL | Background refresh |
+| Bulk data loading | SMALL to MEDIUM | Parallel ingestion |
+
+---
+
+## Integration Points
+
+### External Integrations
+
+| Integration | Purpose | Implementation |
+|-------------|---------|----------------|
+| GitHub | Version control, GitOps | Git repository stage |
+| Weather APIs | Outage correlation | External access integration |
+| GIS Systems | Geospatial data | H3 hexagonal indexing |
+| SCADA | Real-time operations | Streaming ingestion |
+
+### Internal Snowflake Features
+
+| Feature | Usage |
+|---------|-------|
+| Dynamic Tables | Declarative data pipelines |
+| Streams & Tasks | CDC and scheduling |
+| Snowpipe | Automated data ingestion |
+| Model Registry | ML model versioning |
+| Stages | File storage and Git integration |
+
+---
+
+## Getting Started
+
+1. **Choose your deployment path** based on team preferences
+2. **Clone the repository** and review documentation
+3. **Configure connection** using Snow CLI or Terraform
+4. **Deploy infrastructure** following the chosen path
+5. **Load seed data** for immediate exploration
+6. **Explore applications** - Streamlit apps and notebooks
+
+See [README.md](../README.md) for quick start instructions.
+
+---
+
+## Additional Resources
+
+| Document | Description |
+|----------|-------------|
+| [DATA_MODEL.md](./DATA_MODEL.md) | Detailed schema documentation |
+| [CORTEX_GUIDE.md](./CORTEX_GUIDE.md) | AI features configuration |
+| [TERRAFORM_GUIDE.md](./TERRAFORM_GUIDE.md) | Infrastructure as Code guide |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | Step-by-step deployment |
