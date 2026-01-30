@@ -62,11 +62,11 @@ Orchestrates multiple AI capabilities:
 ```mermaid
 flowchart TB
     subgraph Agent["GRID INTELLIGENCE AGENT"]
-        USER["User: Show high-risk transformers near substation 5"]
+        USER["User query"]
     end
     
     subgraph Tools["TOOL SELECTION"]
-        ANA["Analyst (SQL)"] ~~~ SRC["Search (RAG)"] ~~~ PRO["Procedures"] ~~~ EXT["External APIs"]
+        ANA["Analyst"] ~~~ SRC["Search"] ~~~ PRO["Procedures"] ~~~ EXT["APIs"]
     end
     
     Agent --> Tools
