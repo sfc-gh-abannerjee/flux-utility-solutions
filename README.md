@@ -52,38 +52,36 @@ snow connection list
 ## Architecture
 
 ```mermaid
-block-beta
-    columns 1
-    
-    block:app["APPLICATION LAYER"]:1
-        columns 4
+flowchart TB
+    subgraph APP["APPLICATION LAYER"]
+        direction LR
         A1["Streamlit Apps"]
         A2["Cortex Agents"]
         A3["Notebooks"]
         A4["SPCS Services"]
     end
     
-    block:analytics["ANALYTICS LAYER"]:1
-        columns 4
+    subgraph ANALYTICS["ANALYTICS LAYER"]
+        direction LR
         B1["Dynamic Tables"]
         B2["Cortex Analyst"]
         B3["Cortex Search"]
         B4["ML Models"]
     end
     
-    block:data["DATA LAYER"]:1
-        columns 4
+    subgraph DATA["DATA LAYER"]
+        direction LR
         C1["AMI Readings"]
         C2["Grid Topology"]
         C3["Customers"]
         C4["Asset Metadata"]
     end
     
-    app --> analytics --> data
+    APP --> ANALYTICS --> DATA
     
-    style app fill:#1565c0,color:#fff
-    style analytics fill:#ef6c00,color:#fff
-    style data fill:#2e7d32,color:#fff
+    style APP fill:#1565c0,color:#fff,stroke:#0d47a1
+    style ANALYTICS fill:#ef6c00,color:#fff,stroke:#e65100
+    style DATA fill:#2e7d32,color:#fff,stroke:#1b5e20
 ```
 
 See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed diagrams and design decisions.
