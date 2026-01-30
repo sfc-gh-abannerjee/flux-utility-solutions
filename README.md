@@ -51,18 +51,39 @@ snow connection list
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                      APPLICATION LAYER                               │
-│   Streamlit Apps  │  Cortex Agents  │  Notebooks  │  SPCS Services  │
-├─────────────────────────────────────────────────────────────────────┤
-│                       ANALYTICS LAYER                                │
-│   Dynamic Tables  │  Cortex Analyst  │  Cortex Search  │  ML Models │
-├─────────────────────────────────────────────────────────────────────┤
-│                         DATA LAYER                                   │
-│          Snowflake Data Cloud - Single Source of Truth              │
-│   AMI Readings  │  Grid Topology  │  Customers  │  Asset Metadata   │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+block-beta
+    columns 1
+    
+    block:app["🖥️ APPLICATION LAYER"]:1
+        columns 4
+        A1["Streamlit Apps"]
+        A2["Cortex Agents"]
+        A3["Notebooks"]
+        A4["SPCS Services"]
+    end
+    
+    block:analytics["📊 ANALYTICS LAYER"]:1
+        columns 4
+        B1["Dynamic Tables"]
+        B2["Cortex Analyst"]
+        B3["Cortex Search"]
+        B4["ML Models"]
+    end
+    
+    block:data["💾 DATA LAYER"]:1
+        columns 4
+        C1["AMI Readings"]
+        C2["Grid Topology"]
+        C3["Customers"]
+        C4["Asset Metadata"]
+    end
+    
+    app --> analytics --> data
+    
+    style app fill:#e1f5fe
+    style analytics fill:#fff3e0
+    style data fill:#e8f5e9
 ```
 
 See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed diagrams and design decisions.

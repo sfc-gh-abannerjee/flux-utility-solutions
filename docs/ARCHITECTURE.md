@@ -6,29 +6,39 @@ A comprehensive reference architecture for utility companies building grid opera
 
 Flux Utility Solutions demonstrates a **modern data platform architecture** that combines real-time operations, large-scale analytics, and AI capabilities in a unified solution.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          APPLICATION LAYER                                   │
-│                                                                              │
-│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
-│   │  Streamlit   │  │   Cortex     │  │  Notebooks   │  │    SPCS      │   │
-│   │    Apps      │  │   Agents     │  │              │  │  Services    │   │
-│   └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                           ANALYTICS LAYER                                    │
-│                                                                              │
-│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
-│   │   Dynamic    │  │   Cortex     │  │   Cortex     │  │   Snowpark   │   │
-│   │   Tables     │  │   Analyst    │  │   Search     │  │     ML       │   │
-│   └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                             DATA LAYER                                       │
-│                                                                              │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                     Snowflake Data Cloud                             │   │
-│   │  AMI Readings │ Grid Topology │ Customer Data │ Asset Metadata      │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+block-beta
+    columns 1
+    
+    block:app["🖥️ APPLICATION LAYER"]:1
+        columns 4
+        A1["Streamlit Apps"]
+        A2["Cortex Agents"]
+        A3["Notebooks"]
+        A4["SPCS Services"]
+    end
+    
+    block:analytics["📊 ANALYTICS LAYER"]:1
+        columns 4
+        B1["Dynamic Tables"]
+        B2["Cortex Analyst"]
+        B3["Cortex Search"]
+        B4["Snowpark ML"]
+    end
+    
+    block:data["💾 DATA LAYER - Snowflake Data Cloud"]:1
+        columns 4
+        C1["AMI Readings"]
+        C2["Grid Topology"]
+        C3["Customer Data"]
+        C4["Asset Metadata"]
+    end
+    
+    app --> analytics --> data
+    
+    style app fill:#e1f5fe
+    style analytics fill:#fff3e0
+    style data fill:#e8f5e9
 ```
 
 ---
@@ -47,30 +57,21 @@ The foundation layer stores and manages all utility data in Snowflake:
 
 **Key Data Domains:**
 
-```
-┌─────────────────┐
-│   SUBSTATIONS   │ ── Grid infrastructure backbone
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│    CIRCUITS     │ ── Distribution feeders
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  TRANSFORMERS   │ ── Asset fleet with load data
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│     METERS      │ ── AMI smart meter network
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   CUSTOMERS     │ ── Customer master data
-└─────────────────┘
+```mermaid
+flowchart TD
+    SUB[🏭 SUBSTATIONS<br/>Grid infrastructure backbone]
+    CIR[⚡ CIRCUITS<br/>Distribution feeders]
+    TRF[🔌 TRANSFORMERS<br/>Asset fleet with load data]
+    MTR[📊 METERS<br/>AMI smart meter network]
+    CUS[👤 CUSTOMERS<br/>Customer master data]
+    
+    SUB --> CIR --> TRF --> MTR --> CUS
+    
+    style SUB fill:#1e88e5,color:#fff
+    style CIR fill:#43a047,color:#fff
+    style TRF fill:#fb8c00,color:#fff
+    style MTR fill:#8e24aa,color:#fff
+    style CUS fill:#e53935,color:#fff
 ```
 
 ### Analytics Layer
@@ -105,32 +106,32 @@ Multiple interfaces for different user personas:
 
 Enables business users to query data using natural language:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        User Question                             │
-│              "What's the total load on substation 5?"           │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      SEMANTIC VIEW                               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│  │   Tables    │  │ Relationships│  │   Metrics   │              │
-│  │   (30+)     │  │   & Joins   │  │ & Measures  │              │
-│  └─────────────┘  └─────────────┘  └─────────────┘              │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     SQL Generation                               │
-│         Automatic query construction with proper joins           │
-└────────────────────────────┬────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Query Results                               │
-│                  Formatted response to user                      │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Question["💬 User Question"]
+        Q["What's the total load on substation 5?"]
+    end
+    
+    subgraph Semantic["🧠 SEMANTIC VIEW"]
+        T["📋 Tables<br/>(30+)"]
+        R["🔗 Relationships<br/>& Joins"]
+        M["📏 Metrics<br/>& Measures"]
+    end
+    
+    subgraph SQL["⚙️ SQL Generation"]
+        G["Automatic query construction<br/>with proper joins"]
+    end
+    
+    subgraph Results["📊 Query Results"]
+        RES["Formatted response to user"]
+    end
+    
+    Question --> Semantic --> SQL --> Results
+    
+    style Question fill:#e3f2fd
+    style Semantic fill:#fff8e1
+    style SQL fill:#f3e5f5
+    style Results fill:#e8f5e9
 ```
 
 ### Cortex Search (RAG)
@@ -148,25 +149,25 @@ Multiple search services for different data domains:
 
 Orchestrates multiple AI capabilities:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    GRID INTELLIGENCE AGENT                       │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│   User: "Show high-risk transformers near substation 5"         │
-│                                                                  │
-│   ┌─────────────────┐                                           │
-│   │  Tool Selection │                                           │
-│   └────────┬────────┘                                           │
-│            │                                                     │
-│   ┌────────┴────────┬────────────────┬────────────────┐        │
-│   ▼                 ▼                ▼                ▼        │
-│ ┌─────────┐   ┌─────────────┐  ┌──────────┐  ┌────────────┐   │
-│ │ Analyst │   │   Search    │  │Procedures│  │  External  │   │
-│ │  (SQL)  │   │   (RAG)     │  │ (Cascade)│  │   APIs     │   │
-│ └─────────┘   └─────────────┘  └──────────┘  └────────────┘   │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Agent["🤖 GRID INTELLIGENCE AGENT"]
+        USER["👤 User: Show high-risk transformers<br/>near substation 5"]
+        TOOL["🔧 Tool Selection"]
+        
+        USER --> TOOL
+        
+        TOOL --> ANA["📊 Analyst<br/>(SQL)"]
+        TOOL --> SRC["🔍 Search<br/>(RAG)"]
+        TOOL --> PRO["⚡ Procedures<br/>(Cascade)"]
+        TOOL --> EXT["🌐 External<br/>APIs"]
+    end
+    
+    style Agent fill:#fce4ec
+    style ANA fill:#e3f2fd
+    style SRC fill:#e8f5e9
+    style PRO fill:#fff8e1
+    style EXT fill:#f3e5f5
 ```
 
 ---
@@ -177,22 +178,22 @@ Orchestrates multiple AI capabilities:
 
 All paths deploy identical infrastructure - choose based on your team's preferences:
 
-```
-                        ┌──────────────────────┐
-                        │  flux-utility-       │
-                        │  solutions/          │
-                        └──────────┬───────────┘
-                                   │
-        ┌──────────┬───────────┬───┴───┬───────────┬──────────┐
-        │          │           │       │           │          │
-        ▼          ▼           ▼       ▼           ▼          ▼
-   ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
-   │   SQL   │ │Notebooks│ │   Git   │ │   CLI   │ │Terraform│
-   │ Scripts │ │         │ │  Integ  │ │         │ │   IaC   │
-   ├─────────┤ ├─────────┤ ├─────────┤ ├─────────┤ ├─────────┤
-   │ Manual  │ │Workshop │ │ GitOps  │ │  Quick  │ │Enterprise│
-   │ Control │ │  POCs   │ │Workflows│ │  Start  │ │Multi-env│
-   └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘
+```mermaid
+flowchart TD
+    REPO["📦 flux-utility-solutions/"]
+    
+    REPO --> SQL["📜 SQL Scripts<br/><i>Manual Control</i>"]
+    REPO --> NB["📓 Notebooks<br/><i>Workshop POCs</i>"]
+    REPO --> GIT["🔄 Git Integration<br/><i>GitOps Workflows</i>"]
+    REPO --> CLI["⚡ CLI<br/><i>Quick Start</i>"]
+    REPO --> TF["🏗️ Terraform<br/><i>Enterprise Multi-env</i>"]
+    
+    style REPO fill:#1565c0,color:#fff
+    style SQL fill:#e3f2fd
+    style NB fill:#fff8e1
+    style GIT fill:#e8f5e9
+    style CLI fill:#fce4ec
+    style TF fill:#f3e5f5
 ```
 
 | Path | Best For | Key Feature |
@@ -207,17 +208,32 @@ All paths deploy identical infrastructure - choose based on your team's preferen
 
 Regardless of path chosen, deployment follows these phases:
 
-```
-Phase 1: Infrastructure    ─► Database, Schemas, Warehouses
-Phase 2: Reference Data    ─► Substations, Circuits
-Phase 3: Core Tables       ─► Transformers, Meters, Customers
-Phase 4: Views & Analytics ─► Dynamic Tables, Semantic Views
-Phase 5: Streamlit Apps    ─► H3 Geospatial, Grid Map, Dashboards
-Phase 6: Notebooks         ─► Setup, Demo, Advanced notebooks
-Phase 7: ML Features       ─► Feature tables, Model registry
-Phase 8: Security          ─► RBAC roles and grants
-Phase 9: Seed Data         ─► Sample data loading
-Phase 10: Validation       ─► Deployment verification
+```mermaid
+flowchart LR
+    subgraph P1["Phase 1-3: Foundation"]
+        A1["🏗️ Infrastructure<br/>Database, Schemas"]
+        A2["📋 Reference Data<br/>Substations, Circuits"]
+        A3["📊 Core Tables<br/>Transformers, Meters"]
+    end
+    
+    subgraph P2["Phase 4-6: Analytics"]
+        B1["📈 Views & Analytics<br/>Dynamic Tables"]
+        B2["🖥️ Streamlit Apps<br/>Dashboards"]
+        B3["📓 Notebooks<br/>Setup, Demos"]
+    end
+    
+    subgraph P3["Phase 7-10: Finalization"]
+        C1["🤖 ML Features<br/>Model Registry"]
+        C2["🔐 Security<br/>RBAC Roles"]
+        C3["💾 Seed Data<br/>Sample Loading"]
+        C4["✅ Validation<br/>Verification"]
+    end
+    
+    P1 --> P2 --> P3
+    
+    style P1 fill:#e3f2fd
+    style P2 fill:#fff8e1
+    style P3 fill:#e8f5e9
 ```
 
 ---
@@ -226,26 +242,29 @@ Phase 10: Validation       ─► Deployment verification
 
 ### Role-Based Access Control (RBAC)
 
-```
-                    ACCOUNTADMIN
-                         │
-                         ▼
-                 ┌───────────────┐
-                 │  FLUX_ADMIN   │ ── Full ownership
-                 └───────┬───────┘
-                         │
-        ┌────────────────┼────────────────┐
-        │                │                │
-        ▼                ▼                ▼
-┌───────────────┐ ┌───────────────┐ ┌───────────────┐
-│  FLUX_USER    │ │  FLUX_ETL     │ │ FLUX_SERVICE  │
-│  (Analytics)  │ │  (Data Load)  │ │   (SPCS)      │
-└───────┬───────┘ └───────────────┘ └───────────────┘
-        │
-        ▼
-┌───────────────┐
-│ FLUX_ANALYST  │ ── Cortex Analyst access
-└───────────────┘
+```mermaid
+flowchart TD
+    AA["👑 ACCOUNTADMIN"]
+    FA["🔧 FLUX_ADMIN<br/><i>Full ownership</i>"]
+    
+    FU["👤 FLUX_USER<br/><i>Analytics</i>"]
+    FE["📥 FLUX_ETL<br/><i>Data Load</i>"]
+    FS["🔌 FLUX_SERVICE<br/><i>SPCS</i>"]
+    
+    FAN["📊 FLUX_ANALYST<br/><i>Cortex Analyst access</i>"]
+    
+    AA --> FA
+    FA --> FU
+    FA --> FE
+    FA --> FS
+    FU --> FAN
+    
+    style AA fill:#c62828,color:#fff
+    style FA fill:#1565c0,color:#fff
+    style FU fill:#2e7d32,color:#fff
+    style FE fill:#ef6c00,color:#fff
+    style FS fill:#6a1b9a,color:#fff
+    style FAN fill:#00838f,color:#fff
 ```
 
 ### Permission Matrix
