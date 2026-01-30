@@ -134,3 +134,21 @@ htmlcov/
 *.whl
 *.tar.gz
 *.zip
+
+# -----------------------------------------------------------------------------
+# Internal Documentation (Not for Public Repo)
+# -----------------------------------------------------------------------------
+# Planning and implementation docs
+IMPLEMENTATION_PLAN.md
+*_Plan_*.md
+Flux_Repo_Plan*.md
+
+# Test results and validation reports
+E2E_TEST_RESULTS.md
+*_TEST_RESULTS.md
+
+# Internal playbooks and gap analysis
+docs/DEMO_PLAYBOOK.md
+docs/KNOWN_GAPS.md
+*_PLAYBOOK.md
+*_GAPS.md
