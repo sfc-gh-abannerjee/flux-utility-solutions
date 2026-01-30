@@ -10,7 +10,7 @@ Flux Utility Solutions demonstrates a **modern data platform architecture** that
 block-beta
     columns 1
     
-    block:app["🖥️ APPLICATION LAYER"]:1
+    block:app["APPLICATION LAYER"]:1
         columns 4
         A1["Streamlit Apps"]
         A2["Cortex Agents"]
@@ -18,7 +18,7 @@ block-beta
         A4["SPCS Services"]
     end
     
-    block:analytics["📊 ANALYTICS LAYER"]:1
+    block:analytics["ANALYTICS LAYER"]:1
         columns 4
         B1["Dynamic Tables"]
         B2["Cortex Analyst"]
@@ -26,7 +26,7 @@ block-beta
         B4["Snowpark ML"]
     end
     
-    block:data["💾 DATA LAYER - Snowflake Data Cloud"]:1
+    block:data["DATA LAYER · Snowflake Data Cloud"]:1
         columns 4
         C1["AMI Readings"]
         C2["Grid Topology"]
@@ -36,9 +36,9 @@ block-beta
     
     app --> analytics --> data
     
-    style app fill:#e1f5fe
-    style analytics fill:#fff3e0
-    style data fill:#e8f5e9
+    style app fill:#1565c0,color:#fff
+    style analytics fill:#ef6c00,color:#fff
+    style data fill:#2e7d32,color:#fff
 ```
 
 ---
@@ -59,19 +59,19 @@ The foundation layer stores and manages all utility data in Snowflake:
 
 ```mermaid
 flowchart TD
-    SUB[🏭 SUBSTATIONS<br/>Grid infrastructure backbone]
-    CIR[⚡ CIRCUITS<br/>Distribution feeders]
-    TRF[🔌 TRANSFORMERS<br/>Asset fleet with load data]
-    MTR[📊 METERS<br/>AMI smart meter network]
-    CUS[👤 CUSTOMERS<br/>Customer master data]
+    SUB["SUBSTATIONS<br/>Grid infrastructure backbone"]
+    CIR["CIRCUITS<br/>Distribution feeders"]
+    TRF["TRANSFORMERS<br/>Asset fleet with load data"]
+    MTR["METERS<br/>AMI smart meter network"]
+    CUS["CUSTOMERS<br/>Customer master data"]
     
     SUB --> CIR --> TRF --> MTR --> CUS
     
-    style SUB fill:#1e88e5,color:#fff
-    style CIR fill:#43a047,color:#fff
-    style TRF fill:#fb8c00,color:#fff
-    style MTR fill:#8e24aa,color:#fff
-    style CUS fill:#e53935,color:#fff
+    style SUB fill:#1565c0,color:#fff
+    style CIR fill:#0277bd,color:#fff
+    style TRF fill:#00838f,color:#fff
+    style MTR fill:#00695c,color:#fff
+    style CUS fill:#2e7d32,color:#fff
 ```
 
 ### Analytics Layer
@@ -108,30 +108,30 @@ Enables business users to query data using natural language:
 
 ```mermaid
 flowchart TD
-    subgraph Question["💬 User Question"]
+    subgraph Question["USER QUESTION"]
         Q["What's the total load on substation 5?"]
     end
     
-    subgraph Semantic["🧠 SEMANTIC VIEW"]
-        T["📋 Tables<br/>(30+)"]
-        R["🔗 Relationships<br/>& Joins"]
-        M["📏 Metrics<br/>& Measures"]
+    subgraph Semantic["SEMANTIC VIEW"]
+        T["Tables<br/>(30+)"]
+        R["Relationships<br/>& Joins"]
+        M["Metrics<br/>& Measures"]
     end
     
-    subgraph SQL["⚙️ SQL Generation"]
+    subgraph SQL["SQL GENERATION"]
         G["Automatic query construction<br/>with proper joins"]
     end
     
-    subgraph Results["📊 Query Results"]
+    subgraph Results["QUERY RESULTS"]
         RES["Formatted response to user"]
     end
     
     Question --> Semantic --> SQL --> Results
     
-    style Question fill:#e3f2fd
-    style Semantic fill:#fff8e1
-    style SQL fill:#f3e5f5
-    style Results fill:#e8f5e9
+    style Question fill:#1565c0,color:#fff
+    style Semantic fill:#ef6c00,color:#fff
+    style SQL fill:#7b1fa2,color:#fff
+    style Results fill:#2e7d32,color:#fff
 ```
 
 ### Cortex Search (RAG)
@@ -151,23 +151,23 @@ Orchestrates multiple AI capabilities:
 
 ```mermaid
 flowchart TD
-    subgraph Agent["🤖 GRID INTELLIGENCE AGENT"]
-        USER["👤 User: Show high-risk transformers<br/>near substation 5"]
-        TOOL["🔧 Tool Selection"]
+    subgraph Agent["GRID INTELLIGENCE AGENT"]
+        USER["User: Show high-risk transformers<br/>near substation 5"]
+        TOOL["Tool Selection"]
         
         USER --> TOOL
         
-        TOOL --> ANA["📊 Analyst<br/>(SQL)"]
-        TOOL --> SRC["🔍 Search<br/>(RAG)"]
-        TOOL --> PRO["⚡ Procedures<br/>(Cascade)"]
-        TOOL --> EXT["🌐 External<br/>APIs"]
+        TOOL --> ANA["Analyst<br/>(SQL)"]
+        TOOL --> SRC["Search<br/>(RAG)"]
+        TOOL --> PRO["Procedures<br/>(Cascade)"]
+        TOOL --> EXT["External<br/>APIs"]
     end
     
-    style Agent fill:#fce4ec
-    style ANA fill:#e3f2fd
-    style SRC fill:#e8f5e9
-    style PRO fill:#fff8e1
-    style EXT fill:#f3e5f5
+    style Agent fill:#37474f,color:#fff
+    style ANA fill:#1565c0,color:#fff
+    style SRC fill:#2e7d32,color:#fff
+    style PRO fill:#ef6c00,color:#fff
+    style EXT fill:#7b1fa2,color:#fff
 ```
 
 ---
@@ -180,20 +180,20 @@ All paths deploy identical infrastructure - choose based on your team's preferen
 
 ```mermaid
 flowchart TD
-    REPO["📦 flux-utility-solutions/"]
+    REPO["flux-utility-solutions/"]
     
-    REPO --> SQL["📜 SQL Scripts<br/><i>Manual Control</i>"]
-    REPO --> NB["📓 Notebooks<br/><i>Workshop POCs</i>"]
-    REPO --> GIT["🔄 Git Integration<br/><i>GitOps Workflows</i>"]
-    REPO --> CLI["⚡ CLI<br/><i>Quick Start</i>"]
-    REPO --> TF["🏗️ Terraform<br/><i>Enterprise Multi-env</i>"]
+    REPO --> SQL["SQL Scripts<br/><i>Manual Control</i>"]
+    REPO --> NB["Notebooks<br/><i>Workshop POCs</i>"]
+    REPO --> GIT["Git Integration<br/><i>GitOps Workflows</i>"]
+    REPO --> CLI["CLI<br/><i>Quick Start</i>"]
+    REPO --> TF["Terraform<br/><i>Enterprise Multi-env</i>"]
     
-    style REPO fill:#1565c0,color:#fff
-    style SQL fill:#e3f2fd
-    style NB fill:#fff8e1
-    style GIT fill:#e8f5e9
-    style CLI fill:#fce4ec
-    style TF fill:#f3e5f5
+    style REPO fill:#37474f,color:#fff
+    style SQL fill:#1565c0,color:#fff
+    style NB fill:#ef6c00,color:#fff
+    style GIT fill:#2e7d32,color:#fff
+    style CLI fill:#c62828,color:#fff
+    style TF fill:#7b1fa2,color:#fff
 ```
 
 | Path | Best For | Key Feature |
@@ -210,30 +210,30 @@ Regardless of path chosen, deployment follows these phases:
 
 ```mermaid
 flowchart LR
-    subgraph P1["Phase 1-3: Foundation"]
-        A1["🏗️ Infrastructure<br/>Database, Schemas"]
-        A2["📋 Reference Data<br/>Substations, Circuits"]
-        A3["📊 Core Tables<br/>Transformers, Meters"]
+    subgraph P1["PHASE 1-3: FOUNDATION"]
+        A1["Infrastructure<br/>Database, Schemas"]
+        A2["Reference Data<br/>Substations, Circuits"]
+        A3["Core Tables<br/>Transformers, Meters"]
     end
     
-    subgraph P2["Phase 4-6: Analytics"]
-        B1["📈 Views & Analytics<br/>Dynamic Tables"]
-        B2["🖥️ Streamlit Apps<br/>Dashboards"]
-        B3["📓 Notebooks<br/>Setup, Demos"]
+    subgraph P2["PHASE 4-6: ANALYTICS"]
+        B1["Views & Analytics<br/>Dynamic Tables"]
+        B2["Streamlit Apps<br/>Dashboards"]
+        B3["Notebooks<br/>Setup, Demos"]
     end
     
-    subgraph P3["Phase 7-10: Finalization"]
-        C1["🤖 ML Features<br/>Model Registry"]
-        C2["🔐 Security<br/>RBAC Roles"]
-        C3["💾 Seed Data<br/>Sample Loading"]
-        C4["✅ Validation<br/>Verification"]
+    subgraph P3["PHASE 7-10: FINALIZATION"]
+        C1["ML Features<br/>Model Registry"]
+        C2["Security<br/>RBAC Roles"]
+        C3["Seed Data<br/>Sample Loading"]
+        C4["Validation<br/>Verification"]
     end
     
     P1 --> P2 --> P3
     
-    style P1 fill:#e3f2fd
-    style P2 fill:#fff8e1
-    style P3 fill:#e8f5e9
+    style P1 fill:#1565c0,color:#fff
+    style P2 fill:#ef6c00,color:#fff
+    style P3 fill:#2e7d32,color:#fff
 ```
 
 ---
@@ -244,14 +244,14 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    AA["👑 ACCOUNTADMIN"]
-    FA["🔧 FLUX_ADMIN<br/><i>Full ownership</i>"]
+    AA["ACCOUNTADMIN"]
+    FA["FLUX_ADMIN<br/><i>Full ownership</i>"]
     
-    FU["👤 FLUX_USER<br/><i>Analytics</i>"]
-    FE["📥 FLUX_ETL<br/><i>Data Load</i>"]
-    FS["🔌 FLUX_SERVICE<br/><i>SPCS</i>"]
+    FU["FLUX_USER<br/><i>Analytics</i>"]
+    FE["FLUX_ETL<br/><i>Data Load</i>"]
+    FS["FLUX_SERVICE<br/><i>SPCS</i>"]
     
-    FAN["📊 FLUX_ANALYST<br/><i>Cortex Analyst access</i>"]
+    FAN["FLUX_ANALYST<br/><i>Cortex Analyst access</i>"]
     
     AA --> FA
     FA --> FU
@@ -259,7 +259,7 @@ flowchart TD
     FA --> FS
     FU --> FAN
     
-    style AA fill:#c62828,color:#fff
+    style AA fill:#b71c1c,color:#fff
     style FA fill:#1565c0,color:#fff
     style FU fill:#2e7d32,color:#fff
     style FE fill:#ef6c00,color:#fff

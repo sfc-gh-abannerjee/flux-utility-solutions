@@ -55,7 +55,7 @@ snow connection list
 block-beta
     columns 1
     
-    block:app["🖥️ APPLICATION LAYER"]:1
+    block:app["APPLICATION LAYER"]:1
         columns 4
         A1["Streamlit Apps"]
         A2["Cortex Agents"]
@@ -63,7 +63,7 @@ block-beta
         A4["SPCS Services"]
     end
     
-    block:analytics["📊 ANALYTICS LAYER"]:1
+    block:analytics["ANALYTICS LAYER"]:1
         columns 4
         B1["Dynamic Tables"]
         B2["Cortex Analyst"]
@@ -71,7 +71,7 @@ block-beta
         B4["ML Models"]
     end
     
-    block:data["💾 DATA LAYER"]:1
+    block:data["DATA LAYER"]:1
         columns 4
         C1["AMI Readings"]
         C2["Grid Topology"]
@@ -81,9 +81,9 @@ block-beta
     
     app --> analytics --> data
     
-    style app fill:#e1f5fe
-    style analytics fill:#fff3e0
-    style data fill:#e8f5e9
+    style app fill:#1565c0,color:#fff
+    style analytics fill:#ef6c00,color:#fff
+    style data fill:#2e7d32,color:#fff
 ```
 
 See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed diagrams and design decisions.
