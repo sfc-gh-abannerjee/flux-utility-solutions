@@ -9,27 +9,15 @@ Flux Utility Solutions demonstrates a **modern data platform architecture** that
 ```mermaid
 flowchart TB
     subgraph APP["APPLICATION LAYER"]
-        direction LR
-        A1["Streamlit Apps"]
-        A2["Cortex Agents"]
-        A3["Notebooks"]
-        A4["SPCS Services"]
+        A1["Streamlit Apps"] ~~~ A2["Cortex Agents"] ~~~ A3["Notebooks"] ~~~ A4["SPCS Services"]
     end
     
     subgraph ANALYTICS["ANALYTICS LAYER"]
-        direction LR
-        B1["Dynamic Tables"]
-        B2["Cortex Analyst"]
-        B3["Cortex Search"]
-        B4["Snowpark ML"]
+        B1["Dynamic Tables"] ~~~ B2["Cortex Analyst"] ~~~ B3["Cortex Search"] ~~~ B4["Snowpark ML"]
     end
     
     subgraph DATA["DATA LAYER"]
-        direction LR
-        C1["AMI Readings"]
-        C2["Grid Topology"]
-        C3["Customer Data"]
-        C4["Asset Metadata"]
+        C1["AMI Readings"] ~~~ C2["Grid Topology"] ~~~ C3["Customer Data"] ~~~ C4["Asset Metadata"]
     end
     
     APP --> ANALYTICS --> DATA
