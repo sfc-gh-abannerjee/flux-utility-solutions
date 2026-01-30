@@ -133,6 +133,22 @@ variable "create_semantic_view" {
 }
 
 # -----------------------------------------------------------------------------
+# Preview Features (v2.11.0+)
+# -----------------------------------------------------------------------------
+
+variable "enable_preview_features" {
+  description = "Enable Terraform provider preview features (notebooks, semantic views)"
+  type        = bool
+  default     = false
+}
+
+variable "create_notebooks" {
+  description = "Create notebook resources (requires enable_preview_features = true)"
+  type        = bool
+  default     = true
+}
+
+# -----------------------------------------------------------------------------
 # Tags
 # -----------------------------------------------------------------------------
 

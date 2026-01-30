@@ -33,6 +33,14 @@ provider "snowflake" {
   account_name      = var.snowflake_account
   user              = var.snowflake_user
   password          = var.snowflake_password
+  
+  # Enable preview features for notebooks and semantic views
+  preview_features_enabled = var.enable_preview_features ? [
+    "snowflake_notebook_resource",
+    "snowflake_notebooks_datasource",
+    "snowflake_semantic_view_resource",
+    "snowflake_semantic_views_datasource"
+  ] : []
 }
 
 # =============================================================================
@@ -175,6 +183,32 @@ module "cortex" {
 }
 
 # =============================================================================
+# STREAMLIT APPLICATIONS
+# =============================================================================
+
+module "streamlit" {
+  source = "./modules/streamlit"
+  
+  database_name  = module.database.database_name
+  schema_name    = "APPLICATIONS"
+  warehouse_name = module.warehouses.primary_warehouse_name
+}
+
+# =============================================================================
+# NOTEBOOKS (Preview Feature)
+# Requires: enable_preview_features = true
+# =============================================================================
+
+module "notebooks" {
+  source = "./modules/notebook"
+  
+  database_name    = module.database.database_name
+  schema_name      = "APPLICATIONS"
+  warehouse_name   = module.warehouses.primary_warehouse_name
+  create_notebooks = var.enable_preview_features && var.create_notebooks
+}
+
+# =============================================================================
 # OUTPUTS
 # =============================================================================
 
@@ -201,9 +235,11 @@ output "user_role" {
 output "deployment_info" {
   description = "Deployment summary"
   value = {
-    environment = var.environment
-    database    = module.database.database_name
-    warehouses  = module.warehouses.warehouse_names
-    next_steps  = "Run SQL scripts for tables, semantic views, and agents"
+    environment       = var.environment
+    database          = module.database.database_name
+    warehouses        = module.warehouses.warehouse_names
+    streamlit_apps    = module.streamlit.streamlit_apps
+    notebooks_enabled = var.enable_preview_features && var.create_notebooks
+    next_steps        = "Upload files to stages, then run SQL scripts for tables and agents"
   }
 }
