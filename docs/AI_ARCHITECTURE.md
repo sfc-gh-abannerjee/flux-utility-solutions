@@ -11,19 +11,19 @@ Enables business users to query data using natural language:
 ```mermaid
 flowchart TB
     subgraph Question["USER QUESTION"]
-        Q["What's the total load on substation 5?"]
+        Q["Natural language query"]
     end
     
     subgraph Semantic["SEMANTIC VIEW"]
-        T["Tables (30+)"] ~~~ R["Relationships & Joins"] ~~~ M["Metrics & Measures"]
+        T["Tables"] ~~~ R["Relationships"] ~~~ M["Metrics"]
     end
     
     subgraph Generation["SQL GENERATION"]
-        G["Automatic query construction with proper joins"]
+        G["Auto-generates SQL"]
     end
     
     subgraph Results["QUERY RESULTS"]
-        RES["Formatted response to user"]
+        RES["Formatted response"]
     end
     
     Question --> Semantic --> Generation --> Results

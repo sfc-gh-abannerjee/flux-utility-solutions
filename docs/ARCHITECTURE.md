@@ -79,6 +79,33 @@ Multiple interfaces for different user personas:
 
 ---
 
+## AI Capabilities Overview
+
+```mermaid
+flowchart TB
+    subgraph Analyst["CORTEX ANALYST"]
+        A1["Natural Language"] ~~~ A2["Semantic Model"] ~~~ A3["SQL Generation"]
+    end
+    
+    subgraph Search["CORTEX SEARCH"]
+        S1["Customers"] ~~~ S2["Meters"] ~~~ S3["Documents"]
+    end
+    
+    subgraph Agent["CORTEX AGENT"]
+        G1["Multi-Tool"] ~~~ G2["Orchestration"] ~~~ G3["Cascading"]
+    end
+    
+    Analyst --> Search --> Agent
+    
+    style Analyst fill:#1565c0,color:#fff
+    style Search fill:#ef6c00,color:#fff
+    style Agent fill:#7b1fa2,color:#fff
+```
+
+See [AI_ARCHITECTURE.md](./AI_ARCHITECTURE.md) for detailed configuration.
+
+---
+
 ## Detailed Documentation
 
 | Document | Description |
