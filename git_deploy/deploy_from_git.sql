@@ -130,34 +130,61 @@ EXCEPTION
 END;
 
 -- ============================================================================
--- Phase 6: ML and Advanced Features (Optional)
+-- Phase 6: Notebooks Deployment
 -- ============================================================================
 
-SELECT '=== Phase 6: ML Features ===' AS phase;
+SELECT '=== Phase 6: Notebooks ===' AS phase;
+
+BEGIN
+    -- Setup notebooks stage
+    EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/26_notebooks_deployment.sql
+      USING (database => $database);
+    
+    -- Copy notebook files from Git repo to stage
+    COPY FILES INTO @IDENTIFIER($database || '.APPLICATIONS.NOTEBOOKS_STAGE/setup')
+    FROM @flux_utility_solutions_repo/branches/main/notebooks/setup/;
+    
+    COPY FILES INTO @IDENTIFIER($database || '.APPLICATIONS.NOTEBOOKS_STAGE/demos')
+    FROM @flux_utility_solutions_repo/branches/main/notebooks/demos/;
+    
+    COPY FILES INTO @IDENTIFIER($database || '.APPLICATIONS.NOTEBOOKS_STAGE/advanced')
+    FROM @flux_utility_solutions_repo/branches/main/notebooks/advanced/;
+    
+    SELECT 'Phase 6 complete: Notebooks deployed to stage' AS status;
+EXCEPTION
+    WHEN OTHER THEN
+        SELECT 'Notebooks deployment skipped - can be deployed manually using scripts/26_notebooks_deployment.sql' AS status;
+END;
+
+-- ============================================================================
+-- Phase 7: ML and Advanced Features (Optional)
+-- ============================================================================
+
+SELECT '=== Phase 7: ML Features ===' AS phase;
 
 -- ML Feature tables
 EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/11_ml_feature_tables.sql
   USING (database => $database);
 
-SELECT 'Phase 6 complete: ML feature tables created' AS status;
+SELECT 'Phase 7 complete: ML feature tables created' AS status;
 
 -- ============================================================================
--- Phase 7: Security and RBAC
+-- Phase 8: Security and RBAC
 -- ============================================================================
 
-SELECT '=== Phase 7: Security Setup ===' AS phase;
+SELECT '=== Phase 8: Security Setup ===' AS phase;
 
 -- Final RBAC grants
 EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/16_rbac_final.sql
   USING (database => $database, admin_role => $admin_role, user_role => $user_role, warehouse => $warehouse);
 
-SELECT 'Phase 7 complete: RBAC configured' AS status;
+SELECT 'Phase 8 complete: RBAC configured' AS status;
 
 -- ============================================================================
--- Phase 8: Seed Data Loading
+-- Phase 9: Seed Data Loading
 -- ============================================================================
 
-SELECT '=== Phase 8: Seed Data Loading ===' AS phase;
+SELECT '=== Phase 9: Seed Data Loading ===' AS phase;
 
 -- Load seed data from source database (if configured)
 -- This copies reference tables and generates sample AMI data
@@ -180,13 +207,13 @@ EXCEPTION
         SELECT 'AMI generation skipped - can be run separately' AS status;
 END;
 
-SELECT 'Phase 8 complete: Seed data loaded' AS status;
+SELECT 'Phase 9 complete: Seed data loaded' AS status;
 
 -- ============================================================================
--- Phase 9: Validation
+-- Phase 10: Validation
 -- ============================================================================
 
-SELECT '=== Phase 9: Validation ===' AS phase;
+SELECT '=== Phase 10: Validation ===' AS phase;
 
 EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/99_validate_deployment.sql
   USING (database => $database);
