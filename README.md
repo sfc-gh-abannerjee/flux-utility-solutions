@@ -143,25 +143,24 @@ All paths deploy **identical infrastructure**.
 Flux Data Forge is an SPCS application that generates realistic AMI data and demonstrates streaming pipeline patterns - without requiring production customer data.
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph Forge["FLUX DATA FORGE"]
-        GEN["Generator"]
+        GEN["Data Generator"]
     end
     
-    subgraph Scale["SCALE OPTIONS"]
-        S1["67K rows"] ~~~ S2["8.6M rows"] ~~~ S3["350M rows"]
+    subgraph Modes["PIPELINE MODES"]
+        M1["Task"] ~~~ M2["Snowpipe SDK"] ~~~ M3["Stage Landing"] ~~~ M4["Dual Write"]
     end
     
-    subgraph Pipes["PIPELINE MODES"]
-        P1["Task ~1min"] ~~~ P2["Stream <5sec"] ~~~ P3["Stage Landing"]
+    subgraph Output["OUTPUT"]
+        O1["Snowflake Tables"] ~~~ O2["External Stages"] ~~~ O3["PostgreSQL"]
     end
     
-    Forge --> Scale
-    Forge --> Pipes
+    Forge --> Modes --> Output
     
     style Forge fill:#7b1fa2,color:#fff
-    style Scale fill:#2e7d32,color:#fff
-    style Pipes fill:#1565c0,color:#fff
+    style Modes fill:#1565c0,color:#fff
+    style Output fill:#2e7d32,color:#fff
 ```
 
 | Capability | What It Does |

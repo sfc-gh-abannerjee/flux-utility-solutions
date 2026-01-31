@@ -42,29 +42,22 @@ This enables demos showcasing Snowflake's real-time streaming capabilities.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     FLUX DATA FORGE                             │
-│                    (SPCS Application)                           │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐           │
-│  │   FastAPI   │   │  Generator  │   │  Streaming  │           │
-│  │   Web UI    │   │   Engine    │   │   Manager   │           │
-│  └──────┬──────┘   └──────┬──────┘   └──────┬──────┘           │
-│         │                 │                 │                   │
-│         └────────────────┴─────────────────┘                   │
-│                          │                                      │
-│  ┌───────────────────────┼───────────────────────────────────┐ │
-│  │              OUTPUT DESTINATIONS                          │ │
-│  │                       │                                   │ │
-│  │  ┌────────────┐  ┌────┴─────┐  ┌────────────┐  ┌────────┐│ │
-│  │  │ Snowflake  │  │ External │  │  Snowpipe  │  │Postgres││ │
-│  │  │   Table    │  │  Stage   │  │  Streaming │  │   DB   ││ │
-│  │  │ (Task/SDK) │  │  (S3)    │  │    SDK     │  │(<20ms) ││ │
-│  │  └────────────┘  └──────────┘  └────────────┘  └────────┘│ │
-│  └───────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph App["FLUX DATA FORGE (SPCS)"]
+        subgraph Components["COMPONENTS"]
+            UI["FastAPI Web UI"] ~~~ GEN["Generator Engine"] ~~~ MGR["Streaming Manager"]
+        end
+    end
+    
+    subgraph Outputs["OUTPUT DESTINATIONS"]
+        SF["Snowflake Table"] ~~~ STG["External Stage"] ~~~ SDK["Snowpipe SDK"] ~~~ PG["PostgreSQL"]
+    end
+    
+    App --> Outputs
+    
+    style App fill:#1565c0,color:#fff
+    style Outputs fill:#2e7d32,color:#fff
 ```
 
 ## Prerequisites

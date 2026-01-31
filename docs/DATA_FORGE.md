@@ -37,25 +37,30 @@ Demonstrate different data ingestion patterns with varying latency characteristi
 ```mermaid
 flowchart TB
     subgraph UI["WEB INTERFACE"]
-        GEN["Generate Tab"] ~~~ MON["Monitor Tab"] ~~~ VAL["Validate Tab"]
+        GEN["Generate"] ~~~ STREAM["Stream"] ~~~ MON["Monitor"]
     end
     
-    subgraph ENGINE["DATA ENGINE"]
-        AMI["AMI Generator"] ~~~ WO["Work Orders"] ~~~ OUT["Outages"]
+    subgraph ENGINE["GENERATION ENGINE"]
+        AMI["AMI Readings"] ~~~ CORR["Correlated Data"]
+    end
+    
+    subgraph PIPES["PIPELINE MODES"]
+        P1["Task"] ~~~ P2["Snowpipe SDK"] ~~~ P3["Stage Landing"] ~~~ P4["Dual Write"]
     end
     
     subgraph DEST["DESTINATIONS"]
-        SF["Snowflake Tables"] ~~~ STG["External Stages"] ~~~ PG["PostgreSQL"]
+        SF["Snowflake"] ~~~ S3["S3 Stage"] ~~~ PG["PostgreSQL"]
     end
     
-    UI --> ENGINE --> DEST
+    UI --> ENGINE --> PIPES --> DEST
     
     style UI fill:#1565c0,color:#fff
     style ENGINE fill:#ef6c00,color:#fff
+    style PIPES fill:#7b1fa2,color:#fff
     style DEST fill:#2e7d32,color:#fff
 ```
 
-### Data Flow Options
+### Pipeline Latency Comparison
 
 ```mermaid
 flowchart LR
@@ -63,26 +68,19 @@ flowchart LR
         GEN["Generator"]
     end
     
-    subgraph Task["SNOWFLAKE TASK"]
-        T1["Scheduled SQL"] --> T2["Direct INSERT"]
+    subgraph Latency["LATENCY BY MODE"]
+        T["Task: ~1 min"] ~~~ SDK["Snowpipe SDK: <5 sec"] ~~~ STG["Stage: ~10 sec"]
     end
     
-    subgraph Stream["SNOWPIPE SDK"]
-        S1["Streaming SDK"] --> S2["<5 sec latency"]
+    subgraph Target["SNOWFLAKE"]
+        TBL["Tables"]
     end
     
-    subgraph Stage["STAGE LANDING"]
-        ST1["S3 Stage"] --> ST2["Snowpipe"] --> ST3["Bronze Table"]
-    end
-    
-    Source --> Task
-    Source --> Stream
-    Source --> Stage
+    Source --> Latency --> Target
     
     style Source fill:#7b1fa2,color:#fff
-    style Task fill:#1565c0,color:#fff
-    style Stream fill:#2e7d32,color:#fff
-    style Stage fill:#ef6c00,color:#fff
+    style Latency fill:#1565c0,color:#fff
+    style Target fill:#2e7d32,color:#fff
 ```
 
 ---
