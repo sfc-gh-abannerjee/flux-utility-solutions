@@ -136,9 +136,50 @@ All paths deploy **identical infrastructure**.
 
 ---
 
+## Flux Data Forge
+
+**Scale synthetic data from thousands to hundreds of millions of rows.**
+
+Flux Data Forge is an SPCS application that generates realistic AMI data and demonstrates streaming pipeline patterns - without requiring production customer data.
+
+```mermaid
+flowchart LR
+    subgraph Forge["FLUX DATA FORGE"]
+        GEN["Generator"]
+    end
+    
+    subgraph Scale["SCALE OPTIONS"]
+        S1["67K rows"] ~~~ S2["8.6M rows"] ~~~ S3["350M rows"]
+    end
+    
+    subgraph Pipes["PIPELINE MODES"]
+        P1["Task ~1min"] ~~~ P2["Stream <5sec"] ~~~ P3["Stage Landing"]
+    end
+    
+    Forge --> Scale
+    Forge --> Pipes
+    
+    style Forge fill:#7b1fa2,color:#fff
+    style Scale fill:#2e7d32,color:#fff
+    style Pipes fill:#1565c0,color:#fff
+```
+
+| Capability | What It Does |
+|------------|--------------|
+| **Batch Generation** | Create 67K to 350M+ rows of AMI readings with realistic patterns |
+| **Streaming Pipelines** | Demo 4 ingestion modes: Task, Snowpipe SDK, Stage Landing, Dual Write |
+| **Production Matching** | Use real meter IDs from infrastructure tables |
+| **Correlated Data** | Generate work orders, outages, power quality linked to meters |
+
+**Use cases:** POC data environments, Cortex Analyst demos, ML training datasets, streaming architecture demos.
+
+See [DATA_FORGE.md](./docs/DATA_FORGE.md) for full documentation.
+
+---
+
 ## Sample Data
 
-Bundled data for immediate exploration:
+Bundled seed data for immediate exploration:
 
 | Dataset | Records | Description |
 |---------|---------|-------------|
@@ -147,10 +188,14 @@ Bundled data for immediate exploration:
 | Meters | 100 | AMI metadata |
 | Customers | 94 | Customer records |
 
-Scale up with included generators:
+**Need more?** Use Flux Data Forge or the script-based generators:
 
 ```bash
+# Script-based (simple, quick)
 python generators/generate_all.py --size full
+
+# Data Forge (large scale, streaming demos)
+# Deploy SPCS app - see docs/DATA_FORGE.md
 ```
 
 ---
@@ -169,8 +214,11 @@ flux-utility-solutions/
 ├── agents/            # Cortex Agent definitions
 ├── models/            # Semantic models
 │
+├── spcs/              # SPCS applications
+│   └── flux_data_forge/  # Data generation & streaming
+│
 ├── seed_data/         # Sample data
-├── generators/        # Data generation
+├── generators/        # Script-based generators
 └── docs/              # Documentation
 ```
 
@@ -193,6 +241,7 @@ flux-utility-solutions/
 |----------|-------------|
 | [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System design and diagrams |
 | [AI_ARCHITECTURE.md](./docs/AI_ARCHITECTURE.md) | Cortex AI configuration |
+| [DATA_FORGE.md](./docs/DATA_FORGE.md) | Synthetic data generation tool |
 | [DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Step-by-step deployment |
 | [DATA_MODEL.md](./docs/DATA_MODEL.md) | Schema documentation |
 | [SECURITY.md](./docs/SECURITY.md) | Roles and permissions |
