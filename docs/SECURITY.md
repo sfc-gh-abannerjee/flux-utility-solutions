@@ -2,6 +2,8 @@
 
 Role-based access control (RBAC) and security configuration for Flux Utility Solutions.
 
+> **Snowflake Documentation**: [Access Control Framework](https://docs.snowflake.com/en/user-guide/security-access-control) | [RBAC Overview](https://docs.snowflake.com/en/user-guide/security-access-control-overview)
+
 ---
 
 ## Role Hierarchy
@@ -35,6 +37,8 @@ flowchart TB
 
 ## Role Definitions
 
+> **Docs**: [CREATE ROLE](https://docs.snowflake.com/en/sql-reference/sql/create-role) | [Role Hierarchy](https://docs.snowflake.com/en/user-guide/security-access-control-overview#role-hierarchy-and-privilege-inheritance)
+
 | Role | Purpose | Typical Users |
 |------|---------|---------------|
 | **FLUX_ADMIN** | Full ownership of all objects | Platform administrators |
@@ -46,6 +50,8 @@ flowchart TB
 ---
 
 ## Permission Matrix
+
+> **Docs**: [GRANT Privileges](https://docs.snowflake.com/en/sql-reference/sql/grant-privilege) | [Access Control Privileges](https://docs.snowflake.com/en/user-guide/security-access-control-privileges)
 
 | Role | Database | Warehouse | Semantic Views | Search | Agents |
 |------|----------|-----------|----------------|--------|--------|
@@ -82,6 +88,8 @@ flowchart LR
 ---
 
 ## Role Creation Scripts
+
+> **Docs**: [CREATE ROLE](https://docs.snowflake.com/en/sql-reference/sql/create-role) | [GRANT](https://docs.snowflake.com/en/sql-reference/sql/grant-privilege)
 
 ### Admin Role
 
@@ -131,6 +139,8 @@ GRANT USAGE ON COMPUTE POOL flux_compute_pool TO ROLE FLUX_SERVICE;
 
 ## Best Practices
 
+> **Docs**: [Security Best Practices](https://docs.snowflake.com/en/user-guide/security-best-practices) | [Data Governance](https://docs.snowflake.com/en/user-guide/governance)
+
 ### Principle of Least Privilege
 
 - Grant minimum permissions needed for each role
@@ -145,6 +155,8 @@ GRANT USAGE ON COMPUTE POOL flux_compute_pool TO ROLE FLUX_SERVICE;
 
 ### Audit Logging
 
+> **Docs**: [ACCESS_HISTORY](https://docs.snowflake.com/en/sql-reference/account-usage/access_history) | [Query History](https://docs.snowflake.com/en/sql-reference/account-usage/query_history)
+
 ```sql
 -- Query access history
 SELECT *
@@ -156,6 +168,8 @@ WHERE query_start_time > DATEADD(day, -7, CURRENT_TIMESTAMP())
 ---
 
 ## Service Account Setup
+
+> **Docs**: [CREATE USER](https://docs.snowflake.com/en/sql-reference/sql/create-user) | [Service Users](https://docs.snowflake.com/en/user-guide/admin-user-management)
 
 For automated processes and SPCS:
 
@@ -172,6 +186,8 @@ GRANT ROLE FLUX_SERVICE TO USER flux_service_user;
 ---
 
 ## Network Policies (Optional)
+
+> **Docs**: [Network Policies](https://docs.snowflake.com/en/user-guide/network-policies) | [Private Connectivity](https://docs.snowflake.com/en/user-guide/admin-security-privatelink)
 
 For enterprise environments with IP restrictions:
 
