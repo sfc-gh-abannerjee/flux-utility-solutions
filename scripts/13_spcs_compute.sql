@@ -10,7 +10,9 @@
 --   <% spcs_service %>  - SPCS service name
 --   <% admin_role %>    - Admin role
 --
--- Note: Service specification YAML is in spcs/flux_ops_center_spec.yaml
+-- Note: SPCS applications are in separate repositories:
+--   - Flux Ops Center: https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs
+--   - Flux Data Forge: https://github.com/sfc-gh-abannerjee/flux-utility-data-forge
 -- =============================================================================
 
 USE DATABASE IDENTIFIER('<% database %>');

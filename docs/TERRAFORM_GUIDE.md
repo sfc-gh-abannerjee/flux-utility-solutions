@@ -574,10 +574,11 @@ After Terraform deployment:
    snow stage put models/*.yaml @SEMANTIC_MODELS
    ```
 
-2. **Build and push SPCS images**:
+2. **Build and push SPCS images** (from separate repositories):
    ```bash
-   ./spcs/flux_ops_center/build_and_push.sh
-   ./spcs/flux_data_forge/build_and_push.sh
+   # Clone and build from external repos:
+   # https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs
+   # https://github.com/sfc-gh-abannerjee/flux-utility-data-forge
    ```
 
 3. **Load sample data**:
