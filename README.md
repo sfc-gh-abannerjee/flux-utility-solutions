@@ -103,10 +103,10 @@ These SPCS applications require Docker, compute pools, and additional setup. Sta
 
 | Category | Features |
 |----------|----------|
-| **Cortex AI** | Analyst, Search, Agent, LLM Functions |
-| **Data Engineering** | Dynamic Tables, Streams, Tasks, Stages |
-| **Machine Learning** | Snowpark ML, Model Registry, Feature Store |
-| **Applications** | Streamlit, Notebooks, SPCS |
+| **Cortex AI** | [Analyst](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-analyst), [Search](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-search/cortex-search-overview), [Agent](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agent), [LLM Functions](https://docs.snowflake.com/en/user-guide/snowflake-cortex/llm-functions), [Snowflake Intelligence](https://docs.snowflake.com/en/user-guide/snowflake-intelligence), [Semantic View](https://docs.snowflake.com/en/user-guide/views-semantic) |
+| **Data Engineering** | [Dynamic Tables](https://docs.snowflake.com/en/user-guide/dynamic-tables-about), [Streams](https://docs.snowflake.com/en/user-guide/streams-intro), [Tasks](https://docs.snowflake.com/en/user-guide/tasks-intro), [Stages](https://docs.snowflake.com/en/user-guide/data-load-overview), [Snowpipe](https://docs.snowflake.com/en/user-guide/data-load-snowpipe-intro) |
+| **Machine Learning** | [Snowpark ML](https://docs.snowflake.com/en/developer-guide/snowpark-ml/index), [Model Registry](https://docs.snowflake.com/en/developer-guide/snowpark-ml/model-registry/overview), [Feature Store](https://docs.snowflake.com/en/developer-guide/snowpark-ml/feature-store/overview), [Notebooks](https://docs.snowflake.com/en/user-guide/ui-snowsight/notebooks) |
+| **Applications** | [Streamlit](https://docs.snowflake.com/en/developer-guide/streamlit/about-streamlit), [SPCS](https://docs.snowflake.com/en/developer-guide/snowpark-container-services/overview) |
 
 ---
 
