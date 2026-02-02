@@ -9,6 +9,18 @@
 
 **A reference architecture for electric utilities on Snowflake's AI Data Cloud.**
 
+## Flux Utility Platform
+
+Flux Utility Solutions is the core platform in the **Flux Utility Platform** - a suite of Snowflake solutions for utility industry demos:
+
+| Repository | Purpose | Start Here If... |
+|------------|---------|------------------|
+| **Flux Utility Solutions** (this repo) | Core platform with Cortex AI, semantic models, 5 deployment paths | You're building a complete utility demo |
+| [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) | Synthetic AMI data generation with streaming | You need realistic test data at scale |
+| [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) | Real-time grid visualization, GNN risk prediction | You need interactive grid maps |
+
+**Recommended flow**: Deploy Flux Utility Solutions first for core data model, use Data Forge to populate with AMI data, then add Ops Center for visualization.
+
 ---
 
 ## Quick Start
@@ -55,20 +67,6 @@ cd flux-utility-solutions
 | **Terraform** | Enterprise IaC, multi-environment | [terraform/](./terraform/) |
 
 <img width="1834" height="228" alt="deployment_options" src="https://github.com/user-attachments/assets/2ef9c913-a38f-4604-8c42-1f9f067902dc" />
-
----
-
-## Flux Utility Platform
-
-Flux Utility Solutions is the core platform in the **Flux Utility Platform** - a suite of Snowflake solutions for utility industry demos:
-
-| Repository | Purpose | Start Here If... |
-|------------|---------|------------------|
-| **Flux Utility Solutions** (this repo) | Core platform with Cortex AI, semantic models, 5 deployment paths | You're building a complete utility demo |
-| [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) | Synthetic AMI data generation with streaming | You need realistic test data at scale |
-| [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) | Real-time grid visualization, GNN risk prediction | You need interactive grid maps |
-
-**Recommended flow**: Deploy Flux Utility Solutions first for core data model, use Data Forge to populate with AMI data, then add Ops Center for visualization.
 
 ---
 
