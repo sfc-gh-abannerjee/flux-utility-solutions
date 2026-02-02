@@ -86,22 +86,18 @@ flux-utility-solutions/
 </tr>
 </table>
 
----
+### SPCS Components
 
-## SPCS Components
-
-For advanced demos requiring containerized applications, these standalone repositories provide additional capabilities:
+Flux features two advanced demos using SPCS to deploy containerized applications. These standalone repositories provide additional capabilities:
 
 | Component | Description | Repository |
 |-----------|-------------|------------|
-| **Flux Data Forge** | Synthetic data generation (67K-350M rows), streaming pipeline demos | [flux-data-forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) |
+| **Flux Data Forge** | Synthetic data generation, streaming pipeline demos | [flux-data-forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) |
 | **Flux Ops Center** | Real-time grid visualization, GNN risk prediction, cascade analysis | [flux-ops-center-spcs](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) |
 
 These SPCS applications require Docker, compute pools, and additional setup. Start with the core platform above, then add these for specific demo scenarios.
 
----
-
-## Snowflake Features Used
+### Snowflake Features Used
 
 | Category | Features |
 |----------|----------|
@@ -112,7 +108,7 @@ These SPCS applications require Docker, compute pools, and additional setup. Sta
 
 ---
 
-## Sample Data
+## Start With Sample Data
 
 Bundled seed data for immediate exploration:
 
@@ -129,7 +125,7 @@ Bundled seed data for immediate exploration:
 python generators/generate_all.py --size full
 ```
 
-For large-scale data (millions of rows), see [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge).
+> **For a GUI-based approach to generating and streaming large-scale AMI data (millions of rows), see** [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge).
 
 ---
 
