@@ -90,10 +90,16 @@ flux-utility-solutions/
 
 Flux features two advanced demos using SPCS to deploy containerized applications. These standalone repositories provide additional capabilities:
 
+<table>
+<tr>
+<td align="center"><img src="./images/crockett_substation_cascade_SI.png" width="400"/><br/><b>Flux Ops Center</b><br/>Real-time grid visualization, GNN risk prediction, cascade analysis</td>
+</tr>
+</table>
+
 | Component | Description | Repository |
 |-----------|-------------|------------|
-| **Flux Data Forge** | Synthetic data generation, streaming pipeline demos | [flux-data-forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) |
 | **Flux Ops Center** | Real-time grid visualization, GNN risk prediction, cascade analysis | [flux-ops-center-spcs](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) |
+| **Flux Data Forge** | Synthetic data generation, streaming pipeline demos | [flux-data-forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) |
 
 These SPCS applications require Docker, compute pools, and additional setup. Start with the core platform above, then add these for specific demo scenarios.
 
