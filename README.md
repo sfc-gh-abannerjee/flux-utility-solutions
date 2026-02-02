@@ -7,10 +7,20 @@
 
 Transform grid operations with real-time monitoring, predictive maintenance, and AI-powered analytics - all running natively in Snowflake.
 
-<p align="center">
-  <img width="49%" alt="Grid Intelligence Agent" src="./images/flux_utility_SI_1.png" />
-  <img width="49%" alt="H3 Grid Visualization" src="./images/flux_sis_h3_1.png" />
-</p>
+---
+
+## What You'll Build
+
+<table>
+<tr>
+<td align="center"><img src="./images/flux_utility_SI_1.png" width="400"/><br/><b>Grid Intelligence Agent</b><br/>Natural language grid queries</td>
+<td align="center"><img src="./images/flux_sis_h3_1.png" width="400"/><br/><b>H3 Grid Visualization</b><br/>Hexagonal topology maps</td>
+</tr>
+<tr>
+<td align="center"><img src="./images/cortex_search_services_1.png" width="400"/><br/><b>Cortex Search Services</b><br/>Semantic customer search</td>
+<td align="center"><img src="./images/transformer_failure_prediction_ml_notebook_1.png" width="400"/><br/><b>Predictive Maintenance</b><br/>ML-based risk scoring</td>
+</tr>
+</table>
 
 ---
 
@@ -97,10 +107,6 @@ flowchart TB
     style Agent fill:#7b1fa2,color:#fff
 ```
 
-<p align="center">
-  <img width="70%" alt="Cortex Search Services" src="./images/cortex_search_services_1.png" />
-</p>
-
 See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed design documentation.
 
 ---
@@ -131,10 +137,6 @@ All paths deploy **identical infrastructure**.
 | **Predictive Maintenance** | ML-based transformer risk scoring | `scripts/08-09_*` |
 | **Conversational Analytics** | Natural language grid intelligence | `agents/` |
 | **Outage Management** | Real-time tracking and restoration | `streamlit/outage_dashboard/` |
-
-<p align="center">
-  <img width="70%" alt="Transformer Failure Prediction ML Notebook" src="./images/transformer_failure_prediction_ml_notebook_1.png" />
-</p>
 
 ---
 
