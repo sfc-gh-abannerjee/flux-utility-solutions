@@ -1,5 +1,9 @@
 # Flux Utility Solutions
 
+<p align="center">
+  <img src="./images/flux_banner_5.png" alt="Flux Utility Solutions" width="100%"/>
+</p>
+
 [![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?logo=snowflake&logoColor=white)](https://www.snowflake.com)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
