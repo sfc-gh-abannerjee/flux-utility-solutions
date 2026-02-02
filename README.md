@@ -232,6 +232,12 @@ See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed design documentation.
 
 ---
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and contribution guidelines.
+
+---
+
 ## License
 
 Apache 2.0 - See [LICENSE](./LICENSE)
