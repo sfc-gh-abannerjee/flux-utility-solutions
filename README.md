@@ -7,6 +7,11 @@
 
 Transform grid operations with real-time monitoring, predictive maintenance, and AI-powered analytics - all running natively in Snowflake.
 
+<p align="center">
+  <img width="49%" alt="Grid Intelligence Agent" src="./images/flux_utility_SI_1.png" />
+  <img width="49%" alt="H3 Grid Visualization" src="./images/flux_sis_h3_1.png" />
+</p>
+
 ---
 
 ## Why Flux?
@@ -92,6 +97,10 @@ flowchart TB
     style Agent fill:#7b1fa2,color:#fff
 ```
 
+<p align="center">
+  <img width="70%" alt="Cortex Search Services" src="./images/cortex_search_services_1.png" />
+</p>
+
 See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed design documentation.
 
 ---
@@ -122,6 +131,10 @@ All paths deploy **identical infrastructure**.
 | **Predictive Maintenance** | ML-based transformer risk scoring | `scripts/08-09_*` |
 | **Conversational Analytics** | Natural language grid intelligence | `agents/` |
 | **Outage Management** | Real-time tracking and restoration | `streamlit/outage_dashboard/` |
+
+<p align="center">
+  <img width="70%" alt="Transformer Failure Prediction ML Notebook" src="./images/transformer_failure_prediction_ml_notebook_1.png" />
+</p>
 
 ---
 
