@@ -29,7 +29,7 @@ Get a working demo environment in under 2 minutes:
 
 ```bash
 # Clone and deploy
-git clone https://github.com/Snowflake-Labs/flux-utility-solutions.git
+git clone https://github.com/sfc-gh-abannerjee/flux-utility-solutions.git
 cd flux-utility-solutions
 ./cli/quickstart.sh
 ```
@@ -106,10 +106,10 @@ cd flux-utility-solutions
 |----------|--------------|----------|
 | **Grid Visualization** | H3 hexagonal maps with real-time topology | `streamlit/geospatial/` |
 | **AMI Analytics** | Smart meter time-series analysis | `notebooks/demos/` |
-| **Customer 360** | Unified customer view with semantic search | `scripts/07_*` |
-| **Predictive Maintenance** | ML-based transformer risk scoring | `scripts/08-09_*` |
+| **Customer 360** | Unified customer view with semantic search | `scripts/09_cortex_search_services.sql` |
+| **Predictive Maintenance** | ML-based transformer risk scoring | `scripts/11_ml_feature_tables.sql` |
 | **Conversational Analytics** | Natural language grid intelligence | `agents/` |
-| **Outage Management** | Real-time tracking and restoration | `streamlit/outage_dashboard/` |
+| **Outage Management** | Real-time tracking and restoration | `streamlit/outage_dashboard.py` |
 
 ### SPCS Components
 
@@ -212,12 +212,13 @@ See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed design documentation.
 
 | Document | Description |
 |----------|-------------|
+| [DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Step-by-step deployment guide |
 | [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System design and diagrams |
 | [AI_ARCHITECTURE.md](./docs/AI_ARCHITECTURE.md) | Cortex AI configuration |
-| [DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Step-by-step deployment |
 | [DATA_MODEL.md](./docs/DATA_MODEL.md) | Schema documentation |
 | [SECURITY.md](./docs/SECURITY.md) | Roles and permissions |
-| [SCALABILITY.md](./docs/SCALABILITY.md) | Sizing guidance |
+| [TERRAFORM_GUIDE.md](./docs/TERRAFORM_GUIDE.md) | Infrastructure as Code guide |
+| [SEED_DATA_GUIDE.md](./docs/SEED_DATA_GUIDE.md) | Sample data reference |
 
 ---
 
@@ -226,7 +227,7 @@ See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed design documentation.
 ```
 flux-utility-solutions/
 ├── cli/               # Quick start scripts
-├── scripts/           # SQL deployment (01-99)
+├── scripts/           # SQL deployment (01-24)
 ├── notebooks/         # Snowflake Notebooks
 ├── git_deploy/        # Git integration
 ├── terraform/         # Infrastructure as Code
@@ -235,8 +236,9 @@ flux-utility-solutions/
 ├── agents/            # Cortex Agent definitions
 ├── models/            # Semantic models
 │
-├── seed_data/         # Sample data
+├── seed_data/         # Sample data (CSV, Parquet)
 ├── generators/        # Script-based generators
+├── app/               # Full-stack application (FastAPI + React)
 └── docs/              # Documentation
 ```
 
