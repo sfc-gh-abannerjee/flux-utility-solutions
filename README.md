@@ -9,11 +9,18 @@
 
 **A reference architecture for electric utilities on Snowflake's AI Data Cloud.**
 
-Transform grid operations with real-time monitoring, predictive maintenance, and AI-powered analytics - all running natively in Snowflake.
+<img width="2752" height="1301" alt="flux_utiility_components_readme" src="https://github.com/user-attachments/assets/ed510414-3856-4e1c-a7b6-bea77199faf0" />
 
 ---
 
 ## What You'll Build
+
+| Challenge | Flux Solution |
+|-----------|---------------|
+| Siloed AMI, GIS, and customer data | **Unified data platform** with single source of truth |
+| Manual SQL for business questions | **Natural language queries** via Cortex Analyst |
+| Reactive maintenance | **Predictive risk scoring** with Snowpark ML |
+| Complex deployment requirements | **5 deployment paths** - choose your workflow |
 
 <table>
 <tr>
@@ -26,22 +33,17 @@ Transform grid operations with real-time monitoring, predictive maintenance, and
 </tr>
 </table>
 
+
 ---
 
 ## Why Flux?
 
-| Challenge | Flux Solution |
-|-----------|---------------|
-| Siloed AMI, GIS, and customer data | **Unified data platform** with single source of truth |
-| Manual SQL for business questions | **Natural language queries** via Cortex Analyst |
-| Reactive maintenance | **Predictive risk scoring** with Snowpark ML |
-| Complex deployment requirements | **5 deployment paths** - choose your workflow |
-
-> **One solution. Five deployment paths.** SQL scripts, notebooks, Git integration, CLI, or Terraform - Flux works the way your team works.
-
 <p align="center">
   <img src="./images/flux_summary_outcomes.png" alt="Flux: Unified, Intelligent, Resilient" width="90%"/>
 </p>
+
+> **One solution. Five deployment paths.** SQL scripts, notebooks, Git integration, CLI, or Terraform - Flux works the way your team works.
+<img width="1834" height="228" alt="deployment_options" src="https://github.com/user-attachments/assets/2ef9c913-a38f-4604-8c42-1f9f067902dc" />
 
 ---
 
