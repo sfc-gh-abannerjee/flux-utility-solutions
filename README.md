@@ -39,6 +39,10 @@ Transform grid operations with real-time monitoring, predictive maintenance, and
 
 > **One solution. Five deployment paths.** SQL scripts, notebooks, Git integration, CLI, or Terraform - Flux works the way your team works.
 
+<p align="center">
+  <img src="./images/flux_summary_outcomes.png" alt="Flux: Unified, Intelligent, Resilient" width="90%"/>
+</p>
+
 ---
 
 ## Quick Start
