@@ -12,7 +12,7 @@
 --
 -- Note: SPCS applications are in separate repositories:
 --   - Flux Ops Center: https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs
---   - Flux Data Forge: https://github.com/sfc-gh-abannerjee/flux-utility-data-forge
+--   - Flux Data Forge: https://github.com/sfc-gh-abannerjee/flux-data-forge
 -- =============================================================================
 
 USE DATABASE IDENTIFIER('<% database %>');

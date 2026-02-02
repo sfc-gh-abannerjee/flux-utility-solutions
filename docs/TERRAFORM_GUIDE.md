@@ -578,7 +578,7 @@ After Terraform deployment:
    ```bash
    # Clone and build from external repos:
    # https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs
-   # https://github.com/sfc-gh-abannerjee/flux-utility-data-forge
+   # https://github.com/sfc-gh-abannerjee/flux-data-forge
    ```
 
 3. **Load sample data**:

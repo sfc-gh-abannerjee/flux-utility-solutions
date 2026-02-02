@@ -165,7 +165,7 @@ For advanced demos requiring containerized applications, these standalone reposi
 
 | Component | Description | Repository |
 |-----------|-------------|------------|
-| **Flux Data Forge** | Synthetic data generation (67K-350M rows), streaming pipeline demos | [flux-utility-data-forge](https://github.com/sfc-gh-abannerjee/flux-utility-data-forge) |
+| **Flux Data Forge** | Synthetic data generation (67K-350M rows), streaming pipeline demos | [flux-data-forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) |
 | **Flux Ops Center** | Real-time grid visualization, GNN risk prediction, cascade analysis | [flux-ops-center-spcs](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) |
 
 These SPCS applications require Docker, compute pools, and additional setup. Start with the core platform above, then add these for specific demo scenarios.
@@ -189,7 +189,7 @@ Bundled seed data for immediate exploration:
 python generators/generate_all.py --size full
 ```
 
-For large-scale data (millions of rows), see [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-utility-data-forge).
+For large-scale data (millions of rows), see [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge).
 
 ---
 
