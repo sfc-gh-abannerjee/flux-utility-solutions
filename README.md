@@ -93,6 +93,7 @@ Flux features two advanced demos using SPCS to deploy containerized applications
 <table>
 <tr>
 <td align="center"><img src="./images/crockett_substation_cascade_SI.png" width="400"/><br/><b>Flux Ops Center</b><br/>Real-time grid visualization, GNN risk prediction, cascade analysis</td>
+<td align="center"><img src="./images/flux_data_forge_generate_1.png" width="400"/><br/><b>Flux Data Forge</b><br/>Synthetic data generation, streaming pipeline demos</td>
 </tr>
 </table>
 
