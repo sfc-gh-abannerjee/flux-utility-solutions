@@ -11,6 +11,18 @@
 
 <img width="2752" height="1301" alt="flux_utiility_components_readme" src="https://github.com/user-attachments/assets/ed510414-3856-4e1c-a7b6-bea77199faf0" />
 
+## Flux Utility Platform
+
+Flux Utility Solutions is the core platform in the **Flux Utility Platform** - a suite of Snowflake solutions for utility industry demos:
+
+| Repository | Purpose | Start Here If... |
+|------------|---------|------------------|
+| **Flux Utility Solutions** (this repo) | Core platform with Cortex AI, semantic models, 5 deployment paths | You're building a complete utility demo |
+| [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) | Synthetic AMI data generation with streaming | You need realistic test data at scale |
+| [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) | Real-time grid visualization, GNN risk prediction | You need interactive grid maps |
+
+**Recommended flow**: Deploy Flux Utility Solutions first for core data model, use Data Forge to populate with AMI data, then add Ops Center for visualization.
+
 ---
 
 ## Repository Structure
@@ -107,18 +119,6 @@ These SPCS applications require Docker, compute pools, and additional setup. Sta
 | **Data Engineering** | [Dynamic Tables](https://docs.snowflake.com/en/user-guide/dynamic-tables-about), [Streams](https://docs.snowflake.com/en/user-guide/streams-intro), [Tasks](https://docs.snowflake.com/en/user-guide/tasks-intro), [Stages](https://docs.snowflake.com/en/user-guide/data-load-overview), [Snowpipe](https://docs.snowflake.com/en/user-guide/data-load-snowpipe-intro) |
 | **Machine Learning** | [Snowpark ML](https://docs.snowflake.com/en/developer-guide/snowpark-ml/index), [Model Registry](https://docs.snowflake.com/en/developer-guide/snowpark-ml/model-registry/overview), [Feature Store](https://docs.snowflake.com/en/developer-guide/snowpark-ml/feature-store/overview), [Notebooks](https://docs.snowflake.com/en/user-guide/ui-snowsight/notebooks) |
 | **Applications** | [Streamlit](https://docs.snowflake.com/en/developer-guide/streamlit/about-streamlit), [SPCS](https://docs.snowflake.com/en/developer-guide/snowpark-container-services/overview) |
-
-### Flux Utility Platform
-
-Flux Utility Solutions is the core platform in the **Flux Utility Platform** - a suite of Snowflake solutions for utility industry demos:
-
-| Repository | Purpose | Start Here If... |
-|------------|---------|------------------|
-| **Flux Utility Solutions** (this repo) | Core platform with Cortex AI, semantic models, 5 deployment paths | You're building a complete utility demo |
-| [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) | Synthetic AMI data generation with streaming | You need realistic test data at scale |
-| [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) | Real-time grid visualization, GNN risk prediction | You need interactive grid maps |
-
-**Recommended flow**: Deploy Flux Utility Solutions first for core data model, use Data Forge to populate with AMI data, then add Ops Center for visualization.
 
 ---
 
