@@ -370,6 +370,36 @@ SELECT
 FROM TABLE(GENERATOR(ROWCOUNT => 10000));
 
 -- -----------------------------------------------------------------------------
+-- 2.5b VEGETATION_RISK_ENHANCED - Enhanced Vegetation Data Table
+-- -----------------------------------------------------------------------------
+-- Stores enhanced vegetation risk data from external processing (e.g., Meta Canopy, LiDAR)
+-- This table is populated by backend/scripts/process_meta_canopy_houston.py
+-- Data is synced to Postgres for spatial queries
+
+CREATE TABLE IF NOT EXISTS APPLICATIONS.VEGETATION_RISK_ENHANCED (
+    TREE_ID VARCHAR(100) PRIMARY KEY,
+    LONGITUDE FLOAT NOT NULL,
+    LATITUDE FLOAT NOT NULL,
+    HEIGHT_M FLOAT,                        -- Tree height in meters
+    CANOPY_RADIUS_M FLOAT,                 -- Estimated canopy spread
+    SPECIES VARCHAR(100),                  -- Tree species if known
+    TREE_CLASS VARCHAR(50),                -- small_tree, medium_tree, large_tree
+    RISK_SCORE FLOAT,                      -- 0.0-1.0 overall risk
+    RISK_LEVEL VARCHAR(20),                -- critical, warning, monitor, safe
+    DISTANCE_TO_LINE_M FLOAT,              -- Distance to nearest power line
+    NEAREST_LINE_ID VARCHAR(100),          -- ID of nearest power line
+    NEAREST_LINE_VOLTAGE_KV FLOAT,         -- Voltage level
+    MINIMUM_CLEARANCE_M FLOAT,             -- Required clearance
+    CLEARANCE_DEFICIT_M FLOAT,             -- How much tree exceeds clearance
+    ESTIMATED_ANNUAL_GROWTH_M FLOAT,       -- Growth rate
+    YEARS_TO_ENCROACHMENT FLOAT,           -- Prediction
+    DATA_SOURCE VARCHAR(100),              -- 'meta_canopy_2020', 'lidar_2024'
+    SOURCE_DATE DATE,
+    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+)
+COMMENT = 'Enhanced vegetation risk data from external processing for Postgres sync';
+
+-- -----------------------------------------------------------------------------
 -- 2.6 CIRCUIT_STATUS_REALTIME - Real-time Circuit Status
 -- -----------------------------------------------------------------------------
 -- Live circuit status for outage tracking
@@ -875,6 +905,40 @@ CREATE TABLE IF NOT EXISTS WORK_ORDERS (
     CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
     UPDATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
+
+-- =============================================================================
+-- SECTION 6B: RAW SCHEMA - External Data Sources
+-- =============================================================================
+-- Large external datasets (building footprints, parcel data, etc.)
+-- These are loaded separately from GitHub releases or external sources
+
+CREATE SCHEMA IF NOT EXISTS RAW
+    DATA_RETENTION_TIME_IN_DAYS = 7
+    COMMENT = 'Raw external data sources (buildings, parcels, OSM data)';
+
+GRANT USAGE ON SCHEMA <% database %>.RAW TO ROLE IDENTIFIER('<% user_role %>');
+GRANT SELECT ON FUTURE TABLES IN SCHEMA <% database %>.RAW TO ROLE IDENTIFIER('<% user_role %>');
+
+USE SCHEMA RAW;
+
+-- -----------------------------------------------------------------------------
+-- 6B.1 HOUSTON_BUILDINGS_FOOTPRINTS - Building Polygons for 3D Visualization
+-- -----------------------------------------------------------------------------
+-- NOTE: This is a large dataset (2.6M rows, ~310MB) loaded from external sources.
+--       For full data, download from GitHub Release: gh release download v1.0.0-data
+--       Or use the load script: python backend/scripts/load_postgis_data.py
+--       The table structure is provided here for reference/small test datasets.
+
+CREATE TABLE IF NOT EXISTS HOUSTON_BUILDINGS_FOOTPRINTS (
+    BUILDING_ID VARCHAR(50) PRIMARY KEY,
+    BUILDING_NAME VARCHAR(200),
+    BUILDING_TYPE VARCHAR(50),
+    HEIGHT_METERS FLOAT,
+    NUM_FLOORS INT,
+    GEOMETRY GEOGRAPHY,
+    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+)
+COMMENT = 'Building footprints for 3D map visualization - load from GitHub release v1.0.0-data';
 
 -- =============================================================================
 -- SECTION 7: VERIFICATION QUERIES
