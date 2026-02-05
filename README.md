@@ -7,19 +7,45 @@
 [![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?logo=snowflake&logoColor=white)](https://www.snowflake.com)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-**A reference architecture for electric utilities on Snowflake's AI Data Cloud.**
+**The core data platform for electric utilities on Snowflake's AI Data Cloud.**
+
+---
+
+## TL;DR - Get Started in 2 Commands
+
+```bash
+git clone https://github.com/sfc-gh-abannerjee/flux-utility-solutions.git
+cd flux-utility-solutions
+./cli/quickstart.sh  # Interactive setup - creates database, tables, sample data
+```
+
+**What you get:** Database with schemas (PRODUCTION, APPLICATIONS), core tables, sample data, warehouse configured.
+
+---
+
+## Table of Contents
+
+- [Flux Utility Platform](#flux-utility-platform) - Understanding the ecosystem
+- [Quick Start](#quick-start) ⭐ Start here
+- [Deployment Paths](#deployment-paths) - 5 ways to deploy
+- [What You'll Build](#what-youll-build) - Features and use cases
+- [Sample Data](#sample-data)
+- [Architecture](#architecture)
+- [Documentation](#documentation)
+
+---
 
 ## Flux Utility Platform
 
-Flux Utility Solutions is the core platform in the **Flux Utility Platform** - a suite of Snowflake solutions for utility industry demos:
+Flux Utility Solutions is the **core foundation** of the Flux Utility Platform. Deploy this first, then add other components as needed:
 
-| Repository | Purpose | Start Here If... |
-|------------|---------|------------------|
-| **Flux Utility Solutions** (this repo) | Core platform with Cortex AI, semantic models, 5 deployment paths | You're building a complete utility demo |
-| [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) | Synthetic AMI data generation with streaming | You need realistic test data at scale |
-| [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) | Real-time grid visualization, GNN risk prediction | You need interactive grid maps |
+| Repository | Purpose | Deploy Order |
+|------------|---------|--------------|
+| **Flux Utility Solutions** (this repo) | Core platform - database, Cortex AI, semantic models | **1st - Deploy this first** |
+| [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) | Synthetic AMI data generation with streaming | 2nd (optional) |
+| [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) | Real-time grid visualization, GNN risk prediction | 3rd (optional) |
 
-**Recommended flow**: Deploy Flux Utility Solutions first for core data model, use Data Forge to populate with AMI data, then add Ops Center for visualization.
+> **Note:** Flux Data Forge and Flux Ops Center can also be deployed standalone without this repo. See their READMEs for standalone instructions.
 
 ---
 
