@@ -61,6 +61,7 @@ cd flux-utility-solutions
 ```
 
 **What you get:**
+
 - Database with schemas (PRODUCTION, APPLICATIONS, SECRETS)
 - Core tables: Substations, Circuits, Transformers, Meters, Customers
 - Sample data loaded and ready to query
