@@ -12,31 +12,34 @@ The Flux Platform consists of three interconnected repositories:
 | **flux-data-forge** | Synthetic AMI data generation | flux-utility-solutions |
 | **flux-ops-center-spcs** | Real-time grid visualization | flux-utility-solutions |
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    FLUX UTILITY PLATFORM                        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│    ┌─────────────────────────────────────────────────────┐      │
-│    │          flux-utility-solutions (CORE)              │      │
-│    │  • Database + Schemas                               │      │
-│    │  • PRODUCTION tables (substations, transformers)    │      │
-│    │  • APPLICATIONS views (KPIs, topology)              │      │
-│    │  • ML_DEMO + CASCADE_ANALYSIS schemas               │      │
-│    │  • Cortex AI (Analyst, Search, Agent)               │      │
-│    └─────────────────────┬───────────────────────────────┘      │
-│                          │                                      │
-│           ┌──────────────┴──────────────┐                       │
-│           │                             │                       │
-│           ▼                             ▼                       │
-│    ┌─────────────────┐          ┌─────────────────┐            │
-│    │ flux-data-forge │          │ flux-ops-center │            │
-│    │ • Data Gen UI   │          │ • Grid Maps     │            │
-│    │ • Streaming     │          │ • GNN Analysis  │            │
-│    │ • Snowpipe SDK  │          │ • Cascade Sim   │            │
-│    └─────────────────┘          └─────────────────┘            │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Platform["FLUX UTILITY PLATFORM"]
+        direction TB
+        
+        subgraph Core["flux-utility-solutions (CORE)"]
+            C1["Database + Schemas"]
+            C2["PRODUCTION tables (substations, transformers)"]
+            C3["APPLICATIONS views (KPIs, topology)"]
+            C4["ML_DEMO + CASCADE_ANALYSIS schemas"]
+            C5["Cortex AI (Analyst, Search, Agent)"]
+        end
+        
+        subgraph Forge["flux-data-forge"]
+            F1["Data Gen UI"]
+            F2["Streaming"]
+            F3["Snowpipe SDK"]
+        end
+        
+        subgraph Ops["flux-ops-center"]
+            O1["Grid Maps"]
+            O2["GNN Analysis"]
+            O3["Cascade Sim"]
+        end
+        
+        Core --> Forge
+        Core --> Ops
+    end
 ```
 
 ## Deployment Order
