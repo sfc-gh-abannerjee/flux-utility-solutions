@@ -169,6 +169,23 @@ EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/11_ml_
 SELECT 'Phase 7 complete: ML feature tables created' AS status;
 
 -- ============================================================================
+-- Phase 7b: Flux Ops Center SPCS Dependencies (Optional)
+-- ============================================================================
+-- Creates views and tables required by Flux Ops Center SPCS application
+-- Skip this phase if not deploying Ops Center
+
+SELECT '=== Phase 7b: Ops Center Dependencies ===' AS phase;
+
+BEGIN
+    EXECUTE IMMEDIATE FROM @flux_utility_solutions_repo/branches/main/scripts/30_ops_center_dependencies.sql
+      USING (database => $database, warehouse => $warehouse, admin_role => $admin_role, user_role => $user_role);
+    SELECT 'Phase 7b complete: Ops Center dependencies created (APPLICATIONS views, ML_DEMO, CASCADE_ANALYSIS schemas)' AS status;
+EXCEPTION
+    WHEN OTHER THEN
+        SELECT 'Ops Center dependencies skipped - can be deployed separately using scripts/30_ops_center_dependencies.sql' AS status;
+END;
+
+-- ============================================================================
 -- Phase 8: Security and RBAC
 -- ============================================================================
 

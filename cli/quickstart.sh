@@ -6,8 +6,10 @@
 # Perfect for demos, POCs, and getting started quickly
 #
 # Usage:
-#   ./quickstart.sh                 # Deploy with defaults
-#   ./quickstart.sh --connection x  # Use specific connection
+#   ./quickstart.sh                          # Deploy with defaults
+#   ./quickstart.sh --connection x           # Use specific connection
+#   ./quickstart.sh --database MY_DB         # Use custom database name
+#   ./quickstart.sh --with-ops-center        # Include Ops Center dependencies
 #
 # What gets deployed:
 #   - Database + schemas
@@ -38,6 +40,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 
 CONNECTION=""
+DATABASE="FLUX_QUICKSTART"
+WAREHOUSE="FLUX_QUICKSTART_WH"
+WITH_OPS_CENTER=false
 
 log_step() {
     echo -e "${CYAN}[$(date +%H:%M:%S)]${NC} $1"
@@ -106,8 +111,8 @@ run_sql() {
     log_step "Deploying: $name"
     
     if snow sql $conn_flag -f "$script" \
-        -D "database=FLUX_QUICKSTART" \
-        -D "warehouse=FLUX_QUICKSTART_WH" \
+        -D "database=$DATABASE" \
+        -D "warehouse=$WAREHOUSE" \
         -D "warehouse_size=XSMALL" \
         -D "admin_role=ACCOUNTADMIN" \
         -D "user_role=PUBLIC" > /dev/null 2>&1; then
@@ -130,8 +135,8 @@ run_sql_optional() {
     log_step "Deploying: $display_name"
     
     if snow sql $conn_flag -f "$script" \
-        -D "database=FLUX_QUICKSTART" \
-        -D "warehouse=FLUX_QUICKSTART_WH" \
+        -D "database=$DATABASE" \
+        -D "warehouse=$WAREHOUSE" \
         -D "warehouse_size=XSMALL" \
         -D "admin_role=ACCOUNTADMIN" \
         -D "user_role=PUBLIC" > /dev/null 2>&1; then
@@ -149,8 +154,23 @@ main() {
                 CONNECTION="$2"
                 shift 2
                 ;;
+            --database|-d)
+                DATABASE="$2"
+                WAREHOUSE="${DATABASE}_WH"
+                shift 2
+                ;;
+            --with-ops-center)
+                WITH_OPS_CENTER=true
+                shift
+                ;;
             --help|-h)
-                echo "Usage: ./quickstart.sh [--connection NAME]"
+                echo "Usage: ./quickstart.sh [OPTIONS]"
+                echo ""
+                echo "Options:"
+                echo "  --connection, -c NAME    Use specific Snowflake connection"
+                echo "  --database, -d NAME      Database name (default: FLUX_QUICKSTART)"
+                echo "  --with-ops-center        Include Flux Ops Center dependencies"
+                echo "  --help, -h               Show this help"
                 exit 0
                 ;;
             *)
@@ -211,13 +231,13 @@ main() {
         
         log_step "Loading reference tables..."
         snow sql $conn_flag -f "$REPO_ROOT/scripts/50_load_seed_data.sql" \
-            -D "database=FLUX_QUICKSTART" \
-            -D "warehouse=FLUX_QUICKSTART_WH" > /dev/null 2>&1 && \
+            -D "database=$DATABASE" \
+            -D "warehouse=$WAREHOUSE" > /dev/null 2>&1 && \
             log_success "Reference tables loaded" || log_success "Reference tables (partial)"
         
         log_step "Generating AMI sample data (7 days)..."
         snow sql $conn_flag -f "$REPO_ROOT/scripts/51_generate_ami_sample.sql" \
-            -D "database=FLUX_QUICKSTART" \
+            -D "database=$DATABASE" \
             -D "days=7" > /dev/null 2>&1 && \
             log_success "AMI data generated" || log_success "AMI data skipped"
     else
@@ -232,6 +252,18 @@ main() {
     fi
     echo ""
     
+    # Optional: Deploy Flux Ops Center dependencies
+    if [[ "$WITH_OPS_CENTER" == true ]]; then
+        echo "Step 7: Deploying Flux Ops Center dependencies"
+        echo "───────────────────────────────────────────────"
+        run_sql_optional "$REPO_ROOT/scripts/30_ops_center_dependencies.sql" "Ops Center Views & Tables"
+        echo ""
+        echo -e "${GREEN}✓${NC} Ops Center dependencies ready!"
+        echo "  Deploy Flux Ops Center SPCS with:"
+        echo "    SNOWFLAKE_DATABASE=$DATABASE"
+        echo ""
+    fi
+    
     END=$(date +%s)
     DURATION=$((END - START))
     
@@ -240,10 +272,13 @@ main() {
     log_success "Quick Start Complete! (${DURATION} seconds)"
     echo ""
     echo "What's deployed:"
-    echo "  • Database: FLUX_QUICKSTART"
-    echo "  • Warehouse: FLUX_QUICKSTART_WH"
+    echo "  • Database: $DATABASE"
+    echo "  • Warehouse: $WAREHOUSE"
     echo "  • Tables: Substations, Transformers, Meters, Customers"
     echo "  • Cortex: Semantic View, Search Services, Agent"
+    if [[ "$WITH_OPS_CENTER" == true ]]; then
+        echo "  • Ops Center: ML_DEMO, CASCADE_ANALYSIS schemas"
+    fi
     echo ""
     echo "Try it out:"
     echo "  1. Open Snowsight → Projects → Snowflake Intelligence"
@@ -253,6 +288,9 @@ main() {
     echo "Next steps:"
     echo "  • Load full data: python generators/generate_all.py"
     echo "  • Deploy SPCS: ./cli/deploy.sh --env dev"
+    if [[ "$WITH_OPS_CENTER" != true ]]; then
+        echo "  • Add Ops Center support: ./quickstart.sh --database $DATABASE --with-ops-center"
+    fi
     echo "  • Cleanup: ./cli/teardown.sh"
     echo ""
     echo "═══════════════════════════════════════════════════════════════"

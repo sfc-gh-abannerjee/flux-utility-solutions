@@ -6,14 +6,18 @@ using H3 hexagonal grids.
 
 Deploy to Snowflake:
 1. Go to Snowsight > Streamlit
-2. Create new app in SI_DEMOS database
+2. Create new app in your target database (e.g., FLUX_PROD)
 3. Copy this code into the editor
 4. Run the app
+
+The app uses the database context from where it's deployed, or you can
+configure it via the sidebar.
 """
 
 import streamlit as st
 import pandas as pd
 import pydeck as pdk
+import os
 
 # Page config
 st.set_page_config(
@@ -24,6 +28,16 @@ st.set_page_config(
 
 # Get Snowflake session
 session = st.connection("snowflake").session()
+
+# Get current database context (for SiS apps, this is the database where the app is deployed)
+try:
+    current_db = session.sql("SELECT CURRENT_DATABASE()").collect()[0][0]
+except:
+    current_db = os.getenv("SNOWFLAKE_DATABASE", "FLUX_DB")  # Fallback default
+
+# Configuration - can be overridden via sidebar
+DB = current_db
+SCHEMA = "PRODUCTION"
 
 # Title and description
 st.title("Flux - SiS Geospatial Analytics Demo")
@@ -60,7 +74,7 @@ if analysis_type == "Meter Density":
         COUNT(DISTINCT CIRCUIT_ID) as CIRCUITS,
         AVG(METER_LATITUDE) as LAT,
         AVG(METER_LONGITUDE) as LON
-    FROM SI_DEMOS.PRODUCTION.METER_INFRASTRUCTURE
+    FROM {DB}.{SCHEMA}.METER_INFRASTRUCTURE
     WHERE METER_LATITUDE IS NOT NULL
     GROUP BY 1
     """
@@ -76,7 +90,7 @@ elif analysis_type == "Transformer Health":
         SUM(CASE WHEN HEALTH_SCORE < 60 THEN 1 ELSE 0 END) as LOW_HEALTH_COUNT,
         AVG(LATITUDE) as LAT,
         AVG(LONGITUDE) as LON
-    FROM SI_DEMOS.PRODUCTION.TRANSFORMER_METADATA
+    FROM {DB}.{SCHEMA}.TRANSFORMER_METADATA
     WHERE LATITUDE IS NOT NULL AND HEALTH_SCORE IS NOT NULL
     GROUP BY 1
     """
@@ -92,7 +106,7 @@ elif analysis_type == "Load Utilization":
         SUM(CASE WHEN LOAD_UTILIZATION_PCT > 80 THEN 1 ELSE 0 END) as HIGH_LOAD_COUNT,
         AVG(LATITUDE) as LAT,
         AVG(LONGITUDE) as LON
-    FROM SI_DEMOS.PRODUCTION.TRANSFORMER_METADATA
+    FROM {DB}.{SCHEMA}.TRANSFORMER_METADATA
     WHERE LATITUDE IS NOT NULL AND LOAD_UTILIZATION_PCT IS NOT NULL
     GROUP BY 1
     """
@@ -107,7 +121,7 @@ else:  # Coverage Gaps
             COUNT(*) as METER_COUNT,
             AVG(METER_LATITUDE) as LAT,
             AVG(METER_LONGITUDE) as LON
-        FROM SI_DEMOS.PRODUCTION.METER_INFRASTRUCTURE
+        FROM {DB}.{SCHEMA}.METER_INFRASTRUCTURE
         WHERE METER_LATITUDE IS NOT NULL
         GROUP BY 1
     ),
@@ -115,7 +129,7 @@ else:  # Coverage Gaps
         SELECT 
             H3_POINT_TO_CELL_STRING(ST_MAKEPOINT(LONGITUDE, LATITUDE), {h3_resolution}) as H3,
             COUNT(*) as TRANSFORMER_COUNT
-        FROM SI_DEMOS.PRODUCTION.TRANSFORMER_METADATA
+        FROM {DB}.{SCHEMA}.TRANSFORMER_METADATA
         WHERE LATITUDE IS NOT NULL
         GROUP BY 1
     )

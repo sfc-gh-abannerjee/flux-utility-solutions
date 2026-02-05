@@ -1,0 +1,905 @@
+-- =============================================================================
+-- 30_ops_center_dependencies.sql
+-- Flux Utility Solutions - Flux Ops Center SPCS Dependencies
+-- =============================================================================
+-- Purpose: Create ALL objects required by Flux Ops Center SPCS application
+-- This script must be run BEFORE deploying the Ops Center container.
+--
+-- Dependencies Created:
+--   APPLICATIONS Schema:
+--     - FLUX_OPS_CENTER_KPIS (view)
+--     - FLUX_OPS_CENTER_TOPOLOGY_METRO (view)
+--     - FLUX_OPS_CENTER_TOPOLOGY_FEEDERS (view)
+--     - FLUX_OPS_CENTER_TOPOLOGY (view) - Grid connection edges
+--     - FLUX_OPS_CENTER_TOPOLOGY_NODES (view) - Asset nodes
+--     - FLUX_OPS_CENTER_SERVICE_AREAS_MV (view)
+--     - VEGETATION_RISK_COMPUTED (view)
+--     - CIRCUIT_STATUS_REALTIME (view)
+--
+--   ML_DEMO Schema:
+--     - GRID_NODES (table)
+--     - GRID_EDGES (table)
+--     - T_TRANSFORMER_TEMPORAL_TRAINING (table)
+--     - V_TRANSFORMER_ML_INFERENCE (view)
+--
+--   CASCADE_ANALYSIS Schema:
+--     - NODE_CENTRALITY_FEATURES_V2 (table)
+--     - PRECOMPUTED_CASCADES (table)
+--     - GNN_PREDICTIONS (table)
+--
+-- Variables:
+--   <% database %>    - Target database name
+--   <% warehouse %>   - Warehouse for dynamic tables
+--   <% admin_role %>  - Administrator role
+--   <% user_role %>   - End-user role
+--
+-- Usage:
+--   snow sql -f scripts/30_ops_center_dependencies.sql \
+--       -D "database=FLUX_PROD" -D "warehouse=FLUX_WH" \
+--       -D "admin_role=ACCOUNTADMIN" -D "user_role=PUBLIC"
+-- =============================================================================
+
+USE DATABASE IDENTIFIER('<% database %>');
+
+-- =============================================================================
+-- SECTION 1: CREATE ADDITIONAL SCHEMAS FOR OPS CENTER
+-- =============================================================================
+
+CREATE SCHEMA IF NOT EXISTS ML_DEMO
+    DATA_RETENTION_TIME_IN_DAYS = 7
+    COMMENT = 'ML Demo objects for Flux Ops Center - grid graph, transformer predictions';
+
+CREATE SCHEMA IF NOT EXISTS CASCADE_ANALYSIS
+    DATA_RETENTION_TIME_IN_DAYS = 7
+    COMMENT = 'Cascade failure analysis - GNN features, precomputed cascades';
+
+-- Grant schema access
+GRANT USAGE ON SCHEMA <% database %>.ML_DEMO TO ROLE IDENTIFIER('<% user_role %>');
+GRANT USAGE ON SCHEMA <% database %>.CASCADE_ANALYSIS TO ROLE IDENTIFIER('<% user_role %>');
+GRANT SELECT ON FUTURE TABLES IN SCHEMA <% database %>.ML_DEMO TO ROLE IDENTIFIER('<% user_role %>');
+GRANT SELECT ON FUTURE TABLES IN SCHEMA <% database %>.CASCADE_ANALYSIS TO ROLE IDENTIFIER('<% user_role %>');
+GRANT SELECT ON FUTURE VIEWS IN SCHEMA <% database %>.ML_DEMO TO ROLE IDENTIFIER('<% user_role %>');
+GRANT SELECT ON FUTURE VIEWS IN SCHEMA <% database %>.CASCADE_ANALYSIS TO ROLE IDENTIFIER('<% user_role %>');
+
+-- =============================================================================
+-- SECTION 2: APPLICATIONS SCHEMA - OPS CENTER VIEWS
+-- =============================================================================
+
+USE SCHEMA APPLICATIONS;
+
+-- -----------------------------------------------------------------------------
+-- 2.1 FLUX_OPS_CENTER_KPIS - Real-time KPI Summary View
+-- -----------------------------------------------------------------------------
+-- Provides dashboard KPIs: total customers, active outages, load, crews
+
+CREATE OR REPLACE VIEW FLUX_OPS_CENTER_KPIS AS
+SELECT
+    -- Customer metrics
+    (SELECT COUNT(*) FROM <% database %>.PRODUCTION.METER_INFRASTRUCTURE) AS TOTAL_CUSTOMERS,
+    
+    -- Outage metrics (from circuit status or simulated)
+    COALESCE(
+        (SELECT COUNT(*) FROM <% database %>.PRODUCTION.CIRCUIT_METADATA WHERE STATUS = 'OUTAGE'),
+        FLOOR(RANDOM() * 5)::INT  -- Simulated if no outage tracking
+    ) AS ACTIVE_OUTAGES,
+    
+    -- Load metrics (aggregate from transformers)
+    COALESCE(
+        (SELECT ROUND(SUM(CURRENT_LOAD_KW) / 1000, 2) 
+         FROM <% database %>.PRODUCTION.TRANSFORMER_HOURLY_LOAD 
+         WHERE LOAD_HOUR >= DATEADD('hour', -1, CURRENT_TIMESTAMP())),
+        ROUND(150 + RANDOM() * 50, 2)  -- Simulated ~150-200 MW
+    ) AS TOTAL_LOAD_MW,
+    
+    -- Crew metrics (simulated - would come from workforce management)
+    FLOOR(5 + RANDOM() * 10)::INT AS CREWS_ACTIVE,
+    
+    -- Restoration time (simulated - would come from outage history)
+    ROUND(30 + RANDOM() * 60, 1) AS AVG_RESTORATION_MINUTES;
+
+-- -----------------------------------------------------------------------------
+-- 2.2 FLUX_OPS_CENTER_TOPOLOGY_METRO - Substation Overview
+-- -----------------------------------------------------------------------------
+-- Aggregates substation data with transformer counts and load
+
+CREATE OR REPLACE VIEW FLUX_OPS_CENTER_TOPOLOGY_METRO AS
+SELECT 
+    s.SUBSTATION_ID,
+    s.SUBSTATION_NAME,
+    s.LATITUDE,
+    s.LONGITUDE,
+    s.CAPACITY_MVA,
+    -- Calculate average load percentage across transformers
+    COALESCE(
+        (SELECT ROUND(AVG(LOAD_FACTOR_PCT), 2) 
+         FROM <% database %>.PRODUCTION.TRANSFORMER_HOURLY_LOAD thl
+         JOIN <% database %>.PRODUCTION.TRANSFORMER_METADATA tm 
+             ON thl.TRANSFORMER_ID = tm.TRANSFORMER_ID
+         WHERE tm.SUBSTATION_ID = s.SUBSTATION_ID
+           AND thl.LOAD_HOUR >= DATEADD('hour', -1, CURRENT_TIMESTAMP())),
+        ROUND(40 + RANDOM() * 40, 2)  -- Simulated 40-80% if no data
+    ) AS AVG_LOAD_PCT,
+    -- Count active outages at this substation
+    COALESCE(
+        (SELECT COUNT(*) 
+         FROM <% database %>.PRODUCTION.CIRCUIT_METADATA c
+         WHERE c.SUBSTATION_ID = s.SUBSTATION_ID AND c.STATUS = 'OUTAGE'),
+        0
+    ) AS ACTIVE_OUTAGES,
+    -- Transformer counts
+    (SELECT COUNT(*) 
+     FROM <% database %>.PRODUCTION.TRANSFORMER_METADATA tm 
+     WHERE tm.SUBSTATION_ID = s.SUBSTATION_ID) AS TRANSFORMER_COUNT,
+    -- Total transformer capacity
+    (SELECT COALESCE(SUM(CAPACITY_KVA), 0) 
+     FROM <% database %>.PRODUCTION.TRANSFORMER_METADATA tm 
+     WHERE tm.SUBSTATION_ID = s.SUBSTATION_ID) AS TOTAL_CAPACITY_KVA
+FROM <% database %>.PRODUCTION.SUBSTATIONS s;
+
+-- -----------------------------------------------------------------------------
+-- 2.3 FLUX_OPS_CENTER_TOPOLOGY_FEEDERS - Feeder/Circuit Details
+-- -----------------------------------------------------------------------------
+-- Circuit-level topology for drill-down from substations
+
+CREATE OR REPLACE VIEW FLUX_OPS_CENTER_TOPOLOGY_FEEDERS AS
+SELECT 
+    c.CIRCUIT_ID,
+    c.CIRCUIT_NAME,
+    c.SUBSTATION_ID,
+    s.SUBSTATION_NAME,
+    c.VOLTAGE_CLASS,
+    c.LENGTH_MILES,
+    COALESCE(c.STATUS, 'ENERGIZED') AS STATUS,
+    -- Meter count on this circuit
+    (SELECT COUNT(*) 
+     FROM <% database %>.PRODUCTION.METER_INFRASTRUCTURE m 
+     WHERE m.CIRCUIT_ID = c.CIRCUIT_ID) AS METER_COUNT,
+    -- Average voltage (from AMI or simulated)
+    COALESCE(
+        (SELECT ROUND(AVG(VOLTAGE_V), 1) 
+         FROM <% database %>.PRODUCTION.AMI_INTERVAL_READINGS air
+         JOIN <% database %>.PRODUCTION.METER_INFRASTRUCTURE m 
+             ON air.METER_ID = m.METER_ID
+         WHERE m.CIRCUIT_ID = c.CIRCUIT_ID
+           AND air.READING_TIMESTAMP >= DATEADD('hour', -1, CURRENT_TIMESTAMP())),
+        CASE c.VOLTAGE_CLASS 
+            WHEN '4KV' THEN 4160 
+            WHEN '12KV' THEN 12470 
+            WHEN '25KV' THEN 24900 
+            ELSE 12470 
+        END * (0.98 + RANDOM() * 0.04)  -- 98-102% of nominal
+    ) AS AVG_VOLTAGE,
+    -- Outage indicator
+    CASE WHEN c.STATUS = 'OUTAGE' THEN TRUE ELSE FALSE END AS HAS_OUTAGE
+FROM <% database %>.PRODUCTION.CIRCUIT_METADATA c
+LEFT JOIN <% database %>.PRODUCTION.SUBSTATIONS s ON c.SUBSTATION_ID = s.SUBSTATION_ID;
+
+-- -----------------------------------------------------------------------------
+-- 2.4 FLUX_OPS_CENTER_TOPOLOGY - Grid Connection Topology (Edges)
+-- -----------------------------------------------------------------------------
+-- Represents grid connectivity as edges between assets (for graph visualization)
+-- Used by: /api/topology endpoint, sync_snowflake_to_postgres.py
+
+CREATE OR REPLACE VIEW FLUX_OPS_CENTER_TOPOLOGY AS
+WITH 
+-- Substation to Transformer connections
+substation_transformer AS (
+    SELECT 
+        s.SUBSTATION_ID AS FROM_ASSET_ID,
+        'SUBSTATION' AS FROM_ASSET_TYPE,
+        s.LATITUDE AS FROM_LATITUDE,
+        s.LONGITUDE AS FROM_LONGITUDE,
+        tm.TRANSFORMER_ID AS TO_ASSET_ID,
+        'TRANSFORMER' AS TO_ASSET_TYPE,
+        tm.LATITUDE AS TO_LATITUDE,
+        tm.LONGITUDE AS TO_LONGITUDE,
+        s.SUBSTATION_ID,
+        NULL AS CIRCUIT_ID,
+        NULL AS FEEDER_ID,
+        'ENERGIZED' AS STATUS,
+        COALESCE(tm.PRIMARY_VOLTAGE_KV, 12.47) AS VOLTAGE_KV
+    FROM <% database %>.PRODUCTION.SUBSTATIONS s
+    JOIN <% database %>.PRODUCTION.TRANSFORMER_METADATA tm 
+        ON tm.SUBSTATION_ID = s.SUBSTATION_ID
+    WHERE s.LATITUDE IS NOT NULL AND tm.LATITUDE IS NOT NULL
+),
+-- Transformer to Meter connections
+transformer_meter AS (
+    SELECT 
+        tm.TRANSFORMER_ID AS FROM_ASSET_ID,
+        'TRANSFORMER' AS FROM_ASSET_TYPE,
+        tm.LATITUDE AS FROM_LATITUDE,
+        tm.LONGITUDE AS FROM_LONGITUDE,
+        m.METER_ID AS TO_ASSET_ID,
+        'METER' AS TO_ASSET_TYPE,
+        m.LATITUDE AS TO_LATITUDE,
+        m.LONGITUDE AS TO_LONGITUDE,
+        tm.SUBSTATION_ID,
+        m.CIRCUIT_ID,
+        NULL AS FEEDER_ID,
+        'ENERGIZED' AS STATUS,
+        0.240 AS VOLTAGE_KV  -- Secondary voltage
+    FROM <% database %>.PRODUCTION.TRANSFORMER_METADATA tm
+    JOIN <% database %>.PRODUCTION.METER_INFRASTRUCTURE m 
+        ON m.TRANSFORMER_ID = tm.TRANSFORMER_ID
+    WHERE tm.LATITUDE IS NOT NULL AND m.LATITUDE IS NOT NULL
+),
+-- Circuit connections (substation to substation via circuits)
+circuit_connections AS (
+    SELECT 
+        c.SUBSTATION_ID AS FROM_ASSET_ID,
+        'SUBSTATION' AS FROM_ASSET_TYPE,
+        s1.LATITUDE AS FROM_LATITUDE,
+        s1.LONGITUDE AS FROM_LONGITUDE,
+        'CIRCUIT_' || c.CIRCUIT_ID AS TO_ASSET_ID,
+        'CIRCUIT' AS TO_ASSET_TYPE,
+        -- Circuit endpoint (simulated as offset from substation)
+        s1.LATITUDE + (RANDOM() - 0.5) * 0.05 AS TO_LATITUDE,
+        s1.LONGITUDE + (RANDOM() - 0.5) * 0.05 AS TO_LONGITUDE,
+        c.SUBSTATION_ID,
+        c.CIRCUIT_ID,
+        c.CIRCUIT_ID AS FEEDER_ID,
+        COALESCE(c.STATUS, 'ENERGIZED') AS STATUS,
+        CASE c.VOLTAGE_CLASS 
+            WHEN '4KV' THEN 4.16 
+            WHEN '12KV' THEN 12.47 
+            WHEN '25KV' THEN 24.9 
+            ELSE 12.47 
+        END AS VOLTAGE_KV
+    FROM <% database %>.PRODUCTION.CIRCUIT_METADATA c
+    JOIN <% database %>.PRODUCTION.SUBSTATIONS s1 ON c.SUBSTATION_ID = s1.SUBSTATION_ID
+    WHERE s1.LATITUDE IS NOT NULL
+)
+-- Union all topology edges
+SELECT * FROM substation_transformer
+UNION ALL
+SELECT * FROM transformer_meter
+UNION ALL
+SELECT * FROM circuit_connections;
+
+-- Also create a node-centric view for sync operations
+CREATE OR REPLACE VIEW FLUX_OPS_CENTER_TOPOLOGY_NODES AS
+SELECT 
+    SUBSTATION_ID AS ASSET_ID,
+    'SUBSTATION' AS ASSET_TYPE,
+    SUBSTATION_ID,
+    NULL AS CIRCUIT_ID,
+    NULL AS FEEDER_ID,
+    LATITUDE,
+    LONGITUDE,
+    'ENERGIZED' AS STATUS,
+    CAPACITY_MVA * 1000 AS VOLTAGE_KV  -- Approximate
+FROM <% database %>.PRODUCTION.SUBSTATIONS
+WHERE LATITUDE IS NOT NULL
+UNION ALL
+SELECT 
+    TRANSFORMER_ID AS ASSET_ID,
+    'TRANSFORMER' AS ASSET_TYPE,
+    SUBSTATION_ID,
+    NULL AS CIRCUIT_ID,
+    NULL AS FEEDER_ID,
+    LATITUDE,
+    LONGITUDE,
+    'ENERGIZED' AS STATUS,
+    COALESCE(PRIMARY_VOLTAGE_KV, 12.47) AS VOLTAGE_KV
+FROM <% database %>.PRODUCTION.TRANSFORMER_METADATA
+WHERE LATITUDE IS NOT NULL
+UNION ALL
+SELECT 
+    METER_ID AS ASSET_ID,
+    'METER' AS ASSET_TYPE,
+    NULL AS SUBSTATION_ID,
+    CIRCUIT_ID,
+    NULL AS FEEDER_ID,
+    LATITUDE,
+    LONGITUDE,
+    'ACTIVE' AS STATUS,
+    0.240 AS VOLTAGE_KV
+FROM <% database %>.PRODUCTION.METER_INFRASTRUCTURE
+WHERE LATITUDE IS NOT NULL;
+
+-- -----------------------------------------------------------------------------
+-- 2.5 FLUX_OPS_CENTER_SERVICE_AREAS_MV - Service Area Aggregations
+-- -----------------------------------------------------------------------------
+-- Geographic service area summary (simplified as view, can be dynamic table)
+
+CREATE OR REPLACE VIEW FLUX_OPS_CENTER_SERVICE_AREAS_MV AS
+SELECT 
+    s.SUBSTATION_ID AS SERVICE_AREA_ID,
+    s.SUBSTATION_NAME AS SERVICE_AREA_NAME,
+    s.LATITUDE AS CENTER_LAT,
+    s.LONGITUDE AS CENTER_LON,
+    -- Aggregate metrics
+    (SELECT COUNT(*) 
+     FROM <% database %>.PRODUCTION.METER_INFRASTRUCTURE m
+     JOIN <% database %>.PRODUCTION.TRANSFORMER_METADATA tm ON m.TRANSFORMER_ID = tm.TRANSFORMER_ID
+     WHERE tm.SUBSTATION_ID = s.SUBSTATION_ID) AS CUSTOMER_COUNT,
+    (SELECT COUNT(*) 
+     FROM <% database %>.PRODUCTION.TRANSFORMER_METADATA tm 
+     WHERE tm.SUBSTATION_ID = s.SUBSTATION_ID) AS TRANSFORMER_COUNT,
+    (SELECT COUNT(*) 
+     FROM <% database %>.PRODUCTION.CIRCUIT_METADATA c 
+     WHERE c.SUBSTATION_ID = s.SUBSTATION_ID) AS CIRCUIT_COUNT,
+    s.CAPACITY_MVA AS TOTAL_CAPACITY_MVA,
+    -- Simulated reliability metrics
+    ROUND(99.5 + RANDOM() * 0.4, 2) AS RELIABILITY_PCT,
+    ROUND(0.5 + RANDOM() * 1.5, 2) AS SAIDI_MINUTES
+FROM <% database %>.PRODUCTION.SUBSTATIONS s;
+
+-- -----------------------------------------------------------------------------
+-- 2.5 VEGETATION_RISK_COMPUTED - Vegetation Risk Analysis
+-- -----------------------------------------------------------------------------
+-- Vegetation proximity risk (joins with grid assets when PostGIS data available)
+
+CREATE OR REPLACE VIEW VEGETATION_RISK_COMPUTED AS
+SELECT
+    'VEG_' || SEQ4() AS TREE_ID,
+    CASE MOD(SEQ4(), 5)
+        WHEN 0 THEN 'Oak'
+        WHEN 1 THEN 'Pine'
+        WHEN 2 THEN 'Maple'
+        WHEN 3 THEN 'Cypress'
+        ELSE 'Elm'
+    END AS SPECIES,
+    CASE MOD(SEQ4(), 3)
+        WHEN 0 THEN 'Deciduous'
+        WHEN 1 THEN 'Conifer'
+        ELSE 'Mixed'
+    END AS SUBTYPE,
+    -- Generate coordinates around Houston metro (29.7° to 30.0° lat, -95.7° to -95.0° lon)
+    -95.7 + RANDOM() * 0.7 AS LONGITUDE,
+    29.7 + RANDOM() * 0.3 AS LATITUDE,
+    ROUND(8 + RANDOM() * 25, 1) AS HEIGHT_M,
+    ROUND(2 + RANDOM() * 6, 1) AS CANOPY_RADIUS_M,
+    -- Risk scoring
+    ROUND(RANDOM(), 3) AS RISK_SCORE,
+    CASE 
+        WHEN RANDOM() < 0.03 THEN 'critical'
+        WHEN RANDOM() < 0.10 THEN 'warning'
+        WHEN RANDOM() < 0.25 THEN 'monitor'
+        ELSE 'safe'
+    END AS RISK_LEVEL,
+    ROUND(2 + RANDOM() * 50, 1) AS DISTANCE_TO_LINE_M,
+    'LINE_' || FLOOR(RANDOM() * 1000)::VARCHAR AS NEAREST_LINE_ID,
+    CASE MOD(SEQ4(), 3) WHEN 0 THEN 'transmission' WHEN 1 THEN 'distribution' ELSE 'service' END AS NEAREST_LINE_CLASS,
+    ROUND(10 + RANDOM() * 20, 1) AS FALL_ZONE_M,
+    'Tree within ' || ROUND(2 + RANDOM() * 50, 0)::VARCHAR || 'm of power line' AS RISK_EXPLANATION,
+    CASE MOD(SEQ4(), 4) WHEN 0 THEN 'pole' WHEN 1 THEN 'transformer' WHEN 2 THEN 'line' ELSE 'substation' END AS NEAREST_ASSET_TYPE,
+    ROUND(5 + RANDOM() * 100, 1) AS DISTANCE_TO_ASSET_M,
+    CURRENT_TIMESTAMP() AS COMPUTED_AT
+FROM TABLE(GENERATOR(ROWCOUNT => 10000));
+
+-- -----------------------------------------------------------------------------
+-- 2.6 CIRCUIT_STATUS_REALTIME - Real-time Circuit Status
+-- -----------------------------------------------------------------------------
+-- Live circuit status for outage tracking
+
+CREATE OR REPLACE VIEW CIRCUIT_STATUS_REALTIME AS
+SELECT 
+    c.CIRCUIT_ID,
+    c.CIRCUIT_NAME,
+    c.SUBSTATION_ID,
+    COALESCE(c.STATUS, 'ENERGIZED') AS STATUS,
+    CASE COALESCE(c.STATUS, 'ENERGIZED')
+        WHEN 'OUTAGE' THEN DATEADD('minute', -FLOOR(RANDOM() * 120)::INT, CURRENT_TIMESTAMP())
+        ELSE NULL
+    END AS OUTAGE_START_TIME,
+    CASE COALESCE(c.STATUS, 'ENERGIZED')
+        WHEN 'OUTAGE' THEN FLOOR(RANDOM() * 500)::INT
+        ELSE 0
+    END AS CUSTOMERS_AFFECTED,
+    CASE COALESCE(c.STATUS, 'ENERGIZED')
+        WHEN 'OUTAGE' THEN 
+            CASE MOD(FLOOR(RANDOM() * 5)::INT, 5)
+                WHEN 0 THEN 'Equipment Failure'
+                WHEN 1 THEN 'Weather'
+                WHEN 2 THEN 'Vehicle Accident'
+                WHEN 3 THEN 'Animal Contact'
+                ELSE 'Unknown'
+            END
+        ELSE NULL
+    END AS OUTAGE_CAUSE,
+    CURRENT_TIMESTAMP() AS LAST_UPDATED
+FROM <% database %>.PRODUCTION.CIRCUIT_METADATA c;
+
+-- Grant access to APPLICATIONS views
+GRANT SELECT ON ALL VIEWS IN SCHEMA <% database %>.APPLICATIONS TO ROLE IDENTIFIER('<% user_role %>');
+
+-- =============================================================================
+-- SECTION 3: ML_DEMO SCHEMA - GRAPH AND PREDICTION TABLES
+-- =============================================================================
+
+USE SCHEMA ML_DEMO;
+
+-- -----------------------------------------------------------------------------
+-- 3.1 GRID_NODES - Graph nodes for GNN cascade analysis
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS GRID_NODES (
+    NODE_ID VARCHAR(50) PRIMARY KEY,
+    NODE_TYPE VARCHAR(20) NOT NULL,  -- SUBSTATION, TRANSFORMER, METER, JUNCTION
+    NODE_NAME VARCHAR(200),
+    LATITUDE FLOAT,
+    LONGITUDE FLOAT,
+    VOLTAGE_LEVEL VARCHAR(20),
+    CAPACITY_KVA FLOAT,
+    PARENT_NODE_ID VARCHAR(50),
+    SUBSTATION_ID VARCHAR(50),
+    -- GNN Features
+    DEGREE_CENTRALITY FLOAT,
+    BETWEENNESS_CENTRALITY FLOAT,
+    LOAD_FACTOR FLOAT,
+    AGE_YEARS FLOAT,
+    HEALTH_SCORE FLOAT,
+    -- Metadata
+    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    UPDATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+)
+CLUSTER BY (NODE_TYPE, SUBSTATION_ID)
+COMMENT = 'Grid topology nodes for GNN-based cascade analysis';
+
+-- -----------------------------------------------------------------------------
+-- 3.2 GRID_EDGES - Graph edges connecting nodes
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS GRID_EDGES (
+    EDGE_ID VARCHAR(50) PRIMARY KEY,
+    FROM_NODE_ID VARCHAR(50) NOT NULL,
+    TO_NODE_ID VARCHAR(50) NOT NULL,
+    EDGE_TYPE VARCHAR(20) NOT NULL,  -- TRANSMISSION, DISTRIBUTION, SERVICE
+    LENGTH_METERS FLOAT,
+    IMPEDANCE_OHMS FLOAT,
+    CAPACITY_AMPS FLOAT,
+    -- Edge features for GNN
+    CURRENT_FLOW_PCT FLOAT,
+    IS_OPEN BOOLEAN DEFAULT FALSE,
+    -- Metadata
+    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    
+    FOREIGN KEY (FROM_NODE_ID) REFERENCES GRID_NODES(NODE_ID),
+    FOREIGN KEY (TO_NODE_ID) REFERENCES GRID_NODES(NODE_ID)
+)
+COMMENT = 'Grid topology edges for GNN-based cascade analysis';
+
+-- -----------------------------------------------------------------------------
+-- 3.3 T_TRANSFORMER_TEMPORAL_TRAINING - ML Training Data
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS T_TRANSFORMER_TEMPORAL_TRAINING (
+    RECORD_ID VARCHAR(50) DEFAULT UUID_STRING(),
+    TRANSFORMER_ID VARCHAR(50) NOT NULL,
+    PREDICTION_DATE DATE NOT NULL,
+    
+    -- Temporal features
+    LOAD_FACTOR_AVG_7D FLOAT,
+    LOAD_FACTOR_MAX_7D FLOAT,
+    LOAD_FACTOR_STDDEV_7D FLOAT,
+    OVERLOAD_HOURS_7D INT,
+    THERMAL_CYCLES_7D INT,
+    
+    -- Environmental features
+    AVG_AMBIENT_TEMP_F FLOAT,
+    MAX_AMBIENT_TEMP_F FLOAT,
+    HUMIDITY_PCT FLOAT,
+    
+    -- Asset features
+    AGE_YEARS FLOAT,
+    HEALTH_SCORE FLOAT,
+    MAINTENANCE_COUNT_YTD INT,
+    
+    -- Target variable
+    FAILURE_PROBABILITY FLOAT,
+    RISK_CATEGORY VARCHAR(20),  -- LOW, MODERATE, HIGH, CRITICAL
+    
+    -- Metadata
+    MODEL_VERSION VARCHAR(20),
+    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    
+    PRIMARY KEY (TRANSFORMER_ID, PREDICTION_DATE)
+)
+CLUSTER BY (PREDICTION_DATE, TRANSFORMER_ID)
+COMMENT = 'Transformer failure prediction training/inference data';
+
+-- -----------------------------------------------------------------------------
+-- 3.4 V_TRANSFORMER_ML_INFERENCE - Latest Predictions View
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE VIEW V_TRANSFORMER_ML_INFERENCE AS
+SELECT 
+    t.TRANSFORMER_ID,
+    t.PREDICTION_DATE,
+    t.FAILURE_PROBABILITY,
+    t.RISK_CATEGORY,
+    t.LOAD_FACTOR_AVG_7D,
+    t.LOAD_FACTOR_MAX_7D,
+    t.AGE_YEARS,
+    t.HEALTH_SCORE,
+    tm.TRANSFORMER_NAME,
+    tm.SUBSTATION_ID,
+    tm.CAPACITY_KVA,
+    tm.LATITUDE,
+    tm.LONGITUDE
+FROM T_TRANSFORMER_TEMPORAL_TRAINING t
+JOIN <% database %>.PRODUCTION.TRANSFORMER_METADATA tm 
+    ON t.TRANSFORMER_ID = tm.TRANSFORMER_ID
+WHERE t.PREDICTION_DATE = (SELECT MAX(PREDICTION_DATE) FROM T_TRANSFORMER_TEMPORAL_TRAINING);
+
+-- Grant access to ML_DEMO tables
+GRANT SELECT ON ALL TABLES IN SCHEMA <% database %>.ML_DEMO TO ROLE IDENTIFIER('<% user_role %>');
+GRANT SELECT ON ALL VIEWS IN SCHEMA <% database %>.ML_DEMO TO ROLE IDENTIFIER('<% user_role %>');
+
+-- =============================================================================
+-- SECTION 4: CASCADE_ANALYSIS SCHEMA - GNN ANALYSIS TABLES
+-- =============================================================================
+
+USE SCHEMA CASCADE_ANALYSIS;
+
+-- -----------------------------------------------------------------------------
+-- 4.1 NODE_CENTRALITY_FEATURES_V2 - Pre-computed GNN Features
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS NODE_CENTRALITY_FEATURES_V2 (
+    NODE_ID VARCHAR(50) PRIMARY KEY,
+    
+    -- Centrality metrics (computed via GNN or graph algorithms)
+    DEGREE_CENTRALITY FLOAT,
+    BETWEENNESS_CENTRALITY FLOAT,
+    CLOSENESS_CENTRALITY FLOAT,
+    EIGENVECTOR_CENTRALITY FLOAT,
+    PAGERANK_SCORE FLOAT,
+    
+    -- Clustering metrics
+    CLUSTERING_COEFFICIENT FLOAT,
+    LOCAL_EFFICIENCY FLOAT,
+    
+    -- Cascade risk metrics
+    CASCADE_IMPACT_SCORE FLOAT,      -- Expected downstream impact if node fails
+    VULNERABILITY_SCORE FLOAT,        -- Susceptibility to upstream failures
+    CRITICALITY_RANK INT,             -- Overall importance ranking
+    
+    -- Node attributes
+    NODE_TYPE VARCHAR(20),
+    SUBSTATION_ID VARCHAR(50),
+    LOAD_FACTOR FLOAT,
+    
+    -- Metadata
+    COMPUTED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    MODEL_VERSION VARCHAR(20)
+)
+COMMENT = 'Pre-computed GNN centrality features for cascade analysis';
+
+-- -----------------------------------------------------------------------------
+-- 4.2 PRECOMPUTED_CASCADES - Simulated Cascade Scenarios
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS PRECOMPUTED_CASCADES (
+    CASCADE_ID VARCHAR(50) PRIMARY KEY,
+    INITIATING_NODE_ID VARCHAR(50) NOT NULL,
+    INITIATING_NODE_NAME VARCHAR(200),
+    INITIATING_NODE_TYPE VARCHAR(20),
+    
+    -- Cascade metrics
+    TOTAL_AFFECTED_NODES INT,
+    AFFECTED_SUBSTATIONS INT,
+    AFFECTED_TRANSFORMERS INT,
+    AFFECTED_CUSTOMERS INT,
+    
+    -- Impact metrics
+    LOAD_SHED_MW FLOAT,
+    ESTIMATED_RESTORATION_HOURS FLOAT,
+    ECONOMIC_IMPACT_USD FLOAT,
+    
+    -- Cascade path (JSON array of affected node IDs in order)
+    CASCADE_PATH VARIANT,
+    CASCADE_DEPTH INT,
+    
+    -- Simulation metadata
+    SIMULATION_TIMESTAMP TIMESTAMP_NTZ,
+    SIMULATION_SCENARIO VARCHAR(50),  -- PEAK_LOAD, STORM, EQUIPMENT_FAILURE
+    MODEL_VERSION VARCHAR(20),
+    
+    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+)
+CLUSTER BY (INITIATING_NODE_TYPE, SIMULATION_SCENARIO)
+COMMENT = 'Pre-computed cascade failure scenarios for real-time risk assessment';
+
+-- -----------------------------------------------------------------------------
+-- 4.3 GNN_PREDICTIONS - Real-time GNN Model Outputs
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS GNN_PREDICTIONS (
+    PREDICTION_ID VARCHAR(50) DEFAULT UUID_STRING(),
+    NODE_ID VARCHAR(50) NOT NULL,
+    PREDICTION_TIMESTAMP TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    
+    -- GNN model outputs
+    FAILURE_PROBABILITY_1H FLOAT,     -- Probability of failure within 1 hour
+    FAILURE_PROBABILITY_24H FLOAT,    -- Probability of failure within 24 hours
+    CASCADE_RISK_SCORE FLOAT,         -- Risk of triggering cascade
+    
+    -- Aggregated risk
+    COMPOSITE_RISK_SCORE FLOAT,
+    RISK_TIER VARCHAR(20),            -- LOW, MODERATE, HIGH, CRITICAL
+    
+    -- Contributing factors (feature importance)
+    TOP_RISK_FACTORS VARIANT,
+    
+    -- Model metadata
+    MODEL_ID VARCHAR(50),
+    MODEL_VERSION VARCHAR(20),
+    INFERENCE_LATENCY_MS FLOAT,
+    
+    PRIMARY KEY (NODE_ID, PREDICTION_TIMESTAMP)
+)
+CLUSTER BY (PREDICTION_TIMESTAMP, NODE_ID)
+COMMENT = 'Real-time GNN model predictions for node failure and cascade risk';
+
+-- Grant access to CASCADE_ANALYSIS tables
+GRANT SELECT ON ALL TABLES IN SCHEMA <% database %>.CASCADE_ANALYSIS TO ROLE IDENTIFIER('<% user_role %>');
+
+-- =============================================================================
+-- SECTION 5: POPULATE SAMPLE DATA FOR OPS CENTER
+-- =============================================================================
+-- Generate sample data so Ops Center works immediately after deployment
+
+USE SCHEMA ML_DEMO;
+
+-- Populate GRID_NODES from existing infrastructure
+INSERT INTO GRID_NODES (NODE_ID, NODE_TYPE, NODE_NAME, LATITUDE, LONGITUDE, VOLTAGE_LEVEL, CAPACITY_KVA, SUBSTATION_ID, DEGREE_CENTRALITY, BETWEENNESS_CENTRALITY, LOAD_FACTOR, AGE_YEARS, HEALTH_SCORE)
+SELECT 
+    'SUB_' || SUBSTATION_ID AS NODE_ID,
+    'SUBSTATION' AS NODE_TYPE,
+    SUBSTATION_NAME AS NODE_NAME,
+    LATITUDE,
+    LONGITUDE,
+    VOLTAGE_CLASS AS VOLTAGE_LEVEL,
+    CAPACITY_MVA * 1000 AS CAPACITY_KVA,
+    SUBSTATION_ID,
+    0.8 + RANDOM() * 0.2 AS DEGREE_CENTRALITY,
+    0.3 + RANDOM() * 0.5 AS BETWEENNESS_CENTRALITY,
+    0.4 + RANDOM() * 0.4 AS LOAD_FACTOR,
+    5 + RANDOM() * 30 AS AGE_YEARS,
+    60 + RANDOM() * 35 AS HEALTH_SCORE
+FROM <% database %>.PRODUCTION.SUBSTATIONS
+ON CONFLICT (NODE_ID) DO NOTHING;
+
+-- Add transformer nodes
+INSERT INTO GRID_NODES (NODE_ID, NODE_TYPE, NODE_NAME, LATITUDE, LONGITUDE, VOLTAGE_LEVEL, CAPACITY_KVA, SUBSTATION_ID, PARENT_NODE_ID, DEGREE_CENTRALITY, BETWEENNESS_CENTRALITY, LOAD_FACTOR, AGE_YEARS, HEALTH_SCORE)
+SELECT 
+    'XFMR_' || TRANSFORMER_ID AS NODE_ID,
+    'TRANSFORMER' AS NODE_TYPE,
+    TRANSFORMER_NAME AS NODE_NAME,
+    LATITUDE,
+    LONGITUDE,
+    '12KV' AS VOLTAGE_LEVEL,
+    CAPACITY_KVA,
+    SUBSTATION_ID,
+    'SUB_' || SUBSTATION_ID AS PARENT_NODE_ID,
+    0.3 + RANDOM() * 0.4 AS DEGREE_CENTRALITY,
+    0.1 + RANDOM() * 0.3 AS BETWEENNESS_CENTRALITY,
+    0.3 + RANDOM() * 0.5 AS LOAD_FACTOR,
+    AGE_YEARS,
+    HEALTH_SCORE
+FROM <% database %>.PRODUCTION.TRANSFORMER_METADATA
+ON CONFLICT (NODE_ID) DO NOTHING;
+
+-- Generate grid edges
+INSERT INTO GRID_EDGES (EDGE_ID, FROM_NODE_ID, TO_NODE_ID, EDGE_TYPE, LENGTH_METERS, IMPEDANCE_OHMS, CAPACITY_AMPS, CURRENT_FLOW_PCT)
+SELECT 
+    'EDGE_' || n.NODE_ID AS EDGE_ID,
+    n.PARENT_NODE_ID AS FROM_NODE_ID,
+    n.NODE_ID AS TO_NODE_ID,
+    'DISTRIBUTION' AS EDGE_TYPE,
+    100 + RANDOM() * 500 AS LENGTH_METERS,
+    0.1 + RANDOM() * 0.5 AS IMPEDANCE_OHMS,
+    200 + RANDOM() * 300 AS CAPACITY_AMPS,
+    0.3 + RANDOM() * 0.5 AS CURRENT_FLOW_PCT
+FROM GRID_NODES n
+WHERE n.PARENT_NODE_ID IS NOT NULL
+ON CONFLICT (EDGE_ID) DO NOTHING;
+
+-- Populate transformer training data
+INSERT INTO T_TRANSFORMER_TEMPORAL_TRAINING (TRANSFORMER_ID, PREDICTION_DATE, LOAD_FACTOR_AVG_7D, LOAD_FACTOR_MAX_7D, LOAD_FACTOR_STDDEV_7D, OVERLOAD_HOURS_7D, THERMAL_CYCLES_7D, AVG_AMBIENT_TEMP_F, MAX_AMBIENT_TEMP_F, HUMIDITY_PCT, AGE_YEARS, HEALTH_SCORE, MAINTENANCE_COUNT_YTD, FAILURE_PROBABILITY, RISK_CATEGORY, MODEL_VERSION)
+SELECT 
+    tm.TRANSFORMER_ID,
+    CURRENT_DATE() AS PREDICTION_DATE,
+    0.4 + RANDOM() * 0.4 AS LOAD_FACTOR_AVG_7D,
+    0.6 + RANDOM() * 0.35 AS LOAD_FACTOR_MAX_7D,
+    0.05 + RANDOM() * 0.15 AS LOAD_FACTOR_STDDEV_7D,
+    FLOOR(RANDOM() * 10)::INT AS OVERLOAD_HOURS_7D,
+    FLOOR(5 + RANDOM() * 15)::INT AS THERMAL_CYCLES_7D,
+    70 + RANDOM() * 20 AS AVG_AMBIENT_TEMP_F,
+    85 + RANDOM() * 15 AS MAX_AMBIENT_TEMP_F,
+    50 + RANDOM() * 40 AS HUMIDITY_PCT,
+    tm.AGE_YEARS,
+    tm.HEALTH_SCORE,
+    FLOOR(RANDOM() * 5)::INT AS MAINTENANCE_COUNT_YTD,
+    ROUND(RANDOM() * 0.3, 3) AS FAILURE_PROBABILITY,
+    CASE 
+        WHEN RANDOM() < 0.05 THEN 'CRITICAL'
+        WHEN RANDOM() < 0.15 THEN 'HIGH'
+        WHEN RANDOM() < 0.40 THEN 'MODERATE'
+        ELSE 'LOW'
+    END AS RISK_CATEGORY,
+    'v1.0' AS MODEL_VERSION
+FROM <% database %>.PRODUCTION.TRANSFORMER_METADATA tm
+ON CONFLICT (TRANSFORMER_ID, PREDICTION_DATE) DO NOTHING;
+
+-- Populate NODE_CENTRALITY_FEATURES_V2
+USE SCHEMA CASCADE_ANALYSIS;
+
+INSERT INTO NODE_CENTRALITY_FEATURES_V2 (NODE_ID, DEGREE_CENTRALITY, BETWEENNESS_CENTRALITY, CLOSENESS_CENTRALITY, EIGENVECTOR_CENTRALITY, PAGERANK_SCORE, CLUSTERING_COEFFICIENT, LOCAL_EFFICIENCY, CASCADE_IMPACT_SCORE, VULNERABILITY_SCORE, CRITICALITY_RANK, NODE_TYPE, SUBSTATION_ID, LOAD_FACTOR, MODEL_VERSION)
+SELECT 
+    n.NODE_ID,
+    n.DEGREE_CENTRALITY,
+    n.BETWEENNESS_CENTRALITY,
+    0.3 + RANDOM() * 0.5 AS CLOSENESS_CENTRALITY,
+    0.2 + RANDOM() * 0.6 AS EIGENVECTOR_CENTRALITY,
+    0.001 + RANDOM() * 0.05 AS PAGERANK_SCORE,
+    0.3 + RANDOM() * 0.4 AS CLUSTERING_COEFFICIENT,
+    0.5 + RANDOM() * 0.4 AS LOCAL_EFFICIENCY,
+    CASE n.NODE_TYPE 
+        WHEN 'SUBSTATION' THEN 0.7 + RANDOM() * 0.3
+        WHEN 'TRANSFORMER' THEN 0.3 + RANDOM() * 0.4
+        ELSE 0.1 + RANDOM() * 0.2
+    END AS CASCADE_IMPACT_SCORE,
+    0.2 + RANDOM() * 0.5 AS VULNERABILITY_SCORE,
+    ROW_NUMBER() OVER (ORDER BY n.DEGREE_CENTRALITY DESC) AS CRITICALITY_RANK,
+    n.NODE_TYPE,
+    n.SUBSTATION_ID,
+    n.LOAD_FACTOR,
+    'v1.0' AS MODEL_VERSION
+FROM <% database %>.ML_DEMO.GRID_NODES n
+ON CONFLICT (NODE_ID) DO NOTHING;
+
+-- Generate sample cascade scenarios
+INSERT INTO PRECOMPUTED_CASCADES (CASCADE_ID, INITIATING_NODE_ID, INITIATING_NODE_NAME, INITIATING_NODE_TYPE, TOTAL_AFFECTED_NODES, AFFECTED_SUBSTATIONS, AFFECTED_TRANSFORMERS, AFFECTED_CUSTOMERS, LOAD_SHED_MW, ESTIMATED_RESTORATION_HOURS, ECONOMIC_IMPACT_USD, CASCADE_PATH, CASCADE_DEPTH, SIMULATION_TIMESTAMP, SIMULATION_SCENARIO, MODEL_VERSION)
+SELECT 
+    'CASCADE_' || n.NODE_ID || '_' || TO_VARCHAR(CURRENT_DATE(), 'YYYYMMDD') AS CASCADE_ID,
+    n.NODE_ID AS INITIATING_NODE_ID,
+    n.NODE_NAME AS INITIATING_NODE_NAME,
+    n.NODE_TYPE AS INITIATING_NODE_TYPE,
+    CASE n.NODE_TYPE 
+        WHEN 'SUBSTATION' THEN FLOOR(50 + RANDOM() * 200)::INT
+        WHEN 'TRANSFORMER' THEN FLOOR(5 + RANDOM() * 30)::INT
+        ELSE FLOOR(1 + RANDOM() * 5)::INT
+    END AS TOTAL_AFFECTED_NODES,
+    CASE n.NODE_TYPE WHEN 'SUBSTATION' THEN FLOOR(1 + RANDOM() * 3)::INT ELSE 1 END AS AFFECTED_SUBSTATIONS,
+    CASE n.NODE_TYPE 
+        WHEN 'SUBSTATION' THEN FLOOR(10 + RANDOM() * 40)::INT
+        ELSE FLOOR(1 + RANDOM() * 5)::INT
+    END AS AFFECTED_TRANSFORMERS,
+    CASE n.NODE_TYPE 
+        WHEN 'SUBSTATION' THEN FLOOR(5000 + RANDOM() * 20000)::INT
+        WHEN 'TRANSFORMER' THEN FLOOR(100 + RANDOM() * 500)::INT
+        ELSE FLOOR(10 + RANDOM() * 50)::INT
+    END AS AFFECTED_CUSTOMERS,
+    CASE n.NODE_TYPE 
+        WHEN 'SUBSTATION' THEN ROUND(20 + RANDOM() * 80, 2)
+        WHEN 'TRANSFORMER' THEN ROUND(0.5 + RANDOM() * 5, 2)
+        ELSE ROUND(0.01 + RANDOM() * 0.1, 2)
+    END AS LOAD_SHED_MW,
+    ROUND(0.5 + RANDOM() * 8, 1) AS ESTIMATED_RESTORATION_HOURS,
+    CASE n.NODE_TYPE 
+        WHEN 'SUBSTATION' THEN ROUND((100000 + RANDOM() * 500000), 0)
+        WHEN 'TRANSFORMER' THEN ROUND((5000 + RANDOM() * 50000), 0)
+        ELSE ROUND((100 + RANDOM() * 1000), 0)
+    END AS ECONOMIC_IMPACT_USD,
+    TO_VARIANT(ARRAY_CONSTRUCT(n.NODE_ID)) AS CASCADE_PATH,
+    CASE n.NODE_TYPE WHEN 'SUBSTATION' THEN 3 WHEN 'TRANSFORMER' THEN 2 ELSE 1 END AS CASCADE_DEPTH,
+    CURRENT_TIMESTAMP() AS SIMULATION_TIMESTAMP,
+    CASE MOD(HASH(n.NODE_ID), 3) 
+        WHEN 0 THEN 'PEAK_LOAD'
+        WHEN 1 THEN 'STORM'
+        ELSE 'EQUIPMENT_FAILURE'
+    END AS SIMULATION_SCENARIO,
+    'v1.0' AS MODEL_VERSION
+FROM <% database %>.ML_DEMO.GRID_NODES n
+WHERE n.NODE_TYPE IN ('SUBSTATION', 'TRANSFORMER')
+ON CONFLICT (CASCADE_ID) DO NOTHING;
+
+-- =============================================================================
+-- SECTION 6: MISSING PRODUCTION TABLES FOR OPS CENTER
+-- =============================================================================
+-- These tables are referenced by Flux Ops Center but may not exist in all deployments
+
+USE SCHEMA PRODUCTION;
+
+-- -----------------------------------------------------------------------------
+-- 6.1 OUTAGE_RESTORATION_TRACKER - Active Outage Tracking
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS OUTAGE_RESTORATION_TRACKER (
+    OUTAGE_ID VARCHAR(50) PRIMARY KEY,
+    CIRCUIT_ID VARCHAR(50),
+    SUBSTATION_ID VARCHAR(50),
+    OUTAGE_START_TIME TIMESTAMP_NTZ,
+    OUTAGE_END_TIME TIMESTAMP_NTZ,
+    STATUS VARCHAR(20) DEFAULT 'ACTIVE',  -- ACTIVE, RESTORED, INVESTIGATING
+    CAUSE VARCHAR(100),  -- EQUIPMENT_FAILURE, WEATHER, VEGETATION, ANIMAL, UNKNOWN
+    AFFECTED_CUSTOMERS INT,
+    AFFECTED_TRANSFORMERS INT,
+    CREW_ASSIGNED VARCHAR(50),
+    ESTIMATED_RESTORATION TIMESTAMP_NTZ,
+    ACTUAL_RESTORATION TIMESTAMP_NTZ,
+    OUTAGE_DURATION_MINUTES INT,
+    NOTES TEXT,
+    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    UPDATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
+
+-- Insert sample outage data
+INSERT INTO OUTAGE_RESTORATION_TRACKER (
+    OUTAGE_ID, CIRCUIT_ID, SUBSTATION_ID, OUTAGE_START_TIME, STATUS, CAUSE,
+    AFFECTED_CUSTOMERS, AFFECTED_TRANSFORMERS, CREW_ASSIGNED, ESTIMATED_RESTORATION
+)
+SELECT 
+    'OUT_' || SEQ4() AS OUTAGE_ID,
+    'CKT_' || FLOOR(RANDOM() * 500)::VARCHAR AS CIRCUIT_ID,
+    'SUB_' || FLOOR(RANDOM() * 50)::VARCHAR AS SUBSTATION_ID,
+    DATEADD('hour', -FLOOR(RANDOM() * 24)::INT, CURRENT_TIMESTAMP()) AS OUTAGE_START_TIME,
+    CASE MOD(SEQ4(), 5)
+        WHEN 0 THEN 'ACTIVE'
+        WHEN 1 THEN 'INVESTIGATING'
+        ELSE 'RESTORED'
+    END AS STATUS,
+    CASE MOD(SEQ4(), 5)
+        WHEN 0 THEN 'EQUIPMENT_FAILURE'
+        WHEN 1 THEN 'WEATHER'
+        WHEN 2 THEN 'VEGETATION'
+        WHEN 3 THEN 'ANIMAL'
+        ELSE 'UNKNOWN'
+    END AS CAUSE,
+    FLOOR(50 + RANDOM() * 500)::INT AS AFFECTED_CUSTOMERS,
+    FLOOR(1 + RANDOM() * 10)::INT AS AFFECTED_TRANSFORMERS,
+    'CREW_' || FLOOR(RANDOM() * 20)::VARCHAR AS CREW_ASSIGNED,
+    DATEADD('hour', FLOOR(RANDOM() * 4)::INT, CURRENT_TIMESTAMP()) AS ESTIMATED_RESTORATION
+FROM TABLE(GENERATOR(ROWCOUNT => 25))
+ON CONFLICT (OUTAGE_ID) DO NOTHING;
+
+-- -----------------------------------------------------------------------------
+-- 6.2 WORK_ORDERS - Maintenance Work Orders (if not exists)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS WORK_ORDERS (
+    WORK_ORDER_ID VARCHAR(50) PRIMARY KEY,
+    ASSET_TYPE VARCHAR(50),  -- TRANSFORMER, POLE, METER, CIRCUIT
+    ASSET_ID VARCHAR(50),
+    WORK_TYPE VARCHAR(50),  -- MAINTENANCE, REPAIR, INSPECTION, REPLACEMENT
+    PRIORITY VARCHAR(20),  -- CRITICAL, HIGH, MEDIUM, LOW
+    STATUS VARCHAR(20) DEFAULT 'OPEN',  -- OPEN, ASSIGNED, IN_PROGRESS, COMPLETED, CANCELLED
+    DESCRIPTION TEXT,
+    ASSIGNED_CREW VARCHAR(50),
+    SCHEDULED_DATE DATE,
+    COMPLETED_DATE DATE,
+    ESTIMATED_HOURS FLOAT,
+    ACTUAL_HOURS FLOAT,
+    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+    UPDATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+);
+
+-- =============================================================================
+-- SECTION 7: VERIFICATION QUERIES
+-- =============================================================================
+
+-- Verify all objects created
+SELECT 'APPLICATIONS Views' AS CHECK_TYPE, COUNT(*) AS COUNT 
+FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_SCHEMA = 'APPLICATIONS';
+
+SELECT 'ML_DEMO Tables' AS CHECK_TYPE, COUNT(*) AS COUNT 
+FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'ML_DEMO';
+
+SELECT 'CASCADE_ANALYSIS Tables' AS CHECK_TYPE, COUNT(*) AS COUNT 
+FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'CASCADE_ANALYSIS';
+
+-- Sample data verification
+SELECT 'GRID_NODES' AS TABLE_NAME, COUNT(*) AS ROW_COUNT FROM <% database %>.ML_DEMO.GRID_NODES;
+SELECT 'GRID_EDGES' AS TABLE_NAME, COUNT(*) AS ROW_COUNT FROM <% database %>.ML_DEMO.GRID_EDGES;
+SELECT 'NODE_CENTRALITY_FEATURES_V2' AS TABLE_NAME, COUNT(*) AS ROW_COUNT FROM <% database %>.CASCADE_ANALYSIS.NODE_CENTRALITY_FEATURES_V2;
+SELECT 'PRECOMPUTED_CASCADES' AS TABLE_NAME, COUNT(*) AS ROW_COUNT FROM <% database %>.CASCADE_ANALYSIS.PRECOMPUTED_CASCADES;
+
+-- =============================================================================
+-- DEPLOYMENT COMPLETE
+-- 
+-- Next Steps:
+-- 1. Deploy Flux Ops Center SPCS with SNOWFLAKE_DATABASE=<% database %>
+-- 2. The container will automatically use these objects
+-- =============================================================================

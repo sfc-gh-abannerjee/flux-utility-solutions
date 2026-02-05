@@ -55,6 +55,7 @@ vim scripts/config.yaml
 | 11-15 | (optional) | ML, PostgreSQL, SPCS, Geo, Marketplace |
 | 16 | rbac_final.sql | Complete RBAC setup |
 | 17 | validation_queries.sql | Validate deployment |
+| **30** | **ops_center_dependencies.sql** | **Flux Ops Center SPCS dependencies** |
 
 ### Configuration
 
@@ -233,9 +234,65 @@ SHOW AGENTS IN SCHEMA APPLICATIONS;
 **"Object does not exist"**
 - Run scripts in order (dependencies)
 - Verify database/schema context
+- For Ops Center errors, run `30_ops_center_dependencies.sql`
 
 **"Search service not ready"**
 - Wait for index build (can take minutes)
 - Check warehouse is running
 
+**"FLUX_DB database not found"**
+- Set `SNOWFLAKE_DATABASE` environment variable to your database name
+- Re-deploy Ops Center with correct database
+
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for more.
+
+---
+
+## Deploying Flux Ops Center SPCS
+
+The [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) is an SPCS application that requires additional database objects beyond the core deployment.
+
+### Prerequisites
+
+Complete the core deployment (scripts 01-10) first.
+
+### Deploy Ops Center Dependencies
+
+**Option 1: Via quickstart.sh**
+```bash
+./cli/quickstart.sh --database YOUR_DB --with-ops-center
+```
+
+**Option 2: Via Snow CLI**
+```bash
+snow sql -f scripts/30_ops_center_dependencies.sql \
+    -D "database=YOUR_DB" \
+    -D "warehouse=YOUR_WH" \
+    -D "admin_role=ACCOUNTADMIN" \
+    -D "user_role=PUBLIC"
+```
+
+### What Gets Created
+
+| Schema | Objects |
+|--------|---------|
+| APPLICATIONS | FLUX_OPS_CENTER_KPIS, TOPOLOGY_METRO, TOPOLOGY_FEEDERS, SERVICE_AREAS_MV, VEGETATION_RISK_COMPUTED, CIRCUIT_STATUS_REALTIME |
+| ML_DEMO | GRID_NODES, GRID_EDGES, T_TRANSFORMER_TEMPORAL_TRAINING |
+| CASCADE_ANALYSIS | NODE_CENTRALITY_FEATURES_V2, PRECOMPUTED_CASCADES, GNN_PREDICTIONS |
+
+### Deploy Ops Center Container
+
+After running the dependencies script:
+
+```bash
+# Clone Ops Center repo
+git clone https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs.git
+cd flux-ops-center-spcs
+
+# Set your database (IMPORTANT!)
+export SNOWFLAKE_DATABASE=YOUR_DB
+
+# Follow Ops Center README for SPCS deployment
+```
+
+See [DEPENDENCIES.md](DEPENDENCIES.md) for complete inter-repository dependency documentation.

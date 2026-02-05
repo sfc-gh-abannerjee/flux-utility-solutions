@@ -93,10 +93,10 @@ Environments are defined in `scripts/config.yaml`:
 
 | Environment | Database | Warehouse |
 |-------------|----------|-----------|
-| dev | FLUX_DEV | SI_DEMO_WH |
+| dev | FLUX_DEV | FLUX_WH |
 | staging | FLUX_STAGING | FLUX_STAGING_WH |
 | prod | FLUX_PROD | FLUX_PROD_WH |
-| si_demos | FLUX_DATABASE | SI_DEMO_WH |
+| si_demos | FLUX_DATABASE | FLUX_WH |
 
 ## Workflow
 
