@@ -7,7 +7,20 @@
 [![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?logo=snowflake&logoColor=white)](https://www.snowflake.com)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-**The core data platform for electric utilities on Snowflake's AI Data Cloud.**
+**A reference implementation for electric utility analytics on Snowflake.** Demonstrates Cortex AI, semantic models, and data engineering patterns for grid infrastructure data.
+
+---
+
+## Why Flux Utility Solutions?
+
+This repository provides a foundation for utility-focused Snowflake demos:
+
+| What You Get | Description |
+|--------------|-------------|
+| **Ready-to-use data model** | Pre-built schemas for substations, transformers, meters, and customers |
+| **Cortex AI examples** | Working Analyst, Search, and Agent configurations for natural language queries |
+| **Multiple deployment paths** | CLI, SQL scripts, Notebooks, Git integration, or Terraform |
+| **Extensible platform** | Foundation for [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) and [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) |
 
 ---
 
@@ -44,21 +57,6 @@ cd flux-utility-solutions
 | [DATA_MODEL.md](./docs/DATA_MODEL.md) | Schema documentation |
 | [DEPENDENCIES.md](./docs/DEPENDENCIES.md) | Inter-repository dependencies |
 | [TERRAFORM_GUIDE.md](./docs/TERRAFORM_GUIDE.md) | Infrastructure as Code guide |
-
----
-
-## Why Flux?
-
-| Challenge | Flux Solution |
-|-----------|---------------|
-| Siloed AMI, GIS, and customer data | **Unified data platform** with single source of truth |
-| Manual SQL for business questions | **Natural language queries** via Cortex Analyst |
-| Reactive maintenance | **Predictive risk scoring** with Snowpark ML |
-| Complex deployment requirements | **5 deployment paths** - choose your workflow |
-
-<p align="center">
-  <img src="./images/flux_summary_outcomes.png" alt="Flux: Unified, Intelligent, Resilient" width="90%"/>
-</p>
 
 ---
 
