@@ -11,89 +11,17 @@
 
 ---
 
-## TL;DR - Get Started in 2 Commands
-
-```bash
-git clone https://github.com/sfc-gh-abannerjee/flux-utility-solutions.git
-cd flux-utility-solutions
-./cli/quickstart.sh  # Interactive setup - creates database, tables, sample data
-```
-
-**What you get:** Database with schemas (PRODUCTION, APPLICATIONS), core tables, sample data, warehouse configured.
-
----
-
-## Table of Contents
-
-- [Flux Utility Platform](#flux-utility-platform) - Understanding the ecosystem
-- [Quick Start](#quick-start) ⭐ Start here
-- [Deployment Paths](#deployment-paths) - 5 ways to deploy
-- [What You'll Build](#what-youll-build) - Features and use cases
-- [Sample Data](#sample-data)
-- [Architecture](#architecture)
-- [Documentation](#documentation)
-
----
-
-## Flux Utility Platform
-
-Flux Utility Solutions is the **core foundation** of the Flux Utility Platform. Deploy this first, then add other components as needed:
-
-| Repository | Purpose | Deploy Order |
-|------------|---------|--------------|
-| **Flux Utility Solutions** (this repo) | Core platform - database, Cortex AI, semantic models | **1st - Deploy this first** |
-| [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) | Synthetic AMI data generation with streaming | 2nd (optional) |
-| [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) | Real-time grid visualization, GNN risk prediction | 3rd (optional) |
-
-> **Note:** Flux Data Forge and Flux Ops Center can also be deployed standalone without this repo. See their READMEs for standalone instructions.
-
----
-
 ## Quick Start
 
-Get a working demo environment in under 2 minutes:
-
 ```bash
-# Clone and deploy
 git clone https://github.com/sfc-gh-abannerjee/flux-utility-solutions.git
 cd flux-utility-solutions
 ./cli/quickstart.sh
 ```
 
-**What you get:**
+**What you get:** Database with schemas, core tables (Substations, Transformers, Meters, Customers), sample data, and warehouse configured.
 
-- Database with schemas (PRODUCTION, APPLICATIONS, SECRETS)
-- Core tables: Substations, Circuits, Transformers, Meters, Customers
-- Sample data loaded and ready to query
-- Warehouse configured with auto-suspend
-
-```bash
-# Custom deployment
-./cli/quickstart.sh --database MY_FLUX_DB --connection my_connection
-```
-
-### Prerequisites
-
-| Requirement | Notes |
-|-------------|-------|
-| Snowflake account | ACCOUNTADMIN role recommended |
-| [Snow CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index) | Required for CLI deployment |
-| Python 3.10+ | Optional: data generators |
-| Terraform 1.5+ | Optional: IaC deployment |
-
-### Deployment Paths
-
-> **One solution. Five ways to build.** SQL scripts, notebooks, Git integration, CLI, or Terraform.
-
-| Path | Best For | Guide |
-|------|----------|-------|
-| **CLI Quick Start** | Demos, POCs, fastest setup | `./cli/quickstart.sh` |
-| **SQL Scripts** | Learning, auditing, step-by-step control | [scripts/](./scripts/) |
-| **Notebooks** | Workshops, data science teams | [notebooks/](./notebooks/) |
-| **Git Integration** | GitOps, CI/CD pipelines | [git_deploy/](./git_deploy/) |
-| **Terraform** | Enterprise IaC, multi-environment | [terraform/](./terraform/) |
-
-<img width="1834" height="228" alt="deployment_options" src="https://github.com/user-attachments/assets/2ef9c913-a38f-4604-8c42-1f9f067902dc" />
+**[Full Deployment Guide →](./docs/DEPLOYMENT.md)**
 
 ---
 
@@ -109,75 +37,6 @@ cd flux-utility-solutions
 <p align="center">
   <img src="./images/flux_summary_outcomes.png" alt="Flux: Unified, Intelligent, Resilient" width="90%"/>
 </p>
-
----
-
-## What You'll Build
-
-<img width="2752" height="1301" alt="flux_utiility_components_readme" src="https://github.com/user-attachments/assets/ed510414-3856-4e1c-a7b6-bea77199faf0" />
-
-<table>
-<tr>
-<td align="center"><img src="./images/flux_utility_SI_1.png" width="400"/><br/><b>Grid Intelligence Agent</b><br/>Natural language grid queries</td>
-<td align="center"><img src="./images/flux_sis_h3_1.png" width="400"/><br/><b>H3 Grid Visualization</b><br/>Hexagonal topology maps</td>
-</tr>
-<tr>
-<td align="center"><img src="./images/cortex_search_services_1.png" width="400"/><br/><b>Cortex Search Services</b><br/>Semantic customer search</td>
-<td align="center"><img src="./images/transformer_failure_prediction_ml_notebook_1.png" width="400"/><br/><b>Predictive Maintenance</b><br/>ML-based risk scoring</td>
-</tr>
-</table>
-
-### Use Cases
-
-| Use Case | What It Does | Location |
-|----------|--------------|----------|
-| **Grid Visualization** | H3 hexagonal maps with real-time topology | `streamlit/geospatial/` |
-| **AMI Analytics** | Smart meter time-series analysis | `notebooks/demos/` |
-| **Customer 360** | Unified customer view with semantic search | `scripts/09_cortex_search_services.sql` |
-| **Predictive Maintenance** | ML-based transformer risk scoring | `scripts/11_ml_feature_tables.sql` |
-| **Conversational Analytics** | Natural language grid intelligence | `agents/` |
-| **Outage Management** | Real-time tracking and restoration | `streamlit/outage_dashboard.py` |
-
-### SPCS Components
-
-Flux features two advanced demos using SPCS to deploy containerized applications:
-
-<table>
-<tr>
-<td align="center"><img src="./images/crockett_substation_cascade_SI.png" width="400"/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs"><b>Flux Ops Center</b></a><br/>Real-time grid visualization, GNN risk prediction, cascade analysis<br/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/DOCKER_IMAGES.md">Docker Images</a> · <a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/deployment/">Deployment Guide</a></td>
-<td align="center"><img src="./images/flux_data_forge_generate_1.png" width="400"/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-data-forge"><b>Flux Data Forge</b></a><br/>Synthetic data generation, streaming pipeline demos</td>
-</tr>
-</table>
-
-**Pre-built Docker images** are available for Flux Ops Center on [GitHub Container Registry](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/pkgs/container/flux-ops-center-spcs):
-
-| Architecture | Use Case |
-|--------------|----------|
-| `linux/amd64` | Snowflake SPCS, Intel/AMD servers |
-| `linux/arm64` | Apple Silicon (M1/M2/M3/M4), AWS Graviton |
-
-These SPCS applications require Docker, compute pools, and additional setup. Start with the core platform above, then add these for specific demo scenarios.
-
----
-
-## Sample Data
-
-Bundled seed data for immediate exploration:
-
-| Dataset | Records | Description |
-|---------|---------|-------------|
-| Substations | 269 | Grid infrastructure |
-| Transformers | 100 | Asset health data |
-| Meters | 100 | AMI metadata |
-| Customers | 94 | Customer records |
-
-**Need more?** Use the script-based generators:
-
-```bash
-python generators/generate_all.py --size full
-```
-
-> **For a GUI-based approach to generating and streaming large-scale AMI data (millions of rows), see** [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge).
 
 ---
 
@@ -204,41 +63,128 @@ flowchart TB
     style DATA fill:#2e7d32,color:#fff,stroke:#1b5e20
 ```
 
-### AI Capabilities
-
-```mermaid
-flowchart TB
-    subgraph Analyst["CORTEX ANALYST"]
-        A1["Natural Language"] ~~~ A2["Semantic Model"] ~~~ A3["SQL Generation"]
-    end
-    
-    subgraph Search["CORTEX SEARCH"]
-        S1["Customers"] ~~~ S2["Meters"] ~~~ S3["Documents"]
-    end
-    
-    subgraph Agent["CORTEX AGENT"]
-        G1["Multi-Tool"] ~~~ G2["Orchestration"] ~~~ G3["Cascading"]
-    end
-    
-    Analyst --> Search --> Agent
-    
-    style Analyst fill:#1565c0,color:#fff
-    style Search fill:#ef6c00,color:#fff
-    style Agent fill:#7b1fa2,color:#fff
-```
-
-See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed design documentation.
+**[Detailed Architecture →](./docs/ARCHITECTURE.md)**
 
 ---
 
-## Snowflake Features Used
+## Features
+
+<img width="2752" height="1301" alt="flux_utiility_components_readme" src="https://github.com/user-attachments/assets/ed510414-3856-4e1c-a7b6-bea77199faf0" />
+
+<table>
+<tr>
+<td align="center"><img src="./images/flux_utility_SI_1.png" width="400"/><br/><b>Grid Intelligence Agent</b><br/>Natural language grid queries</td>
+<td align="center"><img src="./images/flux_sis_h3_1.png" width="400"/><br/><b>H3 Grid Visualization</b><br/>Hexagonal topology maps</td>
+</tr>
+<tr>
+<td align="center"><img src="./images/cortex_search_services_1.png" width="400"/><br/><b>Cortex Search Services</b><br/>Semantic customer search</td>
+<td align="center"><img src="./images/transformer_failure_prediction_ml_notebook_1.png" width="400"/><br/><b>Predictive Maintenance</b><br/>ML-based risk scoring</td>
+</tr>
+</table>
+
+| Use Case | What It Does | Location |
+|----------|--------------|----------|
+| **Grid Visualization** | H3 hexagonal maps with real-time topology | `streamlit/geospatial/` |
+| **AMI Analytics** | Smart meter time-series analysis | `notebooks/demos/` |
+| **Customer 360** | Unified customer view with semantic search | `scripts/09_cortex_search_services.sql` |
+| **Predictive Maintenance** | ML-based transformer risk scoring | `scripts/11_ml_feature_tables.sql` |
+| **Conversational Analytics** | Natural language grid intelligence | `agents/` |
+| **Outage Management** | Real-time tracking and restoration | `streamlit/outage_dashboard.py` |
+
+---
+
+## Flux Platform Ecosystem
+
+This repo is the **core foundation**. Deploy it first, then add optional components:
+
+```mermaid
+flowchart LR
+    subgraph Core["flux-utility-solutions"]
+        C1[("Database<br/>Tables<br/>Cortex AI")]
+    end
+    
+    subgraph Optional["Optional Components"]
+        O1["flux-data-forge<br/>Synthetic Data"]
+        O2["flux-ops-center<br/>Grid Visualization"]
+    end
+    
+    Core --> O1
+    Core --> O2
+    
+    style Core fill:#1565c0,color:#fff
+    style Optional fill:#ef6c00,color:#fff
+```
+
+| Repository | Purpose | 
+|------------|---------|
+| **Flux Utility Solutions** (this repo) | Core platform - database, Cortex AI, semantic models |
+| [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) | Synthetic AMI data generation with streaming |
+| [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) | Real-time grid visualization, GNN risk prediction |
+
+<table>
+<tr>
+<td align="center"><img src="./images/crockett_substation_cascade_SI.png" width="400"/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs"><b>Flux Ops Center</b></a><br/>Real-time grid visualization, GNN cascade analysis<br/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/DOCKER_IMAGES.md">Docker Images</a> · <a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/deployment/">Deployment</a></td>
+<td align="center"><img src="./images/flux_data_forge_generate_1.png" width="400"/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-data-forge"><b>Flux Data Forge</b></a><br/>Synthetic data generation, streaming pipelines</td>
+</tr>
+</table>
+
+> **Note:** Flux Data Forge and Flux Ops Center can also run standalone. See their READMEs.
+
+---
+
+## Deployment Options
+
+> **One solution. Five ways to build.**
+
+| Path | Best For | Guide |
+|------|----------|-------|
+| **CLI Quick Start** | Demos, POCs, fastest setup | `./cli/quickstart.sh` |
+| **SQL Scripts** | Learning, auditing, step-by-step control | [scripts/](./scripts/) |
+| **Notebooks** | Workshops, data science teams | [notebooks/](./notebooks/) |
+| **Git Integration** | GitOps, CI/CD pipelines | [git_deploy/](./git_deploy/) |
+| **Terraform** | Enterprise IaC, multi-environment | [terraform/](./terraform/) |
+
+<img width="1834" height="228" alt="deployment_options" src="https://github.com/user-attachments/assets/2ef9c913-a38f-4604-8c42-1f9f067902dc" />
+
+### Prerequisites
+
+| Requirement | Notes |
+|-------------|-------|
+| Snowflake account | ACCOUNTADMIN role recommended |
+| [Snow CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli/index) | Required for CLI deployment |
+| Python 3.10+ | Optional: data generators |
+| Terraform 1.5+ | Optional: IaC deployment |
+
+---
+
+## Sample Data
+
+Bundled seed data for immediate exploration:
+
+| Dataset | Records | Description |
+|---------|---------|-------------|
+| Substations | 269 | Grid infrastructure |
+| Transformers | 100 | Asset health data |
+| Meters | 100 | AMI metadata |
+| Customers | 94 | Customer records |
+
+```bash
+# Generate more data
+python generators/generate_all.py --size full
+```
+
+> **For large-scale AMI data (millions of rows), see** [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge).
+
+---
+
+## Snowflake Features
 
 | Category | Features |
 |----------|----------|
-| **Cortex AI** | [Analyst](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-analyst), [Search](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-search/cortex-search-overview), [Agents](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents), [LLM Functions](https://docs.snowflake.com/en/user-guide/snowflake-cortex/llm-functions), [Snowflake Intelligence](https://docs.snowflake.com/en/user-guide/snowflake-intelligence), [Semantic Views](https://docs.snowflake.com/en/user-guide/views-semantic/overview) |
-| **Data Engineering** | [Dynamic Tables](https://docs.snowflake.com/en/user-guide/dynamic-tables-about), [Streams](https://docs.snowflake.com/en/user-guide/streams-intro), [Tasks](https://docs.snowflake.com/en/user-guide/tasks-intro), [Stages](https://docs.snowflake.com/en/user-guide/data-load-overview), [Snowpipe](https://docs.snowflake.com/en/user-guide/data-load-snowpipe-intro) |
-| **Machine Learning** | [Snowpark ML](https://docs.snowflake.com/en/developer-guide/snowpark-ml/index), [Model Registry](https://docs.snowflake.com/en/developer-guide/snowpark-ml/model-registry/overview), [Feature Store](https://docs.snowflake.com/en/developer-guide/snowpark-ml/feature-store/overview), [Notebooks](https://docs.snowflake.com/en/user-guide/ui-snowsight/notebooks) |
-| **Applications** | [Streamlit](https://docs.snowflake.com/en/developer-guide/streamlit/about-streamlit), [SPCS](https://docs.snowflake.com/en/developer-guide/snowpark-container-services/overview) |
+| **Cortex AI** | [Analyst](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-analyst), [Search](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-search/cortex-search-overview), [Agents](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents), [LLM Functions](https://docs.snowflake.com/en/user-guide/snowflake-cortex/llm-functions), [Semantic Views](https://docs.snowflake.com/en/user-guide/views-semantic/overview) |
+| **Data Engineering** | [Dynamic Tables](https://docs.snowflake.com/en/user-guide/dynamic-tables-about), [Streams](https://docs.snowflake.com/en/user-guide/streams-intro), [Tasks](https://docs.snowflake.com/en/user-guide/tasks-intro), [Snowpipe](https://docs.snowflake.com/en/user-guide/data-load-snowpipe-intro) |
+| **Machine Learning** | [Snowpark ML](https://docs.snowflake.com/en/developer-guide/snowpark-ml/index), [Model Registry](https://docs.snowflake.com/en/developer-guide/snowpark-ml/model-registry/overview), [Feature Store](https://docs.snowflake.com/en/developer-guide/snowpark-ml/feature-store/overview) |
+| **Applications** | [Streamlit](https://docs.snowflake.com/en/developer-guide/streamlit/about-streamlit), [SPCS](https://docs.snowflake.com/en/developer-guide/snowpark-container-services/overview), [Notebooks](https://docs.snowflake.com/en/user-guide/ui-snowsight/notebooks) |
 
 ---
 
@@ -250,9 +196,8 @@ See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed design documentation.
 | [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System design and diagrams |
 | [AI_ARCHITECTURE.md](./docs/AI_ARCHITECTURE.md) | Cortex AI configuration |
 | [DATA_MODEL.md](./docs/DATA_MODEL.md) | Schema documentation |
-| [SECURITY.md](./docs/SECURITY.md) | Roles and permissions |
+| [DEPENDENCIES.md](./docs/DEPENDENCIES.md) | Inter-repository dependencies |
 | [TERRAFORM_GUIDE.md](./docs/TERRAFORM_GUIDE.md) | Infrastructure as Code guide |
-| [SEED_DATA_GUIDE.md](./docs/SEED_DATA_GUIDE.md) | Sample data reference |
 
 ---
 
@@ -261,18 +206,15 @@ See [ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed design documentation.
 ```
 flux-utility-solutions/
 ├── cli/               # Quick start scripts
-├── scripts/           # SQL deployment (01-24)
+├── scripts/           # SQL deployment (01-30)
 ├── notebooks/         # Snowflake Notebooks
 ├── git_deploy/        # Git integration
 ├── terraform/         # Infrastructure as Code
-│
 ├── streamlit/         # Streamlit apps
 ├── agents/            # Cortex Agent definitions
 ├── models/            # Semantic models
-│
 ├── seed_data/         # Sample data (CSV, Parquet)
 ├── generators/        # Script-based generators
-├── app/               # Full-stack application (FastAPI + React)
 └── docs/              # Documentation
 ```
 
@@ -280,9 +222,7 @@ flux-utility-solutions/
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and contribution guidelines.
-
----
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
