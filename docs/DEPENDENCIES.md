@@ -13,33 +13,23 @@ The Flux Platform consists of three interconnected repositories:
 | **flux-ops-center-spcs** | Real-time grid visualization | flux-utility-solutions |
 
 ```mermaid
-flowchart TB
-    subgraph Platform["FLUX UTILITY PLATFORM"]
-        direction TB
-        
-        subgraph Core["flux-utility-solutions (CORE)"]
-            C1["Database + Schemas"]
-            C2["PRODUCTION tables (substations, transformers)"]
-            C3["APPLICATIONS views (KPIs, topology)"]
-            C4["ML_DEMO + CASCADE_ANALYSIS schemas"]
-            C5["Cortex AI (Analyst, Search, Agent)"]
-        end
-        
-        subgraph Forge["flux-data-forge"]
-            F1["Data Gen UI"]
-            F2["Streaming"]
-            F3["Snowpipe SDK"]
-        end
-        
-        subgraph Ops["flux-ops-center"]
-            O1["Grid Maps"]
-            O2["GNN Analysis"]
-            O3["Cascade Sim"]
-        end
-        
-        Core --> Forge
-        Core --> Ops
+flowchart LR
+    subgraph Core["flux-utility-solutions (CORE)"]
+        C_DB[("FLUX_DB")]
+        C_SCHEMAS["Schemas + Tables"]
+        C_AI["Cortex AI"]
     end
+    
+    subgraph Forge["flux-data-forge"]
+        F["Data Gen<br/>Streaming"]
+    end
+    
+    subgraph Ops["flux-ops-center"]
+        O["Grid Maps<br/>GNN Analysis"]
+    end
+    
+    Core --> Forge
+    Core --> Ops
 ```
 
 ## Deployment Order
