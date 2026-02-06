@@ -144,10 +144,17 @@ Flux features two advanced demos using SPCS to deploy containerized applications
 
 <table>
 <tr>
-<td align="center"><img src="./images/crockett_substation_cascade_SI.png" width="400"/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs"><b>Flux Ops Center</b></a><br/>Real-time grid visualization, GNN risk prediction, cascade analysis</td>
+<td align="center"><img src="./images/crockett_substation_cascade_SI.png" width="400"/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs"><b>Flux Ops Center</b></a><br/>Real-time grid visualization, GNN risk prediction, cascade analysis<br/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/DOCKER_IMAGES.md">Docker Images</a> · <a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/deployment/">Deployment Guide</a></td>
 <td align="center"><img src="./images/flux_data_forge_generate_1.png" width="400"/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-data-forge"><b>Flux Data Forge</b></a><br/>Synthetic data generation, streaming pipeline demos</td>
 </tr>
 </table>
+
+**Pre-built Docker images** are available for Flux Ops Center on [GitHub Container Registry](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/pkgs/container/flux-ops-center-spcs):
+
+| Architecture | Use Case |
+|--------------|----------|
+| `linux/amd64` | Snowflake SPCS, Intel/AMD servers |
+| `linux/arm64` | Apple Silicon (M1/M2/M3/M4), AWS Graviton |
 
 These SPCS applications require Docker, compute pools, and additional setup. Start with the core platform above, then add these for specific demo scenarios.
 

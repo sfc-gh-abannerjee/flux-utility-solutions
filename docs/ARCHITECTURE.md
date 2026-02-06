@@ -76,6 +76,47 @@ Multiple interfaces for different user personas:
 | **Load Analytics** | Streamlit | Transformer capacity analysis |
 | **Outage Dashboard** | Streamlit | Outage tracking and restoration |
 | **Grid Intelligence Agent** | Cortex Agent | Conversational analytics assistant |
+| **[Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs)** | SPCS (React + FastAPI) | Real-time grid visualization, GNN cascade analysis |
+
+### Flux Ops Center Architecture
+
+The [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) is an SPCS containerized application providing advanced grid visualization:
+
+```mermaid
+flowchart TB
+    subgraph SPCS["SPCS Container Service"]
+        direction LR
+        NGINX["Nginx<br/>:8080"]
+        REACT["React Frontend<br/>(DeckGL Maps)"]
+        FASTAPI["FastAPI Backend<br/>:3001"]
+        
+        NGINX -->|"Static Assets"| REACT
+        NGINX -->|"/api/*"| FASTAPI
+    end
+    
+    subgraph SNOWFLAKE["Snowflake Platform"]
+        direction TB
+        TABLES[("Snowflake Tables<br/>Grid Assets, Events")]
+        POSTGRES[("Snowflake Postgres<br/>PostGIS Geospatial")]
+        CORTEX["Cortex Agent<br/>Grid Intelligence"]
+        GNN["ML Model Registry<br/>GNN Cascade Predictor"]
+    end
+    
+    FASTAPI -->|"snowflake-connector"| TABLES
+    FASTAPI -->|"asyncpg"| POSTGRES
+    FASTAPI -->|"REST API"| CORTEX
+    FASTAPI -->|"Model Inference"| GNN
+    
+    USER((User)) -->|"HTTPS"| NGINX
+```
+
+**Key capabilities:**
+- 66K+ grid assets with DeckGL visualization
+- GNN-based cascade failure prediction
+- Real-time status and risk monitoring
+- Natural language queries via Cortex Agent
+
+**Documentation:** [Docker Images](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/DOCKER_IMAGES.md) · [Deployment](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/deployment/) · [API Reference](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/API_REFERENCE.md)
 
 ---
 

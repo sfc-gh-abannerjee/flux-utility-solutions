@@ -83,6 +83,23 @@ export SNOWFLAKE_DATABASE=MY_FLUX_DB
 
 Use this for real-time grid visualization and GNN cascade analysis.
 
+**Pre-built Docker images** are available - no need to build locally:
+
+```bash
+# Pull from GitHub Container Registry (auto-selects your architecture)
+docker pull ghcr.io/sfc-gh-abannerjee/flux-ops-center-spcs:main
+
+# For SPCS deployment (requires amd64)
+docker pull --platform linux/amd64 ghcr.io/sfc-gh-abannerjee/flux-ops-center-spcs:main
+```
+
+| Architecture | Use Case |
+|--------------|----------|
+| `linux/amd64` | Snowflake SPCS, Intel/AMD servers |
+| `linux/arm64` | Apple Silicon (M1/M2/M3/M4), AWS Graviton |
+
+**Full deployment:**
+
 ```bash
 git clone https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs.git
 cd flux-ops-center-spcs
@@ -99,6 +116,11 @@ export SNOWFLAKE_DATABASE=MY_FLUX_DB
 - `{DATABASE}.PRODUCTION.*` (substations, transformers)
 - `{DATABASE}.ML_DEMO.*` (grid graph)
 - `{DATABASE}.CASCADE_ANALYSIS.*` (centrality features)
+
+**Documentation:**
+- [Docker Images Guide](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/DOCKER_IMAGES.md)
+- [Deployment Options](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/deployment/)
+- [API Reference](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/API_REFERENCE.md)
 
 ## Database Configuration
 
