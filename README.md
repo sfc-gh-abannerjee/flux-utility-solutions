@@ -21,7 +21,29 @@ cd flux-utility-solutions
 
 **What you get:** Database with schemas, core tables (Substations, Transformers, Meters, Customers), sample data, and warehouse configured.
 
-**[Full Deployment Guide →](./docs/DEPLOYMENT.md)**
+---
+
+## Snowflake Features
+
+| Category | Features |
+|----------|----------|
+| **Cortex AI** | [Analyst](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-analyst), [Search](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-search/cortex-search-overview), [Agents](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents), [LLM Functions](https://docs.snowflake.com/en/user-guide/snowflake-cortex/llm-functions), [Semantic Views](https://docs.snowflake.com/en/user-guide/views-semantic) |
+| **Data Engineering** | [Dynamic Tables](https://docs.snowflake.com/en/user-guide/dynamic-tables-about), [Streams](https://docs.snowflake.com/en/user-guide/streams-intro), [Tasks](https://docs.snowflake.com/en/user-guide/tasks-intro), [Snowpipe](https://docs.snowflake.com/en/user-guide/data-load-snowpipe-intro) |
+| **Machine Learning** | [Snowpark ML](https://docs.snowflake.com/en/developer-guide/snowflake-ml/overview), [Model Registry](https://docs.snowflake.com/en/developer-guide/snowflake-ml/model-registry/overview), [Feature Store](https://docs.snowflake.com/en/developer-guide/snowflake-ml/feature-store/overview) |
+| **Applications** | [Streamlit](https://docs.snowflake.com/en/developer-guide/streamlit/about-streamlit), [SPCS](https://docs.snowflake.com/en/developer-guide/snowpark-container-services/overview), [Notebooks](https://docs.snowflake.com/en/user-guide/ui-snowsight/notebooks) |
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Step-by-step deployment guide |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System design and diagrams |
+| [AI_ARCHITECTURE.md](./docs/AI_ARCHITECTURE.md) | Cortex AI configuration |
+| [DATA_MODEL.md](./docs/DATA_MODEL.md) | Schema documentation |
+| [DEPENDENCIES.md](./docs/DEPENDENCIES.md) | Inter-repository dependencies |
+| [TERRAFORM_GUIDE.md](./docs/TERRAFORM_GUIDE.md) | Infrastructure as Code guide |
 
 ---
 
@@ -174,30 +196,6 @@ python generators/generate_all.py --size full
 ```
 
 > **For large-scale AMI data (millions of rows), see** [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge).
-
----
-
-## Snowflake Features
-
-| Category | Features |
-|----------|----------|
-| **Cortex AI** | [Analyst](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-analyst), [Search](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-search/cortex-search-overview), [Agents](https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents), [LLM Functions](https://docs.snowflake.com/en/user-guide/snowflake-cortex/llm-functions), [Semantic Views](https://docs.snowflake.com/en/user-guide/views-semantic/overview) |
-| **Data Engineering** | [Dynamic Tables](https://docs.snowflake.com/en/user-guide/dynamic-tables-about), [Streams](https://docs.snowflake.com/en/user-guide/streams-intro), [Tasks](https://docs.snowflake.com/en/user-guide/tasks-intro), [Snowpipe](https://docs.snowflake.com/en/user-guide/data-load-snowpipe-intro) |
-| **Machine Learning** | [Snowpark ML](https://docs.snowflake.com/en/developer-guide/snowpark-ml/index), [Model Registry](https://docs.snowflake.com/en/developer-guide/snowpark-ml/model-registry/overview), [Feature Store](https://docs.snowflake.com/en/developer-guide/snowpark-ml/feature-store/overview) |
-| **Applications** | [Streamlit](https://docs.snowflake.com/en/developer-guide/streamlit/about-streamlit), [SPCS](https://docs.snowflake.com/en/developer-guide/snowpark-container-services/overview), [Notebooks](https://docs.snowflake.com/en/user-guide/ui-snowsight/notebooks) |
-
----
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Step-by-step deployment guide |
-| [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System design and diagrams |
-| [AI_ARCHITECTURE.md](./docs/AI_ARCHITECTURE.md) | Cortex AI configuration |
-| [DATA_MODEL.md](./docs/DATA_MODEL.md) | Schema documentation |
-| [DEPENDENCIES.md](./docs/DEPENDENCIES.md) | Inter-repository dependencies |
-| [TERRAFORM_GUIDE.md](./docs/TERRAFORM_GUIDE.md) | Infrastructure as Code guide |
 
 ---
 
