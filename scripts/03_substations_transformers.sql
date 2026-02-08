@@ -5,10 +5,12 @@
 -- Purpose: Create core grid infrastructure tables
 -- Dependencies: 01_database_infrastructure.sql
 -- Jinja2 Variables:
---   <% database %>  - Target database name
+--   <% database %>   - Target database name
+--   <% warehouse %>  - Target warehouse name
 -- =============================================================================
 
 USE DATABASE IDENTIFIER('<% database %>');
+USE WAREHOUSE IDENTIFIER('<% warehouse %>');
 USE SCHEMA PRODUCTION;
 
 -- -----------------------------------------------------------------------------

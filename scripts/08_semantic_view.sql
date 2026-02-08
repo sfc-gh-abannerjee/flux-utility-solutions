@@ -6,7 +6,8 @@
 -- Dependencies: All PRODUCTION tables (01-07)
 -- 
 -- Variable Templating (Snow CLI Jinja2):
---   <% database %>  - Target database name (e.g., FLUX_DEMO)
+--   <% database %>   - Target database name (e.g., FLUX_DEMO)
+--   <% warehouse %>  - Target warehouse name
 --
 -- Usage:
 --   snow sql -f scripts/08_semantic_view.sql -D "database=YOUR_DATABASE"
@@ -14,6 +15,7 @@
 -- =============================================================================
 
 USE DATABASE IDENTIFIER('<% database %>');
+USE WAREHOUSE IDENTIFIER('<% warehouse %>');
 USE SCHEMA APPLICATIONS;
 
 -- -----------------------------------------------------------------------------
