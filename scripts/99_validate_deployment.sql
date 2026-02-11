@@ -112,17 +112,23 @@ WHERE STAGE_SCHEMA = 'APPLICATIONS';
 
 SELECT '=== CORTEX SERVICES ===' AS section;
 
--- Check Cortex Search Services
+-- Check Cortex Search Services using flow operator for robust sequencing
+SHOW CORTEX SEARCH SERVICES IN SCHEMA <% database %>.APPLICATIONS
+->>
 SELECT 
     'Cortex Search Services' AS service_type,
     COUNT(*) AS count,
-    LISTAGG(DATABASE_NAME || '.' || SCHEMA_NAME || '.' || NAME, ', ') AS services
-FROM TABLE(RESULT_SCAN(LAST_QUERY_ID(-1)))
-WHERE 1=0;  -- Placeholder - actual check requires SHOW command
+    LISTAGG("name", ', ') AS services
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));
 
--- Note: Run these manually to check Cortex services:
--- SHOW CORTEX SEARCH SERVICES IN SCHEMA <% database %>.APPLICATIONS;
--- SHOW SEMANTIC VIEWS IN SCHEMA <% database %>.APPLICATIONS;
+-- Check Semantic Views using flow operator
+SHOW SEMANTIC VIEWS IN SCHEMA <% database %>.APPLICATIONS
+->>
+SELECT 
+    'Semantic Views' AS service_type,
+    COUNT(*) AS count,
+    LISTAGG("name", ', ') AS views
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));
 
 -- =============================================================================
 -- SECTION 5: WAREHOUSE VALIDATION
