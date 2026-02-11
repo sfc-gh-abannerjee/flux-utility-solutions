@@ -4,9 +4,11 @@
 -- =============================================================================
 -- Purpose: Create database, schemas, roles, and grants for Flux deployment
 -- Variables:
---   <% database %>    - Target database name (e.g., FLUX_PROD)
---   <% admin_role %>  - Administrator role
---   <% user_role %>   - End-user role for queries
+--   <% database %>       - Target database name (e.g., FLUX_PROD)
+--   <% warehouse %>      - Target warehouse name (e.g., FLUX_PROD_WH)
+--   <% warehouse_size %> - Warehouse size (e.g., XSMALL, SMALL, MEDIUM)
+--   <% admin_role %>     - Administrator role
+--   <% user_role %>      - End-user role for queries
 -- 
 -- Usage with Snow CLI:
 --   snow sql -f scripts/01_database_infrastructure.sql \
@@ -22,6 +24,20 @@ CREATE DATABASE IF NOT EXISTS IDENTIFIER('<% database %>')
     COMMENT = 'Flux Utility Solutions - Utility grid analytics platform';
 
 USE DATABASE IDENTIFIER('<% database %>');
+
+-- -----------------------------------------------------------------------------
+-- 1b. CREATE WAREHOUSE (needed for EXECUTE IMMEDIATE blocks below)
+-- -----------------------------------------------------------------------------
+-- Note: 02_warehouses.sql will configure additional warehouse settings
+
+CREATE WAREHOUSE IF NOT EXISTS IDENTIFIER('<% warehouse %>')
+    WAREHOUSE_SIZE = '<% warehouse_size %>'
+    AUTO_SUSPEND = 60
+    AUTO_RESUME = TRUE
+    INITIALLY_SUSPENDED = TRUE
+    COMMENT = 'Flux Utility Solutions - Primary compute warehouse';
+
+USE WAREHOUSE IDENTIFIER('<% warehouse %>');
 
 -- -----------------------------------------------------------------------------
 -- 2. CREATE ROLES (if not system roles)

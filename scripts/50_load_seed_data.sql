@@ -241,7 +241,7 @@ SELECT
 FROM TABLE(GENERATOR(ROWCOUNT => 168));  -- 7 days * 24 hours
 
 -- Insert AMI readings
-INSERT INTO AMI_READINGS (METER_ID, READING_TIMESTAMP, READING_VALUE_KWH, READING_TYPE, QUALITY_FLAG)
+INSERT INTO AMI_INTERVAL_READINGS (METER_ID, TIMESTAMP, USAGE_KWH, VOLTAGE, POWER_FACTOR, CUSTOMER_SEGMENT_ID, SOURCE_TABLE)
 SELECT 
     m.METER_ID,
     t.reading_time,
@@ -260,19 +260,63 @@ SELECT
             WHEN HOUR(t.reading_time) BETWEEN 0 AND 5 THEN 0.4   -- Night low
             ELSE 1.0
         END
-        -- Add randomness
-        * (0.8 + RANDOM() * 0.4)
-    , 3) AS reading_kwh,
-    'INTERVAL',
-    CASE WHEN RANDOM() < 0.98 THEN 'VALID' ELSE 'ESTIMATED' END
+        -- Add randomness (0.8 to 1.2 multiplier)
+        * (0.8 + UNIFORM(0::FLOAT, 0.4::FLOAT, RANDOM()))
+    , 3) AS usage_kwh,
+    120 + ROUND(UNIFORM(0::FLOAT, 5::FLOAT, RANDOM()), 1) AS voltage,  -- ~120V with slight variation
+    0.85 + ROUND(UNIFORM(0::FLOAT, 0.15::FLOAT, RANDOM()), 2) AS power_factor,  -- 0.85-1.0 range
+    m.CUSTOMER_SEGMENT_ID,
+    'SEED_DATA'
 FROM METER_INFRASTRUCTURE m
 CROSS JOIN AMI_TIMESTAMPS t
 WHERE m.METER_ID IS NOT NULL;
 
-SELECT 'AMI_READINGS generated: ' || COUNT(*) || ' rows' AS status FROM AMI_READINGS;
+SELECT 'AMI_INTERVAL_READINGS generated: ' || COUNT(*) || ' rows' AS status FROM AMI_INTERVAL_READINGS;
 
 -- ============================================================================
--- STEP 9: Summary
+-- STEP 9: Load TECHNICAL_MANUALS_PDF_CHUNKS from parquet
+-- ============================================================================
+-- Technical manuals for RAG-based document search
+
+CREATE TABLE IF NOT EXISTS PRODUCTION.TECHNICAL_MANUALS_PDF_CHUNKS (
+    CHUNK_ID NUMBER,
+    DOCUMENT_ID VARCHAR(100),
+    CHUNK_TEXT VARCHAR(16777216),
+    DOCUMENT_TYPE VARCHAR(200),
+    SOURCE_SYSTEM VARCHAR(100) DEFAULT 'TECHNICAL_MANUALS_PDF',
+    LANGUAGE VARCHAR(10) DEFAULT 'en',
+    LANGUAGE_NAME VARCHAR(50) DEFAULT 'English',
+    LANGUAGE_NATIVE VARCHAR(50) DEFAULT 'English'
+);
+
+-- Define parquet file format
+CREATE OR REPLACE FILE FORMAT PARQUET_FORMAT
+    TYPE = 'PARQUET';
+
+-- Load technical manuals from parquet (if file exists in stage)
+COPY INTO PRODUCTION.TECHNICAL_MANUALS_PDF_CHUNKS (
+    CHUNK_ID, DOCUMENT_ID, CHUNK_TEXT, DOCUMENT_TYPE, 
+    SOURCE_SYSTEM, LANGUAGE, LANGUAGE_NAME, LANGUAGE_NATIVE
+)
+FROM (
+    SELECT 
+        $1:CHUNK_ID::NUMBER,
+        $1:DOCUMENT_ID::VARCHAR,
+        $1:CHUNK_TEXT::VARCHAR,
+        $1:DOCUMENT_TYPE::VARCHAR,
+        $1:SOURCE_SYSTEM::VARCHAR,
+        $1:LANGUAGE::VARCHAR,
+        $1:LANGUAGE_NAME::VARCHAR,
+        $1:LANGUAGE_NATIVE::VARCHAR
+    FROM @SEED_DATA_STAGE/technical_manuals/
+)
+FILE_FORMAT = PARQUET_FORMAT
+ON_ERROR = 'CONTINUE';
+
+SELECT 'TECHNICAL_MANUALS_PDF_CHUNKS loaded: ' || COUNT(*) || ' rows' AS status FROM PRODUCTION.TECHNICAL_MANUALS_PDF_CHUNKS;
+
+-- ============================================================================
+-- STEP 10: Summary
 -- ============================================================================
 SELECT '=== SEED DATA LOADING COMPLETE ===' AS message;
 
@@ -285,4 +329,6 @@ SELECT 'METER_INFRASTRUCTURE', COUNT(*) FROM METER_INFRASTRUCTURE
 UNION ALL
 SELECT 'CUSTOMERS_MASTER_DATA', COUNT(*) FROM CUSTOMERS_MASTER_DATA
 UNION ALL
-SELECT 'AMI_READINGS', COUNT(*) FROM AMI_READINGS;
+SELECT 'AMI_INTERVAL_READINGS', COUNT(*) FROM AMI_INTERVAL_READINGS
+UNION ALL
+SELECT 'TECHNICAL_MANUALS_PDF_CHUNKS', COUNT(*) FROM PRODUCTION.TECHNICAL_MANUALS_PDF_CHUNKS;

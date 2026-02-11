@@ -24,7 +24,6 @@ CREATE OR ALTER WAREHOUSE IDENTIFIER('<% warehouse %>')
     MIN_CLUSTER_COUNT = 1
     MAX_CLUSTER_COUNT = 2
     SCALING_POLICY = 'STANDARD'
-    INITIALLY_SUSPENDED = FALSE
     COMMENT = 'Flux primary analytics warehouse';
 
 -- Grant usage to roles
@@ -47,7 +46,6 @@ CREATE OR ALTER WAREHOUSE IDENTIFIER('<% warehouse %>_LARGE')
     MIN_CLUSTER_COUNT = 1
     MAX_CLUSTER_COUNT = 4
     SCALING_POLICY = 'ECONOMY'
-    INITIALLY_SUSPENDED = TRUE
     COMMENT = 'Flux large warehouse for heavy analytics (AMI, ML)';
 
 GRANT USAGE ON WAREHOUSE IDENTIFIER('<% warehouse %>_LARGE') 
@@ -65,7 +63,6 @@ CREATE OR ALTER WAREHOUSE IDENTIFIER('<% warehouse %>_LOADING')
     AUTO_RESUME = TRUE
     MIN_CLUSTER_COUNT = 1
     MAX_CLUSTER_COUNT = 1
-    INITIALLY_SUSPENDED = TRUE
     COMMENT = 'Flux ETL warehouse for data loading';
 
 GRANT USAGE ON WAREHOUSE IDENTIFIER('<% warehouse %>_LOADING') 
@@ -83,7 +80,6 @@ CREATE OR ALTER WAREHOUSE IDENTIFIER('<% warehouse %>_CORTEX')
     AUTO_RESUME = TRUE
     MIN_CLUSTER_COUNT = 1
     MAX_CLUSTER_COUNT = 2
-    INITIALLY_SUSPENDED = TRUE
     COMMENT = 'Flux Cortex AI warehouse for search and embeddings';
 
 GRANT USAGE ON WAREHOUSE IDENTIFIER('<% warehouse %>_CORTEX') 

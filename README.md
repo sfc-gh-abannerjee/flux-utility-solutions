@@ -29,7 +29,7 @@ This repository provides a foundation for utility-focused Snowflake demos:
 ```bash
 git clone https://github.com/sfc-gh-abannerjee/flux-utility-solutions.git
 cd flux-utility-solutions
-./cli/quickstart.sh
+./cli/quickstart.sh -c <connection_name>
 ```
 
 **What you get:** Database with schemas, core tables (Substations, Transformers, Meters, Customers), sample data, and warehouse configured.

@@ -148,14 +148,14 @@ WHERE NAME LIKE '<% warehouse %>%' OR NAME LIKE 'FLUX%';
 
 -- Check service status (using flow operator for robust sequencing)
 SHOW SERVICES IN SCHEMA APPLICATIONS
-=>>
+->>
 SELECT 'SPCS_SERVICES' AS CHECK_TYPE,
        "name" AS SERVICE_NAME,
        "status" AS STATUS,
        "min_instances" AS MIN_INSTANCES,
        "max_instances" AS MAX_INSTANCES,
        CASE WHEN "status" IN ('READY', 'PENDING') THEN 'PASS' ELSE 'CHECK' END AS VALIDATION
-FROM TABLE(RESULT_SCAN(*));
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()));
 
 -- -----------------------------------------------------------------------------
 -- 9. ROLE AND GRANTS VALIDATION

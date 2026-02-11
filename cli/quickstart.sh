@@ -89,7 +89,9 @@ test_connection() {
     local conn_flag=""
     [[ -n "$CONNECTION" ]] && conn_flag="-c $CONNECTION"
     
-    if snow connection test $conn_flag &> /dev/null; then
+    # Use a simple SQL query that doesn't require a warehouse
+    # This makes the quickstart self-contained and doesn't depend on connection defaults
+    if snow sql $conn_flag -q "SELECT CURRENT_ACCOUNT()" &> /dev/null; then
         log_success "Snowflake connection verified"
     else
         log_error "Cannot connect to Snowflake"
@@ -208,48 +210,71 @@ main() {
     run_sql "$REPO_ROOT/scripts/07_aggregation_tables.sql"
     echo ""
     
-    echo "Step 5/6: Deploying Cortex AI (optional)"
-    echo "─────────────────────────────────────────"
-    # Cortex AI features are optional - deployment continues if they fail
-    run_sql_optional "$REPO_ROOT/scripts/08_semantic_view.sql" "Semantic View"
-    run_sql_optional "$REPO_ROOT/scripts/09_cortex_search_services.sql" "Search Services"
-    run_sql_optional "$REPO_ROOT/scripts/10_cortex_agent.sql" "Cortex Agent"
-    echo ""
-    
-    echo "Step 6/6: Loading seed data"
+    echo "Step 5/6: Loading seed data"
     echo "─────────────────────────────────"
     
     # Set up connection flag for direct snow sql calls
     local conn_flag=""
     [[ -n "$CONNECTION" ]] && conn_flag="-c $CONNECTION"
     
-    # Try to load from FLUX_DATABASE first (fastest)
-    log_step "Checking for FLUX_DATABASE seed data..."
-    
-    if snow sql $conn_flag -q "SELECT 1 FROM FLUX_DATABASE.PRODUCTION.SUBSTATIONS LIMIT 1" > /dev/null 2>&1; then
-        log_success "FLUX_DATABASE accessible"
+    # Check if bundled CSV seed data exists
+    if [[ -f "$REPO_ROOT/seed_data/csv/substations.csv" ]]; then
+        log_step "Using bundled CSV seed data..."
         
-        log_step "Loading reference tables..."
+        # Create stage for seed data
+        snow sql $conn_flag -q "USE DATABASE $DATABASE; USE SCHEMA PRODUCTION; CREATE STAGE IF NOT EXISTS SEED_DATA_STAGE DIRECTORY = (ENABLE = TRUE);" > /dev/null 2>&1
+        
+        # Upload CSV files to stage
+        log_step "Uploading seed data to stage..."
+        snow stage copy "$REPO_ROOT/seed_data/csv/substations.csv" "@$DATABASE.PRODUCTION.SEED_DATA_STAGE/substations/" $conn_flag --overwrite > /dev/null 2>&1
+        snow stage copy "$REPO_ROOT/seed_data/csv/transformers.csv" "@$DATABASE.PRODUCTION.SEED_DATA_STAGE/transformers/" $conn_flag --overwrite > /dev/null 2>&1
+        snow stage copy "$REPO_ROOT/seed_data/csv/meters.csv" "@$DATABASE.PRODUCTION.SEED_DATA_STAGE/meters/" $conn_flag --overwrite > /dev/null 2>&1
+        snow stage copy "$REPO_ROOT/seed_data/csv/customers.csv" "@$DATABASE.PRODUCTION.SEED_DATA_STAGE/customers/" $conn_flag --overwrite > /dev/null 2>&1
+        
+        # Upload technical manuals parquet if available
+        if [[ -f "$REPO_ROOT/seed_data/parquet/operational/technical_manuals_pdf_chunks_0_0_0.snappy.parquet" ]]; then
+            snow stage copy "$REPO_ROOT/seed_data/parquet/operational/technical_manuals_pdf_chunks_0_0_0.snappy.parquet" "@$DATABASE.PRODUCTION.SEED_DATA_STAGE/technical_manuals/" $conn_flag --overwrite > /dev/null 2>&1
+        fi
+        log_success "Seed data uploaded"
+        
+        # Run the load script
+        log_step "Loading seed data into tables..."
         snow sql $conn_flag -f "$REPO_ROOT/scripts/50_load_seed_data.sql" \
             -D "database=$DATABASE" \
             -D "warehouse=$WAREHOUSE" > /dev/null 2>&1 && \
-            log_success "Reference tables loaded" || log_success "Reference tables (partial)"
-        
-        log_step "Generating AMI sample data (7 days)..."
-        snow sql $conn_flag -f "$REPO_ROOT/scripts/51_generate_ami_sample.sql" \
-            -D "database=$DATABASE" \
-            -D "days=7" > /dev/null 2>&1 && \
-            log_success "AMI data generated" || log_success "AMI data skipped"
+            log_success "Seed data loaded" || log_success "Seed data (partial)"
     else
-        log_success "FLUX_DATABASE not in this account - using generators"
-        if [[ -f "$REPO_ROOT/generators/load_seed_data.py" ]]; then
-            log_step "Loading sample data..."
-            python3 "$REPO_ROOT/generators/load_seed_data.py" --source small --quick 2>/dev/null || \
-                log_success "Seed data loaded (or skipped if not available)"
+        # Fall back to FLUX_DATABASE if available
+        log_step "Checking for FLUX_DATABASE seed data..."
+        if snow sql $conn_flag -q "SELECT 1 FROM FLUX_DATABASE.PRODUCTION.SUBSTATIONS LIMIT 1" > /dev/null 2>&1; then
+            log_success "FLUX_DATABASE accessible"
+            
+            log_step "Loading reference tables..."
+            snow sql $conn_flag -f "$REPO_ROOT/scripts/50_load_seed_data.sql" \
+                -D "database=$DATABASE" \
+                -D "warehouse=$WAREHOUSE" > /dev/null 2>&1 && \
+                log_success "Reference tables loaded" || log_success "Reference tables (partial)"
+            
+            log_step "Generating AMI sample data (7 days)..."
+            snow sql $conn_flag -f "$REPO_ROOT/scripts/51_generate_ami_sample.sql" \
+                -D "database=$DATABASE" \
+                -D "warehouse=$WAREHOUSE" \
+                -D "days=7" > /dev/null 2>&1 && \
+                log_success "AMI data generated" || log_success "AMI data skipped"
         else
-            log_success "Seed data loading skipped (run generators separately)"
+            log_success "No seed data source available - tables will be empty"
+            log_success "Run generators/generate_all.py to populate data"
         fi
     fi
+    echo ""
+    
+    echo "Step 6/6: Deploying Cortex AI (optional)"
+    echo "─────────────────────────────────────────"
+    # Cortex AI features are optional - deployment continues if they fail
+    # NOTE: Seed data must be loaded first so Cortex Search has data to index
+    run_sql_optional "$REPO_ROOT/scripts/08_semantic_view.sql" "Semantic View"
+    run_sql_optional "$REPO_ROOT/scripts/09_cortex_search_services.sql" "Search Services"
+    run_sql_optional "$REPO_ROOT/scripts/10_cortex_agent.sql" "Cortex Agent"
     echo ""
     
     # Optional: Deploy Flux Ops Center dependencies

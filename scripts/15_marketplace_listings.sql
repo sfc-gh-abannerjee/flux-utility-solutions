@@ -160,7 +160,7 @@ INSERT INTO APPLICATIONS.MARKETPLACE_LISTINGS (
     'FLUX_GRID_ANALYTICS_SHARE',
     'Utility Grid Analytics Dataset',
     'Comprehensive anonymized dataset of utility grid operations including transformer performance, AMI consumption patterns, and reliability metrics. Ideal for research, benchmarking, and ML model development.',
-    'Energy <%  %> Utilities',
+    'Energy & Utilities',
     'Utilities',
     PARSE_JSON('["Grid reliability research", "Load forecasting model training", "Asset health benchmarking", "Energy consumption pattern analysis"]'),
     'DAILY',

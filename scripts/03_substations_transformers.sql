@@ -1,6 +1,6 @@
 -- =============================================================================
 -- 03_substations_transformers.sql
--- Flux Utility Solutions - Grid Foundation Tables (Substations <%  %> Transformers)
+-- Flux Utility Solutions - Grid Foundation Tables (Substations & Transformers)
 -- =============================================================================
 -- Purpose: Create core grid infrastructure tables
 -- Dependencies: 01_database_infrastructure.sql
@@ -35,7 +35,7 @@ CREATE OR ALTER TABLE SUBSTATIONS (
     LOCATION_COORDINATE VARCHAR(100),
     DISTANCE_FROM_COAST_MILE NUMBER(10,1),
     
-    -- Capacity <%  %> Load
+    -- Capacity & Load
     CAPACITY_MVA NUMBER(10,0),
     CURRENT_LOAD_MW NUMBER(10,2),
     PEAK_LOAD_MW NUMBER(10,2),
