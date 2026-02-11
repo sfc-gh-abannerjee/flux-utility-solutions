@@ -158,7 +158,7 @@ flowchart LR
 
 | Path | Best For | Guide |
 |------|----------|-------|
-| **CLI Quick Start** | Demos, POCs, fastest setup | `./cli/quickstart.sh` |
+| **CLI Quick Start** | Demos, POCs, fastest setup | `./cli/quickstart.sh -c <connection_name>` |
 | **SQL Scripts** | Learning, auditing, step-by-step control | [scripts/](./scripts/) |
 | **Notebooks** | Workshops, data science teams | [notebooks/](./notebooks/) |
 | **Git Integration** | GitOps, CI/CD pipelines | [git_deploy/](./git_deploy/) |
