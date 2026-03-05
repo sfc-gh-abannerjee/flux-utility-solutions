@@ -292,7 +292,7 @@ module "cortex_agent" {
   
   database_name = module.database.database_name
   warehouse     = module.warehouses.cortex_warehouse_name
-  model         = "claude-3-5-sonnet"
+  model         = "claude-sonnet-4-5"
   
   create_grid_analyst     = true
   create_customer_agent   = true

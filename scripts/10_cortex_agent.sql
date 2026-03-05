@@ -26,7 +26,7 @@ USE SCHEMA APPLICATIONS;
 -- The spec defines: models, instructions, tools, and tool_resources
 --
 -- Key requirements:
---   - models.orchestration: The LLM to use (e.g., claude-3-5-sonnet)
+--   - models.orchestration: The LLM to use (e.g., claude-sonnet-4-5)
 --   - tools[].tool_spec.type: Must match valid tool types (cortex_analyst_text_to_sql, cortex_search, etc.)
 --   - tool_resources: Must reference valid semantic views or search services
 --
@@ -36,7 +36,7 @@ CREATE OR REPLACE AGENT GRID_INTELLIGENCE_AGENT
     COMMENT = 'Grid Intelligence Agent - Utility operations assistant for AMI analytics, transformer health, and customer lookup'
     FROM SPECIFICATION $$
 models:
-  orchestration: claude-3-5-sonnet
+  orchestration: claude-sonnet-4-5
 
 orchestration:
   budget:

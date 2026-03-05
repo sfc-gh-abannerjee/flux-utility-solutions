@@ -21,7 +21,7 @@ variable "warehouse" {
 variable "model" {
   description = "LLM model for agents"
   type        = string
-  default     = "claude-3-5-sonnet"
+  default     = "claude-sonnet-4-5"
 }
 
 # -----------------------------------------------------------------------------
