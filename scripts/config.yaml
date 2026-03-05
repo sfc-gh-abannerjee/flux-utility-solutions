@@ -85,7 +85,7 @@ common:
   
   # PostgreSQL settings
   postgres_size: HIGHMEM_XL
-  postgres_version: "17"
+  postgres_version: "17"  # Any supported version works; 17 is tested/recommended
   
   # Data retention
   data_retention_days: 7
