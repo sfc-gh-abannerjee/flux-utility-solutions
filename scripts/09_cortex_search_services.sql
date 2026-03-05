@@ -3,10 +3,19 @@
 -- Flux Utility Solutions - Cortex Search Services for RAG
 -- =============================================================================
 -- Purpose: Create Cortex Search services for customer lookup and document search
--- Dependencies: 05_customers_master.sql
+-- Dependencies: 05_customers_master.sql, COMPLIANCE_DOCS table (from sample data)
 -- Jinja2 Variables:
 --   <% database %>   - Target database name
 --   <% warehouse %>  - Warehouse for search index refresh
+--   <% user_role %>  - Role to grant access (default: PUBLIC)
+--
+-- WHAT THIS CREATES:
+--   1. CUSTOMER_SEARCH_SERVICE - Customer profile lookup (686K profiles)
+--   2. AMI_METADATA_SEARCH - Meter metadata lookup (597K meters)
+--   3. TECHNICAL_DOCS_SEARCH - Technical manuals RAG (20K chunks)
+--   4. COMPLIANCE_DOCS_SEARCH - NERC/regulatory compliance docs
+--
+-- NOTE: Service names must match those referenced in 10_cortex_agent.sql
 -- =============================================================================
 
 USE DATABASE IDENTIFIER('<% database %>');
@@ -118,7 +127,7 @@ CREATE TABLE IF NOT EXISTS PRODUCTION.TECHNICAL_MANUALS_PDF_CHUNKS (
 )
 COMMENT = 'Technical manual PDF chunks for RAG search';
 
-CREATE OR REPLACE CORTEX SEARCH SERVICE TECHNICAL_MANUALS_SEARCH_SERVICE
+CREATE OR REPLACE CORTEX SEARCH SERVICE TECHNICAL_DOCS_SEARCH
     ON CHUNK_TEXT
     ATTRIBUTES CHUNK_ID, DOCUMENT_ID, DOCUMENT_TYPE, SOURCE_SYSTEM, LANGUAGE
     WAREHOUSE = <% warehouse %>
@@ -140,20 +149,53 @@ AS (
 -- -----------------------------------------------------------------------------
 
 GRANT USAGE ON CORTEX SEARCH SERVICE CUSTOMER_SEARCH_SERVICE 
-    TO ROLE IDENTIFIER('<% user_role %>');
+    TO ROLE IDENTIFIER('<% user_role | default("PUBLIC") %>');
 
 GRANT USAGE ON CORTEX SEARCH SERVICE AMI_METADATA_SEARCH 
-    TO ROLE IDENTIFIER('<% user_role %>');
+    TO ROLE IDENTIFIER('<% user_role | default("PUBLIC") %>');
 
-GRANT USAGE ON CORTEX SEARCH SERVICE TECHNICAL_MANUALS_SEARCH_SERVICE 
-    TO ROLE IDENTIFIER('<% user_role %>');
+GRANT USAGE ON CORTEX SEARCH SERVICE TECHNICAL_DOCS_SEARCH 
+    TO ROLE IDENTIFIER('<% user_role | default("PUBLIC") %>');
 
 -- -----------------------------------------------------------------------------
--- 5. VERIFICATION
+-- 5. COMPLIANCE DOCUMENTATION SEARCH SERVICE
+-- -----------------------------------------------------------------------------
+-- NERC and regulatory compliance documents including TPL-001, FAC-003,
+-- EOP-011, CIP standards, and internal utility policies.
+
+USE SCHEMA ML_DEMO;
+
+CREATE OR REPLACE CORTEX SEARCH SERVICE COMPLIANCE_DOCS_SEARCH
+    ON CONTENT
+    ATTRIBUTES DOC_ID, DOC_TYPE, TITLE, CATEGORY, KEYWORDS, APPLICABILITY
+    WAREHOUSE = <% warehouse %>
+    TARGET_LAG = '1 hour'
+    COMMENT = 'Regulatory compliance document search for Grid Intelligence Agent'
+AS (
+    SELECT 
+        DOC_ID,
+        DOC_TYPE,
+        TITLE,
+        CONTENT,
+        CATEGORY,
+        KEYWORDS,
+        APPLICABILITY,
+        EFFECTIVE_DATE::VARCHAR AS EFFECTIVE_DATE,
+        REVISION
+    FROM <% database %>.ML_DEMO.COMPLIANCE_DOCS
+    WHERE CONTENT IS NOT NULL
+);
+
+GRANT USAGE ON CORTEX SEARCH SERVICE COMPLIANCE_DOCS_SEARCH 
+    TO ROLE IDENTIFIER('<% user_role | default("PUBLIC") %>');
+
+-- -----------------------------------------------------------------------------
+-- 6. VERIFICATION
 -- -----------------------------------------------------------------------------
 
--- Show all search services
+-- Show search services across both schemas
 SHOW CORTEX SEARCH SERVICES IN SCHEMA APPLICATIONS;
+SHOW CORTEX SEARCH SERVICES IN SCHEMA ML_DEMO;
 
 -- Test customer search
 SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
@@ -167,5 +209,10 @@ SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
 
 -- =============================================================================
 -- DEPLOYMENT COMPLETE
+-- Search services created:
+--   APPLICATIONS.CUSTOMER_SEARCH_SERVICE
+--   APPLICATIONS.AMI_METADATA_SEARCH
+--   PRODUCTION.TECHNICAL_DOCS_SEARCH
+--   ML_DEMO.COMPLIANCE_DOCS_SEARCH
 -- Next: Run 10_cortex_agent.sql to create the Grid Intelligence Agent
 -- =============================================================================
