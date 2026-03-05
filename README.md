@@ -10,8 +10,8 @@
 **Turn siloed utility data into an AI-ready grid intelligence platform — out of the box.** Unifies AMI meter readings, asset health metrics, customer records, and compliance documents on Snowflake so operations, engineering, and field teams can query grid data in plain English instead of waiting on reports.
 
 > *"Data is the control plane for the future of energy."* — Fred Cohagan, Industry Principal, Energy, Snowflake
->
-> Built to address the same challenges driving [Snowflake Energy Solutions](https://www.snowflake.com/en/solutions/industries/manufacturing/energy/): connecting IT, OT, and IoT data on one trusted platform to modernize grid operations and accelerate AI adoption across the energy sector.
+
+Built to address the same challenges driving [Snowflake Energy Solutions](https://www.snowflake.com/en/solutions/industries/manufacturing/energy/): connecting IT, OT, and IoT data on one trusted platform to modernize grid operations and accelerate AI adoption across the energy sector.
 
 ---
 
