@@ -3,7 +3,7 @@
 -- Flux Utility Solutions - Grid Intelligence Cortex Agent
 -- =============================================================================
 -- Purpose: Create Cortex Agent for natural language grid analytics
--- Dependencies: 08_semantic_view.sql
+-- Dependencies: 08_semantic_view.sql, 09_cortex_search_services.sql
 --
 -- Variable Templating (Snow CLI Jinja2):
 --   <% database %>   - Target database name (e.g., FLUX_DEMO)
@@ -33,7 +33,7 @@ USE SCHEMA APPLICATIONS;
 -- IMPORTANT: Do NOT include sample_questions in the spec - it's not a valid field
 
 CREATE OR REPLACE AGENT GRID_INTELLIGENCE_AGENT
-    COMMENT = 'Grid Intelligence Agent - Utility operations assistant for AMI analytics, transformer health, and customer lookup'
+    COMMENT = 'Grid Intelligence Agent - Utility operations assistant with semantic SQL, customer/meter search, and technical docs RAG'
     FROM SPECIFICATION $$
 models:
   orchestration: claude-sonnet-4-5
@@ -75,11 +75,17 @@ instructions:
     Keep responses concise but complete.
     
   orchestration: |
-    Use the Analyst tool for all structured data queries about:
-    - Energy consumption and usage patterns
-    - Transformer loading and health metrics
-    - Customer counts and segmentation
-    - Aggregations, trends, and comparisons
+    Select the right tool based on the question type:
+    
+    - **Analyst**: Use for structured data queries — energy consumption, transformer health,
+      customer counts, aggregations, trends, comparisons, rankings.
+    - **search_customers**: Use for finding specific customers by name, address, or segment.
+    - **search_meters**: Use for finding meters by ID, location, or associated transformer.
+    - **search_technical_docs**: Use for technical procedures, maintenance guides, equipment specs.
+    
+    Some questions need multiple tools in sequence:
+    1. "Find John Smith and show his usage" → search_customers → Analyst
+    2. "Which overloaded transformers need maintenance?" → Analyst → search_technical_docs
 
 tools:
   - tool_spec:
@@ -89,10 +95,43 @@ tools:
         Converts natural language questions to SQL queries against the utility semantic model.
         Use for questions about energy consumption, transformer health, customer data, 
         and any analytical queries requiring aggregation or comparison.
+  - tool_spec:
+      type: cortex_search
+      name: search_customers
+      description: |
+        Search 686K customer profiles by name, address, city, county, ZIP code,
+        or customer segment. Use for finding specific customers or account lookups.
+  - tool_spec:
+      type: cortex_search
+      name: search_meters
+      description: |
+        Search 597K smart meters by meter ID, location (city, ZIP, county),
+        associated transformer, or customer segment. Use for meter lookups.
+  - tool_spec:
+      type: cortex_search
+      name: search_technical_docs
+      description: |
+        Search technical manuals, equipment documentation, maintenance procedures,
+        and troubleshooting guides. Use for technical questions and procedures.
 
 tool_resources:
   Analyst:
     semantic_view: <% database %>.APPLICATIONS.UTILITY_SEMANTIC_VIEW
+  search_customers:
+    name: "<% database %>.APPLICATIONS.CUSTOMER_SEARCH_SERVICE"
+    max_results: "5"
+    id_column: "CUSTOMER_ID"
+    title_column: "FULL_NAME"
+  search_meters:
+    name: "<% database %>.APPLICATIONS.AMI_METADATA_SEARCH"
+    max_results: "5"
+    id_column: "METER_ID"
+    title_column: "METER_ID"
+  search_technical_docs:
+    name: "<% database %>.APPLICATIONS.TECHNICAL_MANUALS_SEARCH_SERVICE"
+    max_results: "5"
+    id_column: "CHUNK_ID"
+    title_column: "DOCUMENT_TYPE"
 $$;
 
 -- -----------------------------------------------------------------------------
