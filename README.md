@@ -11,7 +11,7 @@
 
 > *"Data is the control plane for the future of energy."* — Fred Cohagan, Global Head of Energy, Snowflake
 >
-> Built to address the same challenges driving [Snowflake Energy Solutions](https://www.snowflake.com/en/solutions/industries/energy/): connecting IT, OT, and IoT data on one trusted platform to modernize grid operations and accelerate AI adoption across the energy sector.
+> Built to address the same challenges driving [Snowflake Energy Solutions](https://www.snowflake.com/en/solutions/industries/manufacturing/energy/): connecting IT, OT, and IoT data on one trusted platform to modernize grid operations and accelerate AI adoption across the energy sector.
 
 ---
 
@@ -236,5 +236,5 @@ Apache 2.0 - See [LICENSE](./LICENSE)
 
 <p align="center">
   <strong>Built on Snowflake AI Data Cloud</strong><br/>
-  <em>Part of the <a href="https://www.snowflake.com/en/solutions/industries/energy/">Snowflake Energy Solutions</a> ecosystem</em>
+  <em>Part of the <a href="https://www.snowflake.com/en/solutions/industries/manufacturing/energy/">Snowflake Energy Solutions</a> ecosystem</em>
 </p>
