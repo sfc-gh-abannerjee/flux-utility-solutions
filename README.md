@@ -7,20 +7,26 @@
 [![Snowflake](https://img.shields.io/badge/Snowflake-29B5E8?logo=snowflake&logoColor=white)](https://www.snowflake.com)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-**A reference implementation for electric utility analytics on Snowflake.** Demonstrates Cortex AI, semantic models, and data engineering patterns for grid infrastructure data.
+**Turn siloed utility data into an AI-ready grid intelligence platform — out of the box.** Unifies AMI meter readings, asset health metrics, customer records, and compliance documents on Snowflake so operations, engineering, and field teams can query grid data in plain English instead of waiting on reports.
+
+> *"Data is the control plane for the future of energy."* — Fred Cohagan, Global Head of Energy, Snowflake
+>
+> Built to address the same challenges driving [Snowflake Energy Solutions](https://www.snowflake.com/en/solutions/industries/energy/): connecting IT, OT, and IoT data on one trusted platform to modernize grid operations and accelerate AI adoption across the energy sector.
 
 ---
 
 ## Why Flux Utility Solutions?
 
-This repository provides a foundation for utility-focused Snowflake demos:
+Utilities generate massive volumes of data — AMI readings, SCADA telemetry, asset inspections, customer interactions — but it sits in disconnected systems. Engineers wait days for cross-system reports. Compliance teams manually compile audit evidence. Operations staff can't get real-time answers without a data analyst in the loop.
 
-| What You Get | Description |
-|--------------|-------------|
-| **Ready-to-use data model** | Pre-built schemas for substations, transformers, meters, and customers |
-| **Cortex AI examples** | Working Analyst, Search, and Agent configurations for natural language queries |
-| **Multiple deployment paths** | CLI, SQL scripts, Notebooks, Git integration, or Terraform |
-| **Extensible platform** | Foundation for [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) and [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) |
+This repository solves that by delivering a **production-ready data foundation and AI stack** on Snowflake:
+
+| What You Get | Why It Matters |
+|--------------|----------------|
+| **Unified grid data model** | Substations, transformers, meters, and customers in one governed platform — no more IT/OT silos |
+| **AI-powered grid intelligence** | Cortex Agent with 5 tools: text-to-SQL analytics, customer search, meter lookup, technical docs, and compliance docs — anyone can query the grid in natural language |
+| **Five deployment paths** | CLI, SQL scripts, Notebooks, Git integration, or Terraform — fits your team's workflow |
+| **Extensible platform** | Foundation for [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) (streaming data) and [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) (real-time grid visualization) |
 
 ---
 
@@ -89,6 +95,8 @@ flowchart TB
 
 ## Features
 
+Each capability maps to a real utility workflow — from grid planning and asset monitoring to customer operations and regulatory compliance.
+
 <img width="2752" height="1301" alt="flux_utiility_components_readme" src="https://github.com/user-attachments/assets/ed510414-3856-4e1c-a7b6-bea77199faf0" />
 
 <table>
@@ -102,20 +110,20 @@ flowchart TB
 </tr>
 </table>
 
-| Use Case | What It Does | Location |
-|----------|--------------|----------|
-| **Grid Visualization** | H3 hexagonal maps with real-time topology | `streamlit/geospatial/` |
-| **AMI Analytics** | Smart meter time-series analysis | `notebooks/demos/` |
-| **Customer 360** | Unified customer view with semantic search | `scripts/09_cortex_search_services.sql` |
-| **Predictive Maintenance** | ML-based transformer risk scoring | `scripts/11_ml_feature_tables.sql` |
-| **Conversational Analytics** | Natural language grid intelligence | `agents/` |
-| **Outage Management** | Real-time tracking and restoration | `streamlit/outage_dashboard.py` |
+| Use Case | What It Solves | Location |
+|----------|----------------|----------|
+| **Grid Visualization** | See real-time topology across substations and feeders — situational awareness for control rooms | `streamlit/geospatial/` |
+| **AMI Analytics** | Analyze smart meter time-series at scale — detect anomalies, forecast load, reduce non-technical losses | `notebooks/demos/` |
+| **Customer 360** | Unified customer view with semantic search across 686K profiles — faster service response | `scripts/09_cortex_search_services.sql` |
+| **Predictive Maintenance** | ML-based transformer risk scoring — prevent failures before they cause outages | `scripts/11_ml_feature_tables.sql` |
+| **Conversational Analytics** | Ask grid questions in plain English — democratize data access for operations and field teams | `agents/` |
+| **Outage Management** | Real-time outage tracking and restoration prioritization | `streamlit/outage_dashboard.py` |
 
 ---
 
 ## Flux Platform Ecosystem
 
-This repo is the **core foundation**. Deploy it first, then add optional components:
+Together, these repos deliver a complete grid intelligence stack — from synthetic data generation through real-time operational visualization — mirroring the end-to-end workflows Snowflake Energy Solutions enables for utilities. Deploy this repo first, then add optional components:
 
 ```mermaid
 flowchart LR
@@ -137,9 +145,9 @@ flowchart LR
 
 | Repository | Purpose | 
 |------------|---------|
-| **Flux Utility Solutions** (this repo) | Core platform - database, Cortex AI, semantic models |
-| [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) | Synthetic AMI data generation with streaming |
-| [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) | Real-time grid visualization, GNN risk prediction |
+| **Flux Utility Solutions** (this repo) | Core data foundation — unified grid data model, Cortex AI agent, semantic views |
+| [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) | Synthetic AMI data generation with streaming — simulate millions of meter readings |
+| [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) | Real-time grid visualization and GNN cascade failure prediction — operational situational awareness |
 
 <table>
 <tr>
@@ -227,5 +235,6 @@ Apache 2.0 - See [LICENSE](./LICENSE)
 ---
 
 <p align="center">
-  <strong>Built for Snowflake AI Data Cloud</strong>
+  <strong>Built on Snowflake AI Data Cloud</strong><br/>
+  <em>Part of the <a href="https://www.snowflake.com/en/solutions/industries/energy/">Snowflake Energy Solutions</a> ecosystem</em>
 </p>
