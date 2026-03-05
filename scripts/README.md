@@ -90,7 +90,7 @@ snow sql -f 03_substations_transformers.sql \
 |--------|-------------|-------------------|
 | `08_semantic_view.sql` | Semantic view for Cortex Analyst | `database`, `warehouse` |
 | `09_cortex_search_services.sql` | Cortex Search services | `database`, `warehouse` |
-| `10_cortex_agent.sql` | Cortex Agent configuration | `database`, `warehouse` |
+| `10_cortex_agent.sql` | Cortex Agent (Grid Intelligence) | `database`, `user_role` |
 
 ### Advanced Features
 
@@ -100,6 +100,16 @@ snow sql -f 03_substations_transformers.sql \
 | `12_postgres_instance.sql` | PostgreSQL integration | `database`, `warehouse` |
 | `13_spcs_compute.sql` | Snowpark Container Services | `database`, `warehouse` |
 | `14_geospatial_functions.sql` | Geospatial UDFs | `database`, `warehouse` |
+
+### Ops Center Dependencies (Optional)
+
+| Script | Description | Required Variables |
+|--------|-------------|-------------------|
+| `30_ops_center_dependencies.sql` | All objects for [Flux Ops Center SPCS](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) | `database`, `warehouse`, `admin_role`, `user_role` |
+
+> **Run this only if deploying Flux Ops Center.** It creates schemas (ML_DEMO, CASCADE_ANALYSIS),
+> cascade analysis tables, GNN predictions, precomputed scenarios, and sample data so the Ops Center
+> container works immediately. See the script header for the full list of objects created.
 
 ### Data Loading
 
@@ -142,6 +152,11 @@ done
 for script in 08 09 10; do
     snow sql -c $CONN -f ${script}_*.sql -D "database=$DB" -D "warehouse=$WH"
 done
+
+# Ops Center dependencies (only if deploying flux-ops-center-spcs)
+snow sql -c $CONN -f 30_ops_center_dependencies.sql \
+    -D "database=$DB" -D "warehouse=$WH" \
+    -D "admin_role=FLUX_DEV_ADMIN" -D "user_role=FLUX_DEV_USER"
 
 # Validation
 snow sql -c $CONN -f 99_validate_deployment.sql -D "database=$DB" -D "warehouse=$WH"

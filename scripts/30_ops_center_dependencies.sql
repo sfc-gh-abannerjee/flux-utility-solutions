@@ -5,6 +5,19 @@
 -- Purpose: Create ALL objects required by Flux Ops Center SPCS application
 -- This script must be run BEFORE deploying the Ops Center container.
 --
+-- Cross-repo relationship:
+--   This script in flux-utility-solutions creates the Snowflake objects that
+--   flux-ops-center-spcs (the SPCS container) reads at runtime. The schemas,
+--   table structures, and sample data here are aligned with the ops center
+--   backend (server_fastapi.py, cascade_simulator.py). If you modify table
+--   schemas here, verify the corresponding API endpoints still work.
+--
+-- IMPORTANT - Common misconfiguration:
+--   The <% database %> variable MUST match the database used by the ops center
+--   container. If the ops center is configured to read from FLUX_DB, this
+--   script must also target FLUX_DB. A mismatch causes "table not found" errors
+--   at runtime with no clear error message from the container.
+--
 -- Dependencies Created:
 --   APPLICATIONS Schema:
 --     - FLUX_OPS_CENTER_KPIS (view)
