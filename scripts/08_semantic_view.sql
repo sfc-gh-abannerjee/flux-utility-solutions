@@ -8,9 +8,14 @@
 -- Variable Templating (Snow CLI Jinja2):
 --   <% database %>   - Target database name (e.g., FLUX_DEMO)
 --   <% warehouse %>  - Target warehouse name
+--   <% user_role %>  - Role to grant SELECT on semantic view (default: PUBLIC)
 --
 -- Usage:
---   snow sql -f scripts/08_semantic_view.sql -D "database=YOUR_DATABASE"
+--   snow sql -f scripts/08_semantic_view.sql \
+--       -D "database=YOUR_DATABASE" -D "warehouse=YOUR_WH"
+--   # Optionally override user_role (defaults to PUBLIC):
+--   snow sql -f scripts/08_semantic_view.sql \
+--       -D "database=YOUR_DATABASE" -D "warehouse=YOUR_WH" -D "user_role=ANALYST_ROLE"
 --
 -- =============================================================================
 
@@ -165,7 +170,7 @@ COMMENT = 'Utility grid analytics semantic model for AMI readings, transformer h
 -- -----------------------------------------------------------------------------
 
 GRANT SELECT ON SEMANTIC VIEW UTILITY_SEMANTIC_VIEW 
-    TO ROLE IDENTIFIER('<% user_role %>');
+    TO ROLE IDENTIFIER('<% user_role | default("PUBLIC") %>');
 
 -- -----------------------------------------------------------------------------
 -- 3. VERIFY DEPLOYMENT
