@@ -504,41 +504,33 @@ COMMENT = 'Grid topology edges for GNN-based cascade analysis';
 -- -----------------------------------------------------------------------------
 -- 3.3 T_TRANSFORMER_TEMPORAL_TRAINING - ML Training Data
 -- -----------------------------------------------------------------------------
+-- The ops center backend endpoint /api/cascade/transformer-risk-prediction
+-- requires the 19-column schema below. The old 9-column schema (LOAD_FACTOR_AVG_7D,
+-- etc.) does not match what the backend queries. This uses CREATE OR REPLACE
+-- to ensure existing deployments get the updated schema on re-run.
 
-CREATE TABLE IF NOT EXISTS T_TRANSFORMER_TEMPORAL_TRAINING (
-    RECORD_ID VARCHAR(50) DEFAULT UUID_STRING(),
-    TRANSFORMER_ID VARCHAR(50) NOT NULL,
-    PREDICTION_DATE DATE NOT NULL,
-    
-    -- Temporal features
-    LOAD_FACTOR_AVG_7D FLOAT,
-    LOAD_FACTOR_MAX_7D FLOAT,
-    LOAD_FACTOR_STDDEV_7D FLOAT,
-    OVERLOAD_HOURS_7D INT,
-    THERMAL_CYCLES_7D INT,
-    
-    -- Environmental features
-    AVG_AMBIENT_TEMP_F FLOAT,
-    MAX_AMBIENT_TEMP_F FLOAT,
-    HUMIDITY_PCT FLOAT,
-    
-    -- Asset features
-    AGE_YEARS FLOAT,
-    HEALTH_SCORE FLOAT,
-    MAINTENANCE_COUNT_YTD INT,
-    
-    -- Target variable
-    FAILURE_PROBABILITY FLOAT,
-    RISK_CATEGORY VARCHAR(20),  -- LOW, MODERATE, HIGH, CRITICAL
-    
-    -- Metadata
-    MODEL_VERSION VARCHAR(20),
-    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
-    
-    PRIMARY KEY (TRANSFORMER_ID, PREDICTION_DATE)
+CREATE OR REPLACE TABLE T_TRANSFORMER_TEMPORAL_TRAINING (
+    TRANSFORMER_ID                      VARCHAR(50)    NOT NULL,
+    MORNING_TIMESTAMP                   TIMESTAMP_NTZ,
+    PREDICTION_DATE                     TIMESTAMP_NTZ,
+    MORNING_LOAD_PCT                    FLOAT,
+    MORNING_CATEGORY                    VARCHAR(20),
+    MORNING_KWH                         FLOAT,
+    MORNING_ACTIVE_METERS               INT,
+    MORNING_AVG_VOLTAGE                 INT,
+    MORNING_VOLTAGE_SAGS                INT,
+    TRANSFORMER_AGE_YEARS               INT,
+    RATED_KVA                           INT,
+    HISTORICAL_SUMMER_AVG_LOAD          FLOAT,
+    SUMMER_2023_2024_AVG_CRITICAL_HOURS FLOAT,
+    STRESS_VS_HISTORICAL                VARCHAR(30),
+    KWH_PER_METER                       FLOAT,
+    LOAD_TREND_RATIO                    FLOAT,
+    TARGET_HIGH_RISK                    INT,
+    AFTERNOON_LOAD_PCT                  FLOAT,
+    AFTERNOON_CATEGORY                  VARCHAR(20)
 )
-CLUSTER BY (PREDICTION_DATE, TRANSFORMER_ID)
-COMMENT = 'Transformer failure prediction training/inference data';
+COMMENT = 'Temporal training data for transformer risk prediction model. Each row represents a morning-to-afternoon risk trajectory for one transformer on one day.';
 
 -- -----------------------------------------------------------------------------
 -- 3.4 V_TRANSFORMER_ML_INFERENCE - Latest Predictions View
@@ -548,12 +540,21 @@ CREATE OR REPLACE VIEW V_TRANSFORMER_ML_INFERENCE AS
 SELECT 
     t.TRANSFORMER_ID,
     t.PREDICTION_DATE,
-    t.FAILURE_PROBABILITY,
-    t.RISK_CATEGORY,
-    t.LOAD_FACTOR_AVG_7D,
-    t.LOAD_FACTOR_MAX_7D,
-    t.AGE_YEARS,
-    t.HEALTH_SCORE,
+    -- Compute risk score from temporal features
+    LEAST(1.0,
+        (t.MORNING_LOAD_PCT / 100.0) *
+        (1 + COALESCE(TRY_TO_DOUBLE(t.STRESS_VS_HISTORICAL), 0) / 100) *
+        (1 + t.TRANSFORMER_AGE_YEARS / 50.0)
+    ) AS FAILURE_PROBABILITY,
+    CASE 
+        WHEN LEAST(1.0, (t.MORNING_LOAD_PCT / 100.0) * (1 + t.TRANSFORMER_AGE_YEARS / 50.0)) >= 0.7 THEN 'CRITICAL'
+        WHEN LEAST(1.0, (t.MORNING_LOAD_PCT / 100.0) * (1 + t.TRANSFORMER_AGE_YEARS / 50.0)) >= 0.5 THEN 'HIGH'
+        WHEN LEAST(1.0, (t.MORNING_LOAD_PCT / 100.0) * (1 + t.TRANSFORMER_AGE_YEARS / 50.0)) >= 0.3 THEN 'MEDIUM'
+        ELSE 'LOW'
+    END AS RISK_CATEGORY,
+    t.MORNING_LOAD_PCT AS LOAD_FACTOR_AVG_7D,
+    t.TRANSFORMER_AGE_YEARS AS AGE_YEARS,
+    100 - (t.MORNING_LOAD_PCT * 0.5 + t.TRANSFORMER_AGE_YEARS * 0.5) AS HEALTH_SCORE,
     tm.TRANSFORMER_NAME,
     tm.SUBSTATION_ID,
     tm.CAPACITY_KVA,
@@ -562,7 +563,8 @@ SELECT
 FROM T_TRANSFORMER_TEMPORAL_TRAINING t
 JOIN <% database %>.PRODUCTION.TRANSFORMER_METADATA tm 
     ON t.TRANSFORMER_ID = tm.TRANSFORMER_ID
-WHERE t.PREDICTION_DATE = (SELECT MAX(PREDICTION_DATE) FROM T_TRANSFORMER_TEMPORAL_TRAINING);
+WHERE t.PREDICTION_DATE = (SELECT MAX(PREDICTION_DATE) FROM T_TRANSFORMER_TEMPORAL_TRAINING)
+QUALIFY ROW_NUMBER() OVER (PARTITION BY t.TRANSFORMER_ID ORDER BY t.MORNING_TIMESTAMP DESC) = 1;
 
 -- Grant access to ML_DEMO tables
 GRANT SELECT ON ALL TABLES IN SCHEMA <% database %>.ML_DEMO TO ROLE IDENTIFIER('<% user_role %>');
@@ -619,9 +621,8 @@ COMMENT = 'Pre-computed GNN centrality features for cascade analysis';
 -- 4.2 PRECOMPUTED_CASCADES - Simulated Cascade Scenarios
 -- -----------------------------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS PRECOMPUTED_CASCADES (
-    CASCADE_ID VARCHAR(50) PRIMARY KEY,
-    SCENARIO_ID VARCHAR(100),  -- Backend cascade_simulator.py uses scenario_id
+CREATE OR REPLACE TABLE PRECOMPUTED_CASCADES (
+    SCENARIO_ID VARCHAR(100) PRIMARY KEY,  -- Logical key; matches ops center schema (no CASCADE_ID)
     SCENARIO_NAME VARCHAR(200),  -- Backend cascade_simulator.py uses scenario_name
     INITIATING_NODE_ID VARCHAR(50) NOT NULL,
     PATIENT_ZERO_ID VARCHAR(50),  -- Alias for INITIATING_NODE_ID (backend compatibility)
@@ -665,34 +666,18 @@ COMMENT = 'Pre-computed cascade failure scenarios for real-time risk assessment'
 -- -----------------------------------------------------------------------------
 -- 4.3 GNN_PREDICTIONS - Real-time GNN Model Outputs
 -- -----------------------------------------------------------------------------
+-- Used by /api/cascade/patient-zero-candidates when use_gnn_predictions=True.
+-- The backend expects 5 columns: NODE_ID, NODE_TYPE, CRITICALITY_SCORE,
+-- GNN_CASCADE_RISK, PREDICTION_TIMESTAMP.
 
-CREATE TABLE IF NOT EXISTS GNN_PREDICTIONS (
-    PREDICTION_ID VARCHAR(50) DEFAULT UUID_STRING(),
-    NODE_ID VARCHAR(50) NOT NULL,
-    PREDICTION_TIMESTAMP TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
-    
-    -- GNN model outputs
-    FAILURE_PROBABILITY_1H FLOAT,     -- Probability of failure within 1 hour
-    FAILURE_PROBABILITY_24H FLOAT,    -- Probability of failure within 24 hours
-    CASCADE_RISK_SCORE FLOAT,         -- Risk of triggering cascade
-    GNN_CASCADE_RISK FLOAT,           -- GNN model cascade risk prediction
-    
-    -- Aggregated risk
-    COMPOSITE_RISK_SCORE FLOAT,
-    RISK_TIER VARCHAR(20),            -- LOW, MODERATE, HIGH, CRITICAL
-    
-    -- Contributing factors (feature importance)
-    TOP_RISK_FACTORS VARIANT,
-    
-    -- Model metadata
-    MODEL_ID VARCHAR(50),
-    MODEL_VERSION VARCHAR(20),
-    INFERENCE_LATENCY_MS FLOAT,
-    
-    PRIMARY KEY (NODE_ID, PREDICTION_TIMESTAMP)
+CREATE OR REPLACE TABLE GNN_PREDICTIONS (
+    NODE_ID VARCHAR(100) NOT NULL,
+    NODE_TYPE VARCHAR(50),
+    CRITICALITY_SCORE FLOAT,
+    GNN_CASCADE_RISK FLOAT,
+    PREDICTION_TIMESTAMP TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 )
-CLUSTER BY (PREDICTION_TIMESTAMP, NODE_ID)
-COMMENT = 'Real-time GNN model predictions for node failure and cascade risk';
+COMMENT = 'GNN model predictions for node failure and cascade risk';
 
 -- Grant access to CASCADE_ANALYSIS tables
 GRANT SELECT ON ALL TABLES IN SCHEMA <% database %>.CASCADE_ANALYSIS TO ROLE IDENTIFIER('<% user_role %>');
@@ -700,11 +685,23 @@ GRANT SELECT ON ALL TABLES IN SCHEMA <% database %>.CASCADE_ANALYSIS TO ROLE IDE
 -- =============================================================================
 -- SECTION 5: POPULATE SAMPLE DATA FOR OPS CENTER
 -- =============================================================================
--- Generate sample data so Ops Center works immediately after deployment
+-- Generate sample data so Ops Center works immediately after deployment.
+-- Uses TRUNCATE before INSERT for idempotent re-runs (prevents duplicate data
+-- that previously occurred with ON CONFLICT DO NOTHING on partial reruns).
+--
+-- Data consumed by ops center endpoints:
+--   GRID_NODES            → /api/cascade/grid-topology, /api/cascade/simulate
+--   GRID_EDGES            → /api/cascade/simulate (BFS traversal)
+--   T_TRANSFORMER_TEMPORAL_TRAINING → /api/cascade/transformer-risk-prediction
+--   NODE_CENTRALITY_V2    → /api/cascade/high-risk-nodes, /api/cascade/simulate
+--   GNN_PREDICTIONS       → /api/cascade/patient-zero-candidates
+--   PRECOMPUTED_CASCADES  → /api/cascade/precomputed-scenarios
 
 USE SCHEMA ML_DEMO;
 
--- Populate GRID_NODES from existing infrastructure
+-- 5.1 GRID_NODES — Populate from utility repo's existing infrastructure tables
+TRUNCATE TABLE IF EXISTS GRID_NODES;
+
 INSERT INTO GRID_NODES (NODE_ID, NODE_TYPE, NODE_NAME, LATITUDE, LONGITUDE, LAT, LON, VOLTAGE_LEVEL, VOLTAGE_KV, CAPACITY_KVA, CAPACITY_KW, SUBSTATION_ID, DEGREE_CENTRALITY, BETWEENNESS_CENTRALITY, LOAD_FACTOR, AGE_YEARS, HEALTH_SCORE, CRITICALITY_SCORE, DOWNSTREAM_TRANSFORMERS, DOWNSTREAM_CAPACITY_KVA)
 SELECT 
     'SUB_' || s.SUBSTATION_ID AS NODE_ID,
@@ -738,8 +735,7 @@ LEFT JOIN (
     SELECT SUBSTATION_ID, COUNT(*) AS cnt, SUM(CAPACITY_KVA) AS total_capacity
     FROM <% database %>.PRODUCTION.TRANSFORMER_METADATA
     GROUP BY SUBSTATION_ID
-) t_count ON s.SUBSTATION_ID = t_count.SUBSTATION_ID
-ON CONFLICT (NODE_ID) DO NOTHING;
+) t_count ON s.SUBSTATION_ID = t_count.SUBSTATION_ID;
 
 -- Add transformer nodes
 INSERT INTO GRID_NODES (NODE_ID, NODE_TYPE, NODE_NAME, LATITUDE, LONGITUDE, LAT, LON, VOLTAGE_LEVEL, VOLTAGE_KV, CAPACITY_KVA, CAPACITY_KW, SUBSTATION_ID, PARENT_NODE_ID, DEGREE_CENTRALITY, BETWEENNESS_CENTRALITY, LOAD_FACTOR, AGE_YEARS, HEALTH_SCORE, CRITICALITY_SCORE, DOWNSTREAM_TRANSFORMERS, DOWNSTREAM_CAPACITY_KVA)
@@ -765,10 +761,11 @@ SELECT
     0.2 + RANDOM() * 0.5 AS CRITICALITY_SCORE,
     0 AS DOWNSTREAM_TRANSFORMERS,
     0 AS DOWNSTREAM_CAPACITY_KVA
-FROM <% database %>.PRODUCTION.TRANSFORMER_METADATA
-ON CONFLICT (NODE_ID) DO NOTHING;
+FROM <% database %>.PRODUCTION.TRANSFORMER_METADATA;
 
--- Generate grid edges
+-- 5.2 GRID_EDGES — Connect substations to transformers
+TRUNCATE TABLE IF EXISTS GRID_EDGES;
+
 INSERT INTO GRID_EDGES (EDGE_ID, FROM_NODE_ID, TO_NODE_ID, EDGE_TYPE, LENGTH_METERS, DISTANCE_KM, IMPEDANCE_OHMS, IMPEDANCE_PU, VOLTAGE_LEVEL, CAPACITY_AMPS, CURRENT_FLOW_PCT)
 SELECT 
     'EDGE_' || n.NODE_ID AS EDGE_ID,
@@ -776,120 +773,235 @@ SELECT
     n.NODE_ID AS TO_NODE_ID,
     'DISTRIBUTION' AS EDGE_TYPE,
     100 + RANDOM() * 500 AS LENGTH_METERS,
-    ROUND((100 + RANDOM() * 500) / 1000, 4) AS DISTANCE_KM,  -- Convert to km
+    ROUND((100 + RANDOM() * 500) / 1000, 4) AS DISTANCE_KM,
     0.1 + RANDOM() * 0.5 AS IMPEDANCE_OHMS,
     ROUND(0.01 + RANDOM() * 0.05, 4) AS IMPEDANCE_PU,
     n.VOLTAGE_LEVEL AS VOLTAGE_LEVEL,
     200 + RANDOM() * 300 AS CAPACITY_AMPS,
     0.3 + RANDOM() * 0.5 AS CURRENT_FLOW_PCT
 FROM GRID_NODES n
-WHERE n.PARENT_NODE_ID IS NOT NULL
-ON CONFLICT (EDGE_ID) DO NOTHING;
+WHERE n.PARENT_NODE_ID IS NOT NULL;
 
--- Populate transformer training data
-INSERT INTO T_TRANSFORMER_TEMPORAL_TRAINING (TRANSFORMER_ID, PREDICTION_DATE, LOAD_FACTOR_AVG_7D, LOAD_FACTOR_MAX_7D, LOAD_FACTOR_STDDEV_7D, OVERLOAD_HOURS_7D, THERMAL_CYCLES_7D, AVG_AMBIENT_TEMP_F, MAX_AMBIENT_TEMP_F, HUMIDITY_PCT, AGE_YEARS, HEALTH_SCORE, MAINTENANCE_COUNT_YTD, FAILURE_PROBABILITY, RISK_CATEGORY, MODEL_VERSION)
-SELECT 
-    tm.TRANSFORMER_ID,
-    CURRENT_DATE() AS PREDICTION_DATE,
-    0.4 + RANDOM() * 0.4 AS LOAD_FACTOR_AVG_7D,
-    0.6 + RANDOM() * 0.35 AS LOAD_FACTOR_MAX_7D,
-    0.05 + RANDOM() * 0.15 AS LOAD_FACTOR_STDDEV_7D,
-    FLOOR(RANDOM() * 10)::INT AS OVERLOAD_HOURS_7D,
-    FLOOR(5 + RANDOM() * 15)::INT AS THERMAL_CYCLES_7D,
-    70 + RANDOM() * 20 AS AVG_AMBIENT_TEMP_F,
-    85 + RANDOM() * 15 AS MAX_AMBIENT_TEMP_F,
-    50 + RANDOM() * 40 AS HUMIDITY_PCT,
-    tm.AGE_YEARS,
-    tm.HEALTH_SCORE,
-    FLOOR(RANDOM() * 5)::INT AS MAINTENANCE_COUNT_YTD,
-    ROUND(RANDOM() * 0.3, 3) AS FAILURE_PROBABILITY,
+-- 5.3 T_TRANSFORMER_TEMPORAL_TRAINING — 19-column schema (20 days per transformer)
+-- Consumed by /api/cascade/transformer-risk-prediction endpoint
+TRUNCATE TABLE IF EXISTS T_TRANSFORMER_TEMPORAL_TRAINING;
+
+INSERT INTO T_TRANSFORMER_TEMPORAL_TRAINING
+WITH transformer_base AS (
+    SELECT 
+        TRANSFORMER_ID,
+        CAPACITY_KVA,
+        INSTALL_YEAR,
+        HEALTH_SCORE,
+        LATITUDE,
+        LONGITUDE
+    FROM <% database %>.PRODUCTION.TRANSFORMER_METADATA
+),
+date_series AS (
+    SELECT DATEADD('day', -seq4(), CURRENT_DATE())::TIMESTAMP_NTZ AS prediction_date
+    FROM TABLE(GENERATOR(ROWCOUNT => 20))
+),
+raw_data AS (
+    SELECT
+        t.TRANSFORMER_ID,
+        DATEADD('hour', 8, d.prediction_date) AS MORNING_TIMESTAMP,
+        d.prediction_date AS PREDICTION_DATE,
+        ROUND(30 + (UNIFORM(0::FLOAT, 65::FLOAT, RANDOM()) * 
+              (1 + (100 - COALESCE(t.HEALTH_SCORE, 75)) / 200.0)), 1) AS MORNING_LOAD_PCT,
+        GREATEST(5, ROUND(UNIFORM(10::FLOAT, 50::FLOAT, RANDOM()))) AS MORNING_ACTIVE_METERS,
+        ROUND(UNIFORM(118::FLOAT, 124::FLOAT, RANDOM())) AS MORNING_AVG_VOLTAGE,
+        FLOOR(UNIFORM(0::FLOAT, 5::FLOAT, RANDOM())) AS MORNING_VOLTAGE_SAGS,
+        GREATEST(1, YEAR(CURRENT_DATE()) - COALESCE(t.INSTALL_YEAR, 2010)) AS TRANSFORMER_AGE_YEARS,
+        COALESCE(t.CAPACITY_KVA, 50) AS RATED_KVA,
+        ROUND(UNIFORM(40::FLOAT, 80::FLOAT, RANDOM()), 1) AS HISTORICAL_SUMMER_AVG_LOAD,
+        ROUND(UNIFORM(0::FLOAT, 120::FLOAT, RANDOM()), 1) AS SUMMER_2023_2024_AVG_CRITICAL_HOURS,
+        ROUND(UNIFORM(5::FLOAT, 25::FLOAT, RANDOM()), 2) AS KWH_PER_METER,
+        ROUND(UNIFORM(0.8::FLOAT, 1.3::FLOAT, RANDOM()), 3) AS LOAD_TREND_RATIO
+    FROM transformer_base t
+    CROSS JOIN date_series d
+)
+SELECT
+    TRANSFORMER_ID,
+    MORNING_TIMESTAMP,
+    PREDICTION_DATE,
+    MORNING_LOAD_PCT,
     CASE 
-        WHEN RANDOM() < 0.05 THEN 'CRITICAL'
-        WHEN RANDOM() < 0.15 THEN 'HIGH'
-        WHEN RANDOM() < 0.40 THEN 'MODERATE'
+        WHEN MORNING_LOAD_PCT >= 80 THEN 'CRITICAL'
+        WHEN MORNING_LOAD_PCT >= 60 THEN 'WARNING'
+        WHEN MORNING_LOAD_PCT >= 40 THEN 'NORMAL'
         ELSE 'LOW'
-    END AS RISK_CATEGORY,
-    'v1.0' AS MODEL_VERSION
-FROM <% database %>.PRODUCTION.TRANSFORMER_METADATA tm
-ON CONFLICT (TRANSFORMER_ID, PREDICTION_DATE) DO NOTHING;
+    END AS MORNING_CATEGORY,
+    ROUND(MORNING_LOAD_PCT * RATED_KVA * 0.01 * MORNING_ACTIVE_METERS * 0.5, 1) AS MORNING_KWH,
+    MORNING_ACTIVE_METERS::INT,
+    MORNING_AVG_VOLTAGE::INT,
+    MORNING_VOLTAGE_SAGS::INT,
+    TRANSFORMER_AGE_YEARS::INT,
+    RATED_KVA::INT,
+    HISTORICAL_SUMMER_AVG_LOAD,
+    SUMMER_2023_2024_AVG_CRITICAL_HOURS,
+    CASE 
+        WHEN UNIFORM(0::FLOAT, 1::FLOAT, RANDOM()) < 0.1 THEN 'NO_HISTORICAL_DATA'
+        ELSE ROUND((MORNING_LOAD_PCT - HISTORICAL_SUMMER_AVG_LOAD) / 
+             GREATEST(HISTORICAL_SUMMER_AVG_LOAD, 1) * 100, 1)::VARCHAR
+    END AS STRESS_VS_HISTORICAL,
+    KWH_PER_METER,
+    LOAD_TREND_RATIO,
+    CASE 
+        WHEN MORNING_LOAD_PCT > 75 AND TRANSFORMER_AGE_YEARS > 15 AND LOAD_TREND_RATIO > 1.1 THEN 1
+        WHEN MORNING_LOAD_PCT > 85 THEN 1
+        ELSE 0
+    END AS TARGET_HIGH_RISK,
+    ROUND(LEAST(100, MORNING_LOAD_PCT * UNIFORM(1.1::FLOAT, 1.5::FLOAT, RANDOM())), 1) AS AFTERNOON_LOAD_PCT,
+    CASE 
+        WHEN LEAST(100, MORNING_LOAD_PCT * 1.3) >= 80 THEN 'CRITICAL'
+        WHEN LEAST(100, MORNING_LOAD_PCT * 1.3) >= 60 THEN 'WARNING'
+        WHEN LEAST(100, MORNING_LOAD_PCT * 1.3) >= 40 THEN 'NORMAL'
+        ELSE 'LOW'
+    END AS AFTERNOON_CATEGORY
+FROM raw_data;
 
--- Populate NODE_CENTRALITY_FEATURES_V2
+-- 5.4 NODE_CENTRALITY_FEATURES_V2 — Centrality metrics for all nodes
 USE SCHEMA CASCADE_ANALYSIS;
+
+TRUNCATE TABLE IF EXISTS NODE_CENTRALITY_FEATURES_V2;
 
 INSERT INTO NODE_CENTRALITY_FEATURES_V2 (NODE_ID, DEGREE_CENTRALITY, BETWEENNESS_CENTRALITY, CLOSENESS_CENTRALITY, EIGENVECTOR_CENTRALITY, PAGERANK_SCORE, PAGERANK, CLUSTERING_COEFFICIENT, LOCAL_EFFICIENCY, CASCADE_IMPACT_SCORE, VULNERABILITY_SCORE, CASCADE_RISK_SCORE_NORMALIZED, CRITICALITY_RANK, TOTAL_REACH, NEIGHBORS_1HOP, NEIGHBORS_2HOP, NODE_TYPE, SUBSTATION_ID, LOAD_FACTOR, MODEL_VERSION)
 SELECT 
     n.NODE_ID,
-    n.DEGREE_CENTRALITY,
-    n.BETWEENNESS_CENTRALITY,
-    0.3 + RANDOM() * 0.5 AS CLOSENESS_CENTRALITY,
-    0.2 + RANDOM() * 0.6 AS EIGENVECTOR_CENTRALITY,
-    0.001 + RANDOM() * 0.05 AS PAGERANK_SCORE,
-    0.001 + RANDOM() * 0.05 AS PAGERANK,  -- Backend expects PAGERANK alias
-    0.3 + RANDOM() * 0.4 AS CLUSTERING_COEFFICIENT,
-    0.5 + RANDOM() * 0.4 AS LOCAL_EFFICIENCY,
-    CASE n.NODE_TYPE 
-        WHEN 'SUBSTATION' THEN 0.7 + RANDOM() * 0.3
-        WHEN 'TRANSFORMER' THEN 0.3 + RANDOM() * 0.4
-        ELSE 0.1 + RANDOM() * 0.2
-    END AS CASCADE_IMPACT_SCORE,
-    0.2 + RANDOM() * 0.5 AS VULNERABILITY_SCORE,
-    0.1 + RANDOM() * 0.8 AS CASCADE_RISK_SCORE_NORMALIZED,
-    ROW_NUMBER() OVER (ORDER BY n.DEGREE_CENTRALITY DESC) AS CRITICALITY_RANK,
-    FLOOR(RANDOM() * 50 + 5)::INT AS TOTAL_REACH,
-    FLOOR(RANDOM() * 10 + 1)::INT AS NEIGHBORS_1HOP,
-    FLOOR(RANDOM() * 30 + 5)::INT AS NEIGHBORS_2HOP,
+    CASE WHEN n.NODE_TYPE = 'SUBSTATION' 
+        THEN ROUND(UNIFORM(0.05::FLOAT, 0.3::FLOAT, RANDOM()), 6)
+        ELSE ROUND(UNIFORM(0.001::FLOAT, 0.02::FLOAT, RANDOM()), 6)
+    END AS DEGREE_CENTRALITY,
+    CASE WHEN n.NODE_TYPE = 'SUBSTATION'
+        THEN ROUND(UNIFORM(0.01::FLOAT, 0.5::FLOAT, RANDOM()), 6)
+        ELSE ROUND(UNIFORM(0.0001::FLOAT, 0.01::FLOAT, RANDOM()), 6)
+    END AS BETWEENNESS_CENTRALITY,
+    ROUND(UNIFORM(0.1::FLOAT, 0.5::FLOAT, RANDOM()), 6) AS CLOSENESS_CENTRALITY,
+    CASE WHEN n.NODE_TYPE = 'SUBSTATION'
+        THEN ROUND(UNIFORM(0.01::FLOAT, 0.15::FLOAT, RANDOM()), 6)
+        ELSE ROUND(UNIFORM(0.001::FLOAT, 0.05::FLOAT, RANDOM()), 6)
+    END AS EIGENVECTOR_CENTRALITY,
+    CASE WHEN n.NODE_TYPE = 'SUBSTATION'
+        THEN ROUND(UNIFORM(0.001::FLOAT, 0.01::FLOAT, RANDOM()), 6)
+        ELSE ROUND(UNIFORM(0.0001::FLOAT, 0.002::FLOAT, RANDOM()), 6)
+    END AS PAGERANK_SCORE,
+    CASE WHEN n.NODE_TYPE = 'SUBSTATION'
+        THEN ROUND(UNIFORM(0.001::FLOAT, 0.01::FLOAT, RANDOM()), 6)
+        ELSE ROUND(UNIFORM(0.0001::FLOAT, 0.002::FLOAT, RANDOM()), 6)
+    END AS PAGERANK,
+    ROUND(UNIFORM(0.0::FLOAT, 0.5::FLOAT, RANDOM()), 4) AS CLUSTERING_COEFFICIENT,
+    ROUND(UNIFORM(0.1::FLOAT, 0.9::FLOAT, RANDOM()), 4) AS LOCAL_EFFICIENCY,
+    ROUND(n.CRITICALITY_SCORE * UNIFORM(0.5::FLOAT, 1.5::FLOAT, RANDOM()), 4) AS CASCADE_IMPACT_SCORE,
+    ROUND(UNIFORM(0.1::FLOAT, 0.9::FLOAT, RANDOM()), 4) AS VULNERABILITY_SCORE,
+    CASE WHEN n.NODE_TYPE = 'SUBSTATION'
+        THEN ROUND(UNIFORM(0.5::FLOAT, 1.0::FLOAT, RANDOM()), 4)
+        ELSE ROUND(UNIFORM(0.1::FLOAT, 0.7::FLOAT, RANDOM()), 4)
+    END AS CASCADE_RISK_SCORE_NORMALIZED,
+    ROW_NUMBER() OVER (ORDER BY n.CRITICALITY_SCORE DESC)::INT AS CRITICALITY_RANK,
+    CASE WHEN n.NODE_TYPE = 'SUBSTATION'
+        THEN ROUND(UNIFORM(50::FLOAT, 500::FLOAT, RANDOM()))::INT
+        ELSE ROUND(UNIFORM(1::FLOAT, 20::FLOAT, RANDOM()))::INT
+    END AS TOTAL_REACH,
+    CASE WHEN n.NODE_TYPE = 'SUBSTATION'
+        THEN ROUND(UNIFORM(5::FLOAT, 50::FLOAT, RANDOM()))::INT
+        ELSE ROUND(UNIFORM(1::FLOAT, 5::FLOAT, RANDOM()))::INT
+    END AS NEIGHBORS_1HOP,
+    CASE WHEN n.NODE_TYPE = 'SUBSTATION'
+        THEN ROUND(UNIFORM(50::FLOAT, 500::FLOAT, RANDOM()))::INT
+        ELSE ROUND(UNIFORM(5::FLOAT, 30::FLOAT, RANDOM()))::INT
+    END AS NEIGHBORS_2HOP,
     n.NODE_TYPE,
     n.SUBSTATION_ID,
-    n.LOAD_FACTOR,
-    'v1.0' AS MODEL_VERSION
+    ROUND(UNIFORM(0.3::FLOAT, 0.9::FLOAT, RANDOM()), 3) AS LOAD_FACTOR,
+    'v2.0_quickstart' AS MODEL_VERSION
 FROM <% database %>.ML_DEMO.GRID_NODES n
-ON CONFLICT (NODE_ID) DO NOTHING;
+WHERE n.LAT IS NOT NULL;
 
--- Generate sample cascade scenarios
-INSERT INTO PRECOMPUTED_CASCADES (CASCADE_ID, INITIATING_NODE_ID, INITIATING_NODE_NAME, INITIATING_NODE_TYPE, TOTAL_AFFECTED_NODES, AFFECTED_SUBSTATIONS, AFFECTED_TRANSFORMERS, AFFECTED_CUSTOMERS, LOAD_SHED_MW, ESTIMATED_RESTORATION_HOURS, ECONOMIC_IMPACT_USD, CASCADE_PATH, CASCADE_DEPTH, SIMULATION_TIMESTAMP, SIMULATION_SCENARIO, MODEL_VERSION)
-SELECT 
-    'CASCADE_' || n.NODE_ID || '_' || TO_VARCHAR(CURRENT_DATE(), 'YYYYMMDD') AS CASCADE_ID,
-    n.NODE_ID AS INITIATING_NODE_ID,
-    n.NODE_NAME AS INITIATING_NODE_NAME,
-    n.NODE_TYPE AS INITIATING_NODE_TYPE,
-    CASE n.NODE_TYPE 
-        WHEN 'SUBSTATION' THEN FLOOR(50 + RANDOM() * 200)::INT
-        WHEN 'TRANSFORMER' THEN FLOOR(5 + RANDOM() * 30)::INT
-        ELSE FLOOR(1 + RANDOM() * 5)::INT
-    END AS TOTAL_AFFECTED_NODES,
-    CASE n.NODE_TYPE WHEN 'SUBSTATION' THEN FLOOR(1 + RANDOM() * 3)::INT ELSE 1 END AS AFFECTED_SUBSTATIONS,
-    CASE n.NODE_TYPE 
-        WHEN 'SUBSTATION' THEN FLOOR(10 + RANDOM() * 40)::INT
-        ELSE FLOOR(1 + RANDOM() * 5)::INT
-    END AS AFFECTED_TRANSFORMERS,
-    CASE n.NODE_TYPE 
-        WHEN 'SUBSTATION' THEN FLOOR(5000 + RANDOM() * 20000)::INT
-        WHEN 'TRANSFORMER' THEN FLOOR(100 + RANDOM() * 500)::INT
-        ELSE FLOOR(10 + RANDOM() * 50)::INT
-    END AS AFFECTED_CUSTOMERS,
-    CASE n.NODE_TYPE 
-        WHEN 'SUBSTATION' THEN ROUND(20 + RANDOM() * 80, 2)
-        WHEN 'TRANSFORMER' THEN ROUND(0.5 + RANDOM() * 5, 2)
-        ELSE ROUND(0.01 + RANDOM() * 0.1, 2)
-    END AS LOAD_SHED_MW,
-    ROUND(0.5 + RANDOM() * 8, 1) AS ESTIMATED_RESTORATION_HOURS,
-    CASE n.NODE_TYPE 
-        WHEN 'SUBSTATION' THEN ROUND((100000 + RANDOM() * 500000), 0)
-        WHEN 'TRANSFORMER' THEN ROUND((5000 + RANDOM() * 50000), 0)
-        ELSE ROUND((100 + RANDOM() * 1000), 0)
-    END AS ECONOMIC_IMPACT_USD,
-    TO_VARIANT(ARRAY_CONSTRUCT(n.NODE_ID)) AS CASCADE_PATH,
-    CASE n.NODE_TYPE WHEN 'SUBSTATION' THEN 3 WHEN 'TRANSFORMER' THEN 2 ELSE 1 END AS CASCADE_DEPTH,
-    CURRENT_TIMESTAMP() AS SIMULATION_TIMESTAMP,
-    CASE MOD(HASH(n.NODE_ID), 3) 
-        WHEN 0 THEN 'PEAK_LOAD'
-        WHEN 1 THEN 'STORM'
-        ELSE 'EQUIPMENT_FAILURE'
-    END AS SIMULATION_SCENARIO,
-    'v1.0' AS MODEL_VERSION
+-- 5.5 GNN_PREDICTIONS — Populate with risk predictions for all nodes
+-- Consumed by /api/cascade/patient-zero-candidates
+TRUNCATE TABLE IF EXISTS GNN_PREDICTIONS;
+
+INSERT INTO GNN_PREDICTIONS (NODE_ID, NODE_TYPE, CRITICALITY_SCORE, GNN_CASCADE_RISK, PREDICTION_TIMESTAMP)
+SELECT
+    n.NODE_ID,
+    n.NODE_TYPE,
+    n.CRITICALITY_SCORE,
+    LEAST(1.0, GREATEST(0.0,
+        COALESCE(c.CASCADE_RISK_SCORE_NORMALIZED, n.CRITICALITY_SCORE) * 
+        UNIFORM(0.8::FLOAT, 1.2::FLOAT, RANDOM())
+    )) AS GNN_CASCADE_RISK,
+    CURRENT_TIMESTAMP() AS PREDICTION_TIMESTAMP
 FROM <% database %>.ML_DEMO.GRID_NODES n
-WHERE n.NODE_TYPE IN ('SUBSTATION', 'TRANSFORMER')
-ON CONFLICT (CASCADE_ID) DO NOTHING;
+LEFT JOIN CASCADE_ANALYSIS.NODE_CENTRALITY_FEATURES_V2 c ON n.NODE_ID = c.NODE_ID
+WHERE n.LAT IS NOT NULL;
+
+-- 5.6 PRECOMPUTED_CASCADES — Scenario-based cascade simulations
+-- Consumed by /api/cascade/precomputed-scenarios endpoint.
+-- Uses the 15-column schema with SCENARIO_ID, PATIENT_ZERO_ID, CASCADE_ORDER,
+-- WAVE_BREAKDOWN, etc. that the backend expects.
+TRUNCATE TABLE IF EXISTS PRECOMPUTED_CASCADES;
+
+INSERT INTO PRECOMPUTED_CASCADES (
+    SCENARIO_ID, SCENARIO_NAME, INITIATING_NODE_ID, PATIENT_ZERO_ID,
+    INITIATING_NODE_NAME, PATIENT_ZERO_NAME, INITIATING_NODE_TYPE,
+    SIMULATION_PARAMS, CASCADE_ORDER, WAVE_BREAKDOWN,
+    PROPAGATION_PATHS, TOTAL_AFFECTED_NODES, AFFECTED_CAPACITY_MW,
+    ESTIMATED_CUSTOMERS_AFFECTED, AFFECTED_CUSTOMERS,
+    MAX_CASCADE_DEPTH, CASCADE_DEPTH, LOAD_SHED_MW,
+    SIMULATION_TIMESTAMP, SIMULATION_SCENARIO, COMPUTED_AT
+)
+SELECT
+    scenario_id, scenario_name,
+    patient_zero_id, patient_zero_id,
+    patient_zero_name, patient_zero_name,
+    'SUBSTATION' AS INITIATING_NODE_TYPE,
+    PARSE_JSON(sim_params) AS SIMULATION_PARAMS,
+    PARSE_JSON(cascade_order_json) AS CASCADE_ORDER,
+    PARSE_JSON(wave_json) AS WAVE_BREAKDOWN,
+    PARSE_JSON('[]') AS PROPAGATION_PATHS,
+    total_nodes,
+    affected_mw,
+    affected_customers, affected_customers,
+    max_depth, max_depth,
+    affected_mw AS LOAD_SHED_MW,
+    CURRENT_TIMESTAMP() AS SIMULATION_TIMESTAMP,
+    scenario_name AS SIMULATION_SCENARIO,
+    CURRENT_TIMESTAMP() AS COMPUTED_AT
+FROM (
+    SELECT 
+        'scenario_1' AS scenario_id,
+        'Summer Peak 2025' AS scenario_name,
+        'SUB_0001' AS patient_zero_id,
+        'Substation 1' AS patient_zero_name,
+        '{"temperature_c": 40, "load_multiplier": 1.4, "failure_threshold": 0.6}' AS sim_params,
+        '[{"order":0,"node_id":"SUB_0001","node_name":"Substation 1","node_type":"SUBSTATION","wave_depth":0,"capacity_kw":50000,"lat":29.76,"lon":-95.37},{"order":1,"node_id":"TRF_000101","node_name":"Transformer 101","node_type":"TRANSFORMER","wave_depth":1,"capacity_kw":200,"lat":29.77,"lon":-95.38}]' AS cascade_order_json,
+        '[{"wave":0,"nodes":1,"capacity_kw":50000},{"wave":1,"nodes":12,"capacity_kw":2400}]' AS wave_json,
+        13 AS total_nodes, 52.4 AS affected_mw, 64800 AS affected_customers, 3 AS max_depth
+    UNION ALL
+    SELECT 
+        'scenario_2', 'Winter Storm Scenario',
+        'SUB_0005', 'Substation 5',
+        '{"temperature_c": -10, "load_multiplier": 1.6, "failure_threshold": 0.5}',
+        '[{"order":0,"node_id":"SUB_0005","node_name":"Substation 5","node_type":"SUBSTATION","wave_depth":0,"capacity_kw":75000,"lat":29.82,"lon":-95.45},{"order":1,"node_id":"SUB_0008","node_name":"Substation 8","node_type":"SUBSTATION","wave_depth":1,"capacity_kw":60000,"lat":29.80,"lon":-95.42}]',
+        '[{"wave":0,"nodes":1,"capacity_kw":75000},{"wave":1,"nodes":3,"capacity_kw":180000},{"wave":2,"nodes":18,"capacity_kw":3600}]',
+        22, 258.6, 324000, 5
+    UNION ALL
+    SELECT 
+        'scenario_3', 'Hurricane Season',
+        'SUB_0012', 'Substation 12',
+        '{"temperature_c": 30, "load_multiplier": 1.2, "failure_threshold": 0.55}',
+        '[{"order":0,"node_id":"SUB_0012","node_name":"Substation 12","node_type":"SUBSTATION","wave_depth":0,"capacity_kw":45000,"lat":29.68,"lon":-95.28},{"order":1,"node_id":"TRF_000108","node_name":"Transformer 108","node_type":"TRANSFORMER","wave_depth":1,"capacity_kw":150,"lat":29.69,"lon":-95.29}]',
+        '[{"wave":0,"nodes":1,"capacity_kw":45000},{"wave":1,"nodes":8,"capacity_kw":1200}]',
+        9, 46.2, 54000, 2
+    UNION ALL
+    SELECT 
+        'scenario_4', 'Normal Operations Baseline',
+        'SUB_0003', 'Substation 3',
+        '{"temperature_c": 25, "load_multiplier": 1.0, "failure_threshold": 0.8}',
+        '[{"order":0,"node_id":"SUB_0003","node_name":"Substation 3","node_type":"SUBSTATION","wave_depth":0,"capacity_kw":55000,"lat":29.74,"lon":-95.35}]',
+        '[{"wave":0,"nodes":1,"capacity_kw":55000}]',
+        1, 55.0, 0, 0
+);
 
 -- =============================================================================
 -- SECTION 6: MISSING PRODUCTION TABLES FOR OPS CENTER
