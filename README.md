@@ -30,6 +30,26 @@ This repository solves that by delivering a **production-ready data foundation a
 
 ---
 
+| Repository | Purpose | 
+|------------|---------|
+| **Flux Utility Solutions** (this repo) | Core data foundation — unified grid data model, Cortex AI agent, semantic views |
+| [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) | Synthetic AMI data generation with streaming — simulate millions of meter readings |
+| [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) | Real-time grid visualization and GNN cascade failure prediction — operational situational awareness |
+
+<table>
+<tr>
+<td align="center"><img src="./images/crockett_substation_cascade_SI.png" width="400"/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs"><b>Flux Ops Center</b></a><br/>Real-time grid visualization, GNN cascade analysis<br/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/DOCKER_IMAGES.md">Docker Images</a> · <a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/deployment/">Deployment</a></td>
+<td align="center"><img src="./images/flux_data_forge_generate_1.png" width="400"/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-data-forge"><b>Flux Data Forge</b></a><br/>Synthetic data generation, streaming pipelines</td>
+</tr>
+</table>
+
+
+
+
+> **Note:** Flux Data Forge and Flux Ops Center can also run standalone. See their READMEs.
+
+---
+
 ## Quick Start
 
 ```bash
@@ -142,21 +162,6 @@ flowchart LR
     style Core fill:#1565c0,color:#fff
     style Optional fill:#ef6c00,color:#fff
 ```
-
-| Repository | Purpose | 
-|------------|---------|
-| **Flux Utility Solutions** (this repo) | Core data foundation — unified grid data model, Cortex AI agent, semantic views |
-| [Flux Data Forge](https://github.com/sfc-gh-abannerjee/flux-data-forge) | Synthetic AMI data generation with streaming — simulate millions of meter readings |
-| [Flux Ops Center](https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs) | Real-time grid visualization and GNN cascade failure prediction — operational situational awareness |
-
-<table>
-<tr>
-<td align="center"><img src="./images/crockett_substation_cascade_SI.png" width="400"/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs"><b>Flux Ops Center</b></a><br/>Real-time grid visualization, GNN cascade analysis<br/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/DOCKER_IMAGES.md">Docker Images</a> · <a href="https://github.com/sfc-gh-abannerjee/flux-ops-center-spcs/blob/main/docs/deployment/">Deployment</a></td>
-<td align="center"><img src="./images/flux_data_forge_generate_1.png" width="400"/><br/><a href="https://github.com/sfc-gh-abannerjee/flux-data-forge"><b>Flux Data Forge</b></a><br/>Synthetic data generation, streaming pipelines</td>
-</tr>
-</table>
-
-> **Note:** Flux Data Forge and Flux Ops Center can also run standalone. See their READMEs.
 
 ---
 
