@@ -37,14 +37,14 @@ USE SCHEMA APPLICATIONS;
 
 CREATE OR REPLACE SEMANTIC VIEW UTILITY_SEMANTIC_VIEW
 TABLES (
-    -- AMI Readings table
-    ami AS <% database %>.PRODUCTION.AMI_READINGS_FINAL
+    -- AMI Readings table (actual table: AMI_INTERVAL_READINGS)
+    ami AS <% database %>.PRODUCTION.AMI_INTERVAL_READINGS
         WITH SYNONYMS = ('meter readings', 'interval data', 'energy data'),
     
-    -- Customers table - note UNIQUE constraint on PRIMARY_METER_ID for relationship
+    -- Customers table - UNIQUE on METER_ID (actual col, not PRIMARY_METER_ID)
     customers AS <% database %>.PRODUCTION.CUSTOMERS_MASTER_DATA
         PRIMARY KEY (CUSTOMER_ID)
-        UNIQUE (PRIMARY_METER_ID)
+        UNIQUE (METER_ID)
         WITH SYNONYMS = ('customer profiles', 'accounts'),
     
     -- Transformer hourly load
@@ -58,7 +58,7 @@ TABLES (
 )
 RELATIONSHIPS (
     -- AMI readings link to customers via meter ID
-    ami(METER_ID) REFERENCES customers(PRIMARY_METER_ID),
+    ami(METER_ID) REFERENCES customers(METER_ID),
     -- Transformer load links to transformer metadata
     xfmr_load(TRANSFORMER_ID) REFERENCES xfmr(TRANSFORMER_ID)
 )
@@ -67,24 +67,23 @@ FACTS (
     ami.USAGE_KWH AS USAGE_KWH 
         WITH SYNONYMS = ('consumption', 'energy usage', 'kwh')
         COMMENT = 'Energy consumption in kilowatt-hours',
-    ami.VOLTAGE AS VOLTAGE
+    -- Logical name VOLTAGE maps to actual column VOLTAGE_V
+    ami.VOLTAGE AS VOLTAGE_V
         WITH SYNONYMS = ('volts', 'voltage reading')
         COMMENT = 'Voltage reading in volts',
     
-    -- Transformer load facts
-    xfmr_load.LOAD_KW AS LOAD_KW
+    -- Transformer load facts: logical LOAD_KW maps to actual CURRENT_LOAD_KW
+    xfmr_load.LOAD_KW AS CURRENT_LOAD_KW
         WITH SYNONYMS = ('load', 'power')
         COMMENT = 'Current load in kilowatts',
     xfmr_load.LOAD_FACTOR_PCT AS LOAD_FACTOR_PCT
         WITH SYNONYMS = ('utilization', 'loading percent')
         COMMENT = 'Load as percentage of rated capacity',
     
-    -- Transformer asset facts
+    -- Transformer asset facts: logical RATED_KVA maps to actual CAPACITY_KVA
     xfmr.HEALTH_SCORE AS HEALTH_SCORE
         COMMENT = 'Asset health score 0-100',
-    xfmr.AGE_YEARS AS AGE_YEARS
-        COMMENT = 'Transformer age in years',
-    xfmr.RATED_KVA AS RATED_KVA
+    xfmr.RATED_KVA AS CAPACITY_KVA
         WITH SYNONYMS = ('capacity', 'rating')
         COMMENT = 'Rated capacity in kVA'
 )
@@ -93,7 +92,7 @@ DIMENSIONS (
     ami.METER_ID AS METER_ID
         WITH SYNONYMS = ('meter', 'meter number')
         COMMENT = 'Unique smart meter identifier',
-    ami.TIMESTAMP AS TIMESTAMP
+    ami.READING_TIMESTAMP AS READING_TIMESTAMP
         WITH SYNONYMS = ('reading time', 'time', 'date')
         COMMENT = '15-minute interval timestamp',
     
@@ -101,33 +100,28 @@ DIMENSIONS (
     customers.CUSTOMER_ID AS CUSTOMER_ID
         WITH SYNONYMS = ('customer', 'account')
         COMMENT = 'Unique customer identifier',
-    customers.FULL_NAME AS FULL_NAME
-        WITH SYNONYMS = ('name', 'customer name')
-        COMMENT = 'Customer full name',
+    customers.FIRST_NAME AS FIRST_NAME
+        COMMENT = 'Customer first name',
+    customers.LAST_NAME AS LAST_NAME
+        COMMENT = 'Customer last name',
     customers.CITY AS CITY
         COMMENT = 'Service city',
     customers.ZIP_CODE AS ZIP_CODE
         WITH SYNONYMS = ('zip', 'postal code')
         COMMENT = 'Service ZIP code',
-    customers.CUSTOMER_SEGMENT AS CUSTOMER_SEGMENT
-        WITH SYNONYMS = ('segment', 'type')
+    -- Logical name CUSTOMER_SEGMENT maps to actual column CUSTOMER_CLASS
+    customers.CUSTOMER_SEGMENT AS CUSTOMER_CLASS
+        WITH SYNONYMS = ('segment', 'type', 'customer class')
         COMMENT = 'Customer type (RESIDENTIAL, COMMERCIAL, INDUSTRIAL)',
     
     -- Transformer dimensions
     xfmr.TRANSFORMER_ID AS TRANSFORMER_ID
         WITH SYNONYMS = ('transformer', 'xfmr')
         COMMENT = 'Transformer identifier',
-    xfmr.LOCATION_AREA AS LOCATION_AREA
-        COMMENT = 'Geographic area',
     xfmr.SUBSTATION_ID AS SUBSTATION_ID
         COMMENT = 'Parent substation',
-    xfmr.CIRCUIT_ID AS CIRCUIT_ID
-        COMMENT = 'Circuit/feeder assignment',
     
     -- Transformer load dimensions
-    xfmr_load.THERMAL_STRESS_CATEGORY AS THERMAL_STRESS_CATEGORY
-        WITH SYNONYMS = ('stress level', 'thermal risk')
-        COMMENT = 'Thermal stress category (LOW, MODERATE, HIGH, CRITICAL)',
     xfmr_load.LOAD_HOUR AS LOAD_HOUR
         WITH SYNONYMS = ('hour')
         COMMENT = 'Hour of measurement'
@@ -152,8 +146,6 @@ METRICS (
     -- Transformer metrics
     xfmr.TRANSFORMER_COUNT AS COUNT(DISTINCT xfmr.TRANSFORMER_ID)
         COMMENT = 'Total transformers',
-    xfmr.AVG_AGE AS AVG(xfmr.AGE_YEARS)
-        COMMENT = 'Average transformer age',
     xfmr.AVG_HEALTH_SCORE AS AVG(xfmr.HEALTH_SCORE)
         COMMENT = 'Average health score',
     

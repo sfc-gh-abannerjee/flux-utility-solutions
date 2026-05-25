@@ -33,26 +33,29 @@ CREATE OR REPLACE CORTEX SEARCH SERVICE CUSTOMER_SEARCH_SERVICE
     ATTRIBUTES CUSTOMER_SEGMENT, CITY, SERVICE_COUNTY, ACCOUNT_STATUS
     WAREHOUSE = <% warehouse %>
     TARGET_LAG = '1 day'
-    COMMENT = 'Customer search - 686K profiles, searchable by name, address, segment'
+    COMMENT = 'Customer search - 100K profiles, searchable by name, address, segment'
 AS (
     SELECT
         CUSTOMER_ID,
-        FULL_NAME,
-        CUSTOMER_SEGMENT,
+        -- Compute FULL_NAME from FIRST_NAME + LAST_NAME (actual table columns)
+        CONCAT(COALESCE(FIRST_NAME, ''), ' ', COALESCE(LAST_NAME, '')) AS FULL_NAME,
+        -- Map CUSTOMER_CLASS -> CUSTOMER_SEGMENT for agent compatibility
+        CUSTOMER_CLASS AS CUSTOMER_SEGMENT,
         SERVICE_ADDRESS,
         CITY,
-        SERVICE_COUNTY,
+        -- Map STATE -> SERVICE_COUNTY (county not in table, use state as fallback)
+        STATE AS SERVICE_COUNTY,
         ACCOUNT_STATUS,
-        PRIMARY_METER_ID,
-        PHONE,
-        EMAIL,
+        -- Map METER_ID -> PRIMARY_METER_ID for agent compatibility
+        METER_ID AS PRIMARY_METER_ID,
         -- Concatenated search text for full-text search
         CONCAT(
-            COALESCE(FULL_NAME, ''), ' ',
-            COALESCE(CUSTOMER_SEGMENT, ''), ' ',
+            COALESCE(FIRST_NAME, ''), ' ',
+            COALESCE(LAST_NAME, ''), ' ',
+            COALESCE(CUSTOMER_CLASS, ''), ' ',
             COALESCE(SERVICE_ADDRESS, ''), ' ',
             COALESCE(CITY, ''), ' ',
-            COALESCE(SERVICE_COUNTY, ''), ' County ',
+            COALESCE(STATE, ''), ' ',
             COALESCE(ACCOUNT_STATUS, ''), ' customer'
         ) AS SEARCH_TEXT
     FROM <% database %>.PRODUCTION.CUSTOMERS_MASTER_DATA
@@ -65,25 +68,28 @@ AS (
 -- Supports: meter ID, location, transformer, customer segment
 
 -- First create the searchable view
+-- Maps actual METER_INFRASTRUCTURE columns to expected search service schema
 CREATE OR REPLACE VIEW PRODUCTION.AMI_METADATA_SEARCHABLE AS
 SELECT
     m.METER_ID,
-    m.CUSTOMER_SEGMENT_ID,
+    -- Map CUSTOMER_CLASS -> CUSTOMER_SEGMENT_ID for agent compatibility
+    m.CUSTOMER_CLASS AS CUSTOMER_SEGMENT_ID,
     m.CITY,
-    m.ZIP_CODE,
+    -- ZIP_CODE not in actual table; use NULL placeholder
+    NULL::VARCHAR AS ZIP_CODE,
     m.COUNTY_NAME,
     m.TRANSFORMER_ID,
-    m.SUBSTATION_ID,
+    -- SUBSTATION_ID not in actual table; use NULL placeholder
+    NULL::VARCHAR AS SUBSTATION_ID,
     -- Static value for now (can be updated via scheduled task)
     0 as AVG_DAILY_KWH,
     -- Search text
     CONCAT(
         m.METER_ID, ' ',
         COALESCE(m.CITY, ''), ' ',
-        COALESCE(m.ZIP_CODE, ''), ' ',
         COALESCE(m.COUNTY_NAME, ''), ' ',
         COALESCE(m.TRANSFORMER_ID, ''), ' ',
-        COALESCE(m.CUSTOMER_SEGMENT_ID, '')
+        COALESCE(m.CUSTOMER_CLASS, '')
     ) AS SEARCH_TEXT
 FROM PRODUCTION.METER_INFRASTRUCTURE m;
 
