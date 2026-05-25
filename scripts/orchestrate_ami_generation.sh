@@ -88,12 +88,14 @@ emit() {
 }
 
 # control_status: read CONTROL_VALUE from AMI_GENERATION_CONTROL
+# snow CLI does not support --format=plain; use csv and grep the known status tokens.
 control_status() {
     snow sql \
         -q "USE WAREHOUSE $WAREHOUSE; SELECT CONTROL_VALUE FROM FLUX_DB.PRODUCTION.AMI_GENERATION_CONTROL WHERE CONTROL_KEY='STATUS'" \
-        --format=plain \
+        --format=csv \
         --connection "$CONNECTION" 2>/dev/null \
-        | tail -n 1 \
+        | grep -E '^(RUNNING|PAUSED|ABORTED)$' \
+        | head -n 1 \
         | tr -d '[:space:]'
 }
 
