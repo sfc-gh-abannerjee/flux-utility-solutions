@@ -128,13 +128,13 @@ BEGIN
     -- b. Live insert — 15-min spine × sampled meters × per-segment load curve
     --    Time spine: GENERATOR produces SEQ4() = 0..95; multiply by 15 min.
     --    Meter sample: ORDER BY RANDOM() LIMIT allows variable bind for sample size.
+    --    Column mapping: READING_TIMESTAMP (not TIMESTAMP), VOLTAGE_V (not VOLTAGE).
     INSERT INTO FLUX_DB.PRODUCTION.AMI_INTERVAL_READINGS (
-        METER_ID, TIMESTAMP, USAGE_KWH, VOLTAGE, POWER_FACTOR,
-        CUSTOMER_SEGMENT_ID, SOURCE_TABLE
+        METER_ID, READING_TIMESTAMP, USAGE_KWH, VOLTAGE_V, POWER_FACTOR
     )
     SELECT
         m.METER_ID,
-        DATEADD('minute', (SEQ4() * 15)::INTEGER, :P_FROM_TS) AS TIMESTAMP,
+        DATEADD('minute', (SEQ4() * 15)::INTEGER, :P_FROM_TS) AS READING_TIMESTAMP,
         ROUND(
             CASE m.METER_TYPE
                 WHEN 'RESIDENTIAL' THEN 1.5
@@ -150,12 +150,10 @@ BEGIN
             END *
             (0.8 + (RANDOM() / 10000000000000000000 * 0.4))
         , 3) AS USAGE_KWH,
-        ROUND(120 * (0.95 + (RANDOM() / 10000000000000000000 * 0.1)), 1) AS VOLTAGE,
-        ROUND(0.85 + (RANDOM() / 10000000000000000000 * 0.14), 2)        AS POWER_FACTOR,
-        m.CUSTOMER_SEGMENT_ID,
-        'GENERATED_CHUNK_' || :P_RUN_ID AS SOURCE_TABLE
+        ROUND(120 * (0.95 + (RANDOM() / 10000000000000000000 * 0.1)), 1) AS VOLTAGE_V,
+        ROUND(0.85 + (RANDOM() / 10000000000000000000 * 0.14), 2)        AS POWER_FACTOR
     FROM (
-        SELECT METER_ID, TRANSFORMER_ID, CUSTOMER_SEGMENT_ID, METER_TYPE
+        SELECT METER_ID, TRANSFORMER_ID, METER_TYPE
         FROM FLUX_DB.PRODUCTION.METER_INFRASTRUCTURE
         ORDER BY RANDOM()
         LIMIT :P_METER_SAMPLE
@@ -246,7 +244,7 @@ BEGIN
     -- 1. FK orphans: METER_IDs in this chunk with no TRANSFORMER_ID in METER_INFRASTRUCTURE
     SELECT COUNT(DISTINCT a.METER_ID) INTO v_orphans
     FROM   FLUX_DB.PRODUCTION.AMI_INTERVAL_READINGS a
-    WHERE  a.TIMESTAMP >= :v_from_ts AND a.TIMESTAMP <= :v_to_ts
+    WHERE  a.READING_TIMESTAMP >= :v_from_ts AND a.READING_TIMESTAMP <= :v_to_ts
       AND  NOT EXISTS (
                SELECT 1
                FROM   FLUX_DB.PRODUCTION.METER_INFRASTRUCTURE m
@@ -256,7 +254,7 @@ BEGIN
     -- 2. Total row count in this chunk
     SELECT COUNT(*) INTO v_total_readings
     FROM   FLUX_DB.PRODUCTION.AMI_INTERVAL_READINGS
-    WHERE  TIMESTAMP >= :v_from_ts AND TIMESTAMP <= :v_to_ts;
+    WHERE  READING_TIMESTAMP >= :v_from_ts AND READING_TIMESTAMP <= :v_to_ts;
 
     v_expected_rows := v_meter_sample * 96;
     IF (v_expected_rows > 0) THEN
@@ -264,12 +262,13 @@ BEGIN
     END IF;
 
     -- 3. Voltage band: % of readings in 115-125V
+    --    Column is VOLTAGE_V (not VOLTAGE) in AMI_INTERVAL_READINGS
     SELECT ROUND(
-               SUM(CASE WHEN VOLTAGE BETWEEN 115 AND 125 THEN 1.0 ELSE 0.0 END)
+               SUM(CASE WHEN VOLTAGE_V BETWEEN 115 AND 125 THEN 1.0 ELSE 0.0 END)
                / NULLIF(COUNT(*), 0) * 100.0, 2
            ) INTO v_voltage_ok_pct
     FROM   FLUX_DB.PRODUCTION.AMI_INTERVAL_READINGS
-    WHERE  TIMESTAMP >= :v_from_ts AND TIMESTAMP <= :v_to_ts;
+    WHERE  READING_TIMESTAMP >= :v_from_ts AND READING_TIMESTAMP <= :v_to_ts;
 
     -- 4. Power factor: % of readings in 0.85-0.99
     SELECT ROUND(
@@ -277,33 +276,33 @@ BEGIN
                / NULLIF(COUNT(*), 0) * 100.0, 2
            ) INTO v_pf_ok_pct
     FROM   FLUX_DB.PRODUCTION.AMI_INTERVAL_READINGS
-    WHERE  TIMESTAMP >= :v_from_ts AND TIMESTAMP <= :v_to_ts;
+    WHERE  READING_TIMESTAMP >= :v_from_ts AND READING_TIMESTAMP <= :v_to_ts;
 
-    -- 5. Timestamp grid: % of TIMESTAMP values on exact 15-min boundaries
+    -- 5. Timestamp grid: % of READING_TIMESTAMP values on exact 15-min boundaries
     SELECT ROUND(
-               SUM(CASE WHEN MINUTE(TIMESTAMP) IN (0,15,30,45)
-                             AND SECOND(TIMESTAMP) = 0 THEN 1.0 ELSE 0.0 END)
+               SUM(CASE WHEN MINUTE(READING_TIMESTAMP) IN (0,15,30,45)
+                             AND SECOND(READING_TIMESTAMP) = 0 THEN 1.0 ELSE 0.0 END)
                / NULLIF(COUNT(*), 0) * 100.0, 2
            ) INTO v_grid_ok_pct
     FROM   FLUX_DB.PRODUCTION.AMI_INTERVAL_READINGS
-    WHERE  TIMESTAMP >= :v_from_ts AND TIMESTAMP <= :v_to_ts;
+    WHERE  READING_TIMESTAMP >= :v_from_ts AND READING_TIMESTAMP <= :v_to_ts;
 
-    -- 6. Transformer capacity: count xfmr-hours where SUM(kWh*4) > RATED_KVA * 0.9
-    --    Requires TRANSFORMER_METADATA.RATED_KVA; see 07_aggregation_tables.sql
+    -- 6. Transformer capacity: count xfmr-hours where SUM(kWh*4) > CAPACITY_KVA * 0.9
+    --    TRANSFORMER_METADATA uses CAPACITY_KVA (not RATED_KVA); see 07_aggregation_tables.sql
     SELECT COUNT(*) INTO v_capacity_breach
     FROM (
         SELECT xh.TRANSFORMER_ID, xh.HR
         FROM (
             SELECT m.TRANSFORMER_ID,
-                   DATE_TRUNC('hour', a.TIMESTAMP) AS HR,
-                   SUM(a.USAGE_KWH * 4.0)          AS HOURLY_KW
+                   DATE_TRUNC('hour', a.READING_TIMESTAMP) AS HR,
+                   SUM(a.USAGE_KWH * 4.0)                 AS HOURLY_KW
             FROM   FLUX_DB.PRODUCTION.AMI_INTERVAL_READINGS a
             JOIN   FLUX_DB.PRODUCTION.METER_INFRASTRUCTURE  m ON a.METER_ID = m.METER_ID
-            WHERE  a.TIMESTAMP >= :v_from_ts AND a.TIMESTAMP <= :v_to_ts
-            GROUP  BY m.TRANSFORMER_ID, DATE_TRUNC('hour', a.TIMESTAMP)
+            WHERE  a.READING_TIMESTAMP >= :v_from_ts AND a.READING_TIMESTAMP <= :v_to_ts
+            GROUP  BY m.TRANSFORMER_ID, DATE_TRUNC('hour', a.READING_TIMESTAMP)
         ) xh
         JOIN FLUX_DB.PRODUCTION.TRANSFORMER_METADATA tm ON xh.TRANSFORMER_ID = tm.TRANSFORMER_ID
-        WHERE xh.HOURLY_KW > tm.RATED_KVA * 0.9
+        WHERE xh.HOURLY_KW > tm.CAPACITY_KVA * 0.9
     ) breaches;
 
     -- 7. Segment drift — placeholder; full check requires SEGMENT_MONTHLY_TARGETS table.
