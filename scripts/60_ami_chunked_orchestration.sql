@@ -126,15 +126,19 @@ BEGIN
     END IF;
 
     -- b. Live insert — 15-min spine × sampled meters × per-segment load curve
-    --    Time spine: GENERATOR produces SEQ4() = 0..95; multiply by 15 min.
+    --    Time spine: SEQ4() is isolated inside the generator subquery so it produces
+    --                0..95 PER METER (was a global 0..959999 in CROSS JOIN context,
+    --                which caused DATEADD to spread timestamps across ~27 years).
     --    Meter sample: ORDER BY RANDOM() LIMIT allows variable bind for sample size.
+    --    RNG: UNIFORM(0::FLOAT, 1::FLOAT, RANDOM()) replaces the brittle
+    --         (RANDOM() / 10000000000000000000) division (overflow-prone).
     --    Column mapping: READING_TIMESTAMP (not TIMESTAMP), VOLTAGE_V (not VOLTAGE).
     INSERT INTO FLUX_DB.PRODUCTION.AMI_INTERVAL_READINGS (
         METER_ID, READING_TIMESTAMP, USAGE_KWH, VOLTAGE_V, POWER_FACTOR
     )
     SELECT
         m.METER_ID,
-        DATEADD('minute', (SEQ4() * 15)::INTEGER, :P_FROM_TS) AS READING_TIMESTAMP,
+        DATEADD('minute', (g.interval_idx * 15)::INTEGER, :P_FROM_TS) AS READING_TIMESTAMP,
         ROUND(
             CASE m.METER_TYPE
                 WHEN 'RESIDENTIAL' THEN 1.5
@@ -143,22 +147,25 @@ BEGIN
                 ELSE 2.0
             END * 0.25 *
             CASE
-                WHEN HOUR(DATEADD('minute', (SEQ4() * 15)::INTEGER, :P_FROM_TS)) BETWEEN 6  AND 9  THEN 1.5
-                WHEN HOUR(DATEADD('minute', (SEQ4() * 15)::INTEGER, :P_FROM_TS)) BETWEEN 17 AND 21 THEN 1.8
-                WHEN HOUR(DATEADD('minute', (SEQ4() * 15)::INTEGER, :P_FROM_TS)) BETWEEN 0  AND 5  THEN 0.4
+                WHEN HOUR(DATEADD('minute', (g.interval_idx * 15)::INTEGER, :P_FROM_TS)) BETWEEN 6  AND 9  THEN 1.5
+                WHEN HOUR(DATEADD('minute', (g.interval_idx * 15)::INTEGER, :P_FROM_TS)) BETWEEN 17 AND 21 THEN 1.8
+                WHEN HOUR(DATEADD('minute', (g.interval_idx * 15)::INTEGER, :P_FROM_TS)) BETWEEN 0  AND 5  THEN 0.4
                 ELSE 1.0
             END *
-            (0.8 + (RANDOM() / 10000000000000000000 * 0.4))
+            (0.8 + UNIFORM(0::FLOAT, 1::FLOAT, RANDOM()) * 0.4)
         , 3) AS USAGE_KWH,
-        ROUND(120 * (0.95 + (RANDOM() / 10000000000000000000 * 0.1)), 1) AS VOLTAGE_V,
-        ROUND(0.85 + (RANDOM() / 10000000000000000000 * 0.14), 2)        AS POWER_FACTOR
+        ROUND(120 * (0.95 + UNIFORM(0::FLOAT, 1::FLOAT, RANDOM()) * 0.1), 1) AS VOLTAGE_V,
+        ROUND(0.85 + UNIFORM(0::FLOAT, 1::FLOAT, RANDOM()) * 0.14, 2)        AS POWER_FACTOR
     FROM (
         SELECT METER_ID, TRANSFORMER_ID, METER_TYPE
-        FROM FLUX_DB.PRODUCTION.METER_INFRASTRUCTURE
-        ORDER BY RANDOM()
-        LIMIT :P_METER_SAMPLE
+        FROM   FLUX_DB.PRODUCTION.METER_INFRASTRUCTURE
+        ORDER  BY RANDOM()
+        LIMIT  :P_METER_SAMPLE
     ) m
-    CROSS JOIN TABLE(GENERATOR(ROWCOUNT => 96));  -- 96 × 15-min intervals = 24 h
+    CROSS JOIN (
+        SELECT SEQ4() AS interval_idx
+        FROM TABLE(GENERATOR(ROWCOUNT => 96))
+    ) g;  -- 96 × 15-min intervals = 24 h, isolated per meter
 
     -- c. Capture query ID and rowcount immediately after INSERT
     v_query_id     := LAST_QUERY_ID();

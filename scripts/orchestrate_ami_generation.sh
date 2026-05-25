@@ -150,9 +150,9 @@ for ((i=1; i<=TOTAL_DAYS; i++)); do
         exit 1
     fi
 
-    ROWS=$(echo "$CALL_RESULT"     | jq -r '.[0].ROWS_INSERTED    // 0'       2>/dev/null || echo 0)
-    QID=$(echo "$CALL_RESULT"      | jq -r '.[0].QUERY_ID          // "unknown"' 2>/dev/null || echo unknown)
-    DUR=$(echo "$CALL_RESULT"      | jq -r '.[0].DURATION_SECONDS  // 0'       2>/dev/null || echo 0)
+    ROWS=$(echo "$CALL_RESULT"     | jq -r '.[1][0].ROWS_INSERTED    // 0'       2>/dev/null || echo 0)
+    QID=$(echo "$CALL_RESULT"      | jq -r '.[1][0].QUERY_ID          // "unknown"' 2>/dev/null || echo unknown)
+    DUR=$(echo "$CALL_RESULT"      | jq -r '.[1][0].DURATION_SECONDS  // 0'       2>/dev/null || echo 0)
 
     emit "CHUNK $i/$TOTAL_DAYS done   rows=$ROWS  query_id=$QID  duration_s=$DUR"
 
@@ -173,8 +173,8 @@ for ((i=1; i<=TOTAL_DAYS; i++)); do
         exit 1
     fi
 
-    VERDICT=$(echo "$VAL_RESULT" | jq -r '.[0].VERDICT // "UNKNOWN"' 2>/dev/null || echo UNKNOWN)
-    REASON=$(echo "$VAL_RESULT"  | jq -r '.[0].REASON  // ""'        2>/dev/null || echo '')
+    VERDICT=$(echo "$VAL_RESULT" | jq -r '.[1][0].VERDICT // "UNKNOWN"' 2>/dev/null || echo UNKNOWN)
+    REASON=$(echo "$VAL_RESULT"  | jq -r '.[1][0].REASON  // ""'        2>/dev/null || echo '')
 
     emit "CHUNK $i/$TOTAL_DAYS validation=$VERDICT  reason=\"$REASON\""
 
