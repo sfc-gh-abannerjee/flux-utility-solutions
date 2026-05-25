@@ -518,7 +518,7 @@ COMMENT = 'Grid topology edges for GNN-based cascade analysis';
 -- 3.3 T_TRANSFORMER_TEMPORAL_TRAINING - ML Training Data
 -- -----------------------------------------------------------------------------
 -- The ops center backend endpoint /api/cascade/transformer-risk-prediction
--- requires the 19-column schema below. The old 9-column schema (LOAD_FACTOR_AVG_7D,
+-- requires the 18-column schema below. The old 9-column schema (LOAD_FACTOR_AVG_7D,
 -- etc.) does not match what the backend queries. This uses CREATE OR REPLACE
 -- to ensure existing deployments get the updated schema on re-run.
 
@@ -532,7 +532,6 @@ CREATE OR REPLACE TABLE T_TRANSFORMER_TEMPORAL_TRAINING (
     MORNING_ACTIVE_METERS               INT,
     MORNING_AVG_VOLTAGE                 INT,
     MORNING_VOLTAGE_SAGS                INT,
-    TRANSFORMER_AGE_YEARS               INT,
     RATED_KVA                           INT,
     HISTORICAL_SUMMER_AVG_LOAD          FLOAT,
     SUMMER_2023_2024_AVG_CRITICAL_HOURS FLOAT,
@@ -557,17 +556,17 @@ SELECT
     LEAST(1.0,
         (t.MORNING_LOAD_PCT / 100.0) *
         (1 + COALESCE(TRY_TO_DOUBLE(t.STRESS_VS_HISTORICAL), 0) / 100) *
-        (1 + t.TRANSFORMER_AGE_YEARS / 50.0)
+        (1 + (YEAR(CURRENT_DATE()) - tm.INSTALL_YEAR)::INT / 50.0)
     ) AS FAILURE_PROBABILITY,
     CASE 
-        WHEN LEAST(1.0, (t.MORNING_LOAD_PCT / 100.0) * (1 + t.TRANSFORMER_AGE_YEARS / 50.0)) >= 0.7 THEN 'CRITICAL'
-        WHEN LEAST(1.0, (t.MORNING_LOAD_PCT / 100.0) * (1 + t.TRANSFORMER_AGE_YEARS / 50.0)) >= 0.5 THEN 'HIGH'
-        WHEN LEAST(1.0, (t.MORNING_LOAD_PCT / 100.0) * (1 + t.TRANSFORMER_AGE_YEARS / 50.0)) >= 0.3 THEN 'MEDIUM'
+        WHEN LEAST(1.0, (t.MORNING_LOAD_PCT / 100.0) * (1 + (YEAR(CURRENT_DATE()) - tm.INSTALL_YEAR)::INT / 50.0)) >= 0.7 THEN 'CRITICAL'
+        WHEN LEAST(1.0, (t.MORNING_LOAD_PCT / 100.0) * (1 + (YEAR(CURRENT_DATE()) - tm.INSTALL_YEAR)::INT / 50.0)) >= 0.5 THEN 'HIGH'
+        WHEN LEAST(1.0, (t.MORNING_LOAD_PCT / 100.0) * (1 + (YEAR(CURRENT_DATE()) - tm.INSTALL_YEAR)::INT / 50.0)) >= 0.3 THEN 'MEDIUM'
         ELSE 'LOW'
     END AS RISK_CATEGORY,
     t.MORNING_LOAD_PCT AS LOAD_FACTOR_AVG_7D,
-    t.TRANSFORMER_AGE_YEARS AS AGE_YEARS,
-    100 - (t.MORNING_LOAD_PCT * 0.5 + t.TRANSFORMER_AGE_YEARS * 0.5) AS HEALTH_SCORE,
+    (YEAR(CURRENT_DATE()) - tm.INSTALL_YEAR)::INT AS AGE_YEARS,
+    100 - (t.MORNING_LOAD_PCT * 0.5 + (YEAR(CURRENT_DATE()) - tm.INSTALL_YEAR)::INT * 0.5) AS HEALTH_SCORE,
     tm.TRANSFORMER_NAME,
     tm.SUBSTATION_ID,
     tm.CAPACITY_KVA,
@@ -700,7 +699,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA <% database %>.CASCADE_ANALYSIS TO ROLE IDE
 -- =============================================================================
 -- Generate sample data so Ops Center works immediately after deployment.
 -- Uses TRUNCATE before INSERT for idempotent re-runs (prevents duplicate data
--- that previously occurred with ON CONFLICT DO NOTHING on partial reruns).
+-- that previously occurred with duplicate inserts on partial reruns).
 --
 -- Data consumed by ops center endpoints:
 --   GRID_NODES            → /api/cascade/grid-topology, /api/cascade/simulate
@@ -824,7 +823,7 @@ raw_data AS (
         GREATEST(5, ROUND(UNIFORM(10::FLOAT, 50::FLOAT, RANDOM()))) AS MORNING_ACTIVE_METERS,
         ROUND(UNIFORM(118::FLOAT, 124::FLOAT, RANDOM())) AS MORNING_AVG_VOLTAGE,
         FLOOR(UNIFORM(0::FLOAT, 5::FLOAT, RANDOM())) AS MORNING_VOLTAGE_SAGS,
-        GREATEST(1, YEAR(CURRENT_DATE()) - COALESCE(t.INSTALL_YEAR, 2010)) AS TRANSFORMER_AGE_YEARS,
+        t.INSTALL_YEAR,
         COALESCE(t.CAPACITY_KVA, 50) AS RATED_KVA,
         ROUND(UNIFORM(40::FLOAT, 80::FLOAT, RANDOM()), 1) AS HISTORICAL_SUMMER_AVG_LOAD,
         ROUND(UNIFORM(0::FLOAT, 120::FLOAT, RANDOM()), 1) AS SUMMER_2023_2024_AVG_CRITICAL_HOURS,
@@ -848,7 +847,6 @@ SELECT
     MORNING_ACTIVE_METERS::INT,
     MORNING_AVG_VOLTAGE::INT,
     MORNING_VOLTAGE_SAGS::INT,
-    TRANSFORMER_AGE_YEARS::INT,
     RATED_KVA::INT,
     HISTORICAL_SUMMER_AVG_LOAD,
     SUMMER_2023_2024_AVG_CRITICAL_HOURS,
@@ -860,7 +858,7 @@ SELECT
     KWH_PER_METER,
     LOAD_TREND_RATIO,
     CASE 
-        WHEN MORNING_LOAD_PCT > 75 AND TRANSFORMER_AGE_YEARS > 15 AND LOAD_TREND_RATIO > 1.1 THEN 1
+        WHEN MORNING_LOAD_PCT > 75 AND (YEAR(CURRENT_DATE()) - INSTALL_YEAR) > 15 AND LOAD_TREND_RATIO > 1.1 THEN 1
         WHEN MORNING_LOAD_PCT > 85 THEN 1
         ELSE 0
     END AS TARGET_HIGH_RISK,
@@ -1046,33 +1044,40 @@ CREATE TABLE IF NOT EXISTS OUTAGE_RESTORATION_TRACKER (
 );
 
 -- Insert sample outage data
-INSERT INTO OUTAGE_RESTORATION_TRACKER (
+MERGE INTO OUTAGE_RESTORATION_TRACKER AS target
+USING (
+    SELECT 
+        'OUT_' || SEQ4() AS OUTAGE_ID,
+        'CKT_' || FLOOR(RANDOM() * 500)::VARCHAR AS CIRCUIT_ID,
+        'SUB_' || FLOOR(RANDOM() * 50)::VARCHAR AS SUBSTATION_ID,
+        DATEADD('hour', -FLOOR(RANDOM() * 24)::INT, CURRENT_TIMESTAMP()) AS OUTAGE_START_TIME,
+        CASE MOD(SEQ4(), 5)
+            WHEN 0 THEN 'ACTIVE'
+            WHEN 1 THEN 'INVESTIGATING'
+            ELSE 'RESTORED'
+        END AS STATUS,
+        CASE MOD(SEQ4(), 5)
+            WHEN 0 THEN 'EQUIPMENT_FAILURE'
+            WHEN 1 THEN 'WEATHER'
+            WHEN 2 THEN 'VEGETATION'
+            WHEN 3 THEN 'ANIMAL'
+            ELSE 'UNKNOWN'
+        END AS CAUSE,
+        FLOOR(50 + RANDOM() * 500)::INT AS AFFECTED_CUSTOMERS,
+        FLOOR(1 + RANDOM() * 10)::INT AS AFFECTED_TRANSFORMERS,
+        'CREW_' || FLOOR(RANDOM() * 20)::VARCHAR AS CREW_ASSIGNED,
+        DATEADD('hour', FLOOR(RANDOM() * 4)::INT, CURRENT_TIMESTAMP()) AS ESTIMATED_RESTORATION
+    FROM TABLE(GENERATOR(ROWCOUNT => 25))
+) AS source
+ON target.OUTAGE_ID = source.OUTAGE_ID
+WHEN NOT MATCHED THEN INSERT (
     OUTAGE_ID, CIRCUIT_ID, SUBSTATION_ID, OUTAGE_START_TIME, STATUS, CAUSE,
     AFFECTED_CUSTOMERS, AFFECTED_TRANSFORMERS, CREW_ASSIGNED, ESTIMATED_RESTORATION
-)
-SELECT 
-    'OUT_' || SEQ4() AS OUTAGE_ID,
-    'CKT_' || FLOOR(RANDOM() * 500)::VARCHAR AS CIRCUIT_ID,
-    'SUB_' || FLOOR(RANDOM() * 50)::VARCHAR AS SUBSTATION_ID,
-    DATEADD('hour', -FLOOR(RANDOM() * 24)::INT, CURRENT_TIMESTAMP()) AS OUTAGE_START_TIME,
-    CASE MOD(SEQ4(), 5)
-        WHEN 0 THEN 'ACTIVE'
-        WHEN 1 THEN 'INVESTIGATING'
-        ELSE 'RESTORED'
-    END AS STATUS,
-    CASE MOD(SEQ4(), 5)
-        WHEN 0 THEN 'EQUIPMENT_FAILURE'
-        WHEN 1 THEN 'WEATHER'
-        WHEN 2 THEN 'VEGETATION'
-        WHEN 3 THEN 'ANIMAL'
-        ELSE 'UNKNOWN'
-    END AS CAUSE,
-    FLOOR(50 + RANDOM() * 500)::INT AS AFFECTED_CUSTOMERS,
-    FLOOR(1 + RANDOM() * 10)::INT AS AFFECTED_TRANSFORMERS,
-    'CREW_' || FLOOR(RANDOM() * 20)::VARCHAR AS CREW_ASSIGNED,
-    DATEADD('hour', FLOOR(RANDOM() * 4)::INT, CURRENT_TIMESTAMP()) AS ESTIMATED_RESTORATION
-FROM TABLE(GENERATOR(ROWCOUNT => 25))
-ON CONFLICT (OUTAGE_ID) DO NOTHING;
+) VALUES (
+    source.OUTAGE_ID, source.CIRCUIT_ID, source.SUBSTATION_ID, source.OUTAGE_START_TIME,
+    source.STATUS, source.CAUSE, source.AFFECTED_CUSTOMERS, source.AFFECTED_TRANSFORMERS,
+    source.CREW_ASSIGNED, source.ESTIMATED_RESTORATION
+);
 
 -- -----------------------------------------------------------------------------
 -- 6.2 WORK_ORDERS - Maintenance Work Orders (if not exists)
