@@ -1,0 +1,113 @@
+-- =============================================================================
+-- Script : 06_postgres_outage_sync.sql
+-- Purpose: Documents the approach for syncing historical outages from
+--          FLUX_DB.PRODUCTION.OUTAGE_RESTORATION_TRACKER into
+--          FLUX_OPS_POSTGRES public.outages.
+--          The actual load is executed by the companion Python script:
+--          06_postgres_outage_sync.py
+--
+-- Source : FLUX_DB.PRODUCTION.OUTAGE_RESTORATION_TRACKER  (18,689 rows)
+-- Target : FLUX_OPS_POSTGRES public.outages
+-- Author : Abhinav Bannerjee
+-- Date   : 2026-05-26
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- CAUSE DISTRIBUTION (as of 2026-05-26)
+--   WEATHER              13,637 rows  → scenario 'beryl_historical'
+--   TRANSFORMER_OVERLOAD  4,812 rows  → scenario 'historical_overload'
+--   VEGETATION              240 rows  → scenario 'historical_vegetation'
+--
+-- SEVERITY MAPPING LOGIC
+--   WEATHER + customers_affected > 1  → CRITICAL
+--   customers_affected > 30           → HIGH
+--   customers_affected > 5            → MEDIUM
+--   otherwise                         → LOW
+--   (WEATHER outages representing Hurricane Beryl are nearly all CRITICAL)
+--
+-- STATUS: All rows inserted as 'RESTORED' (these are historical / resolved outages)
+-- -----------------------------------------------------------------------------
+
+-- -----------------------------------------------------------------------------
+-- JOIN STRATEGY: OUTAGE_RESTORATION_TRACKER → TRANSFORMER_METADATA
+--
+--   SELECT
+--       ORT.OUTAGE_ID,
+--       ORT.CIRCUIT_ID,
+--       ORT.CAUSE,
+--       ORT.AFFECTED_CUSTOMERS,
+--       ORT.OUTAGE_START_TIME,
+--       ORT.OUTAGE_END_TIME,
+--       ORT.ESTIMATED_RESTORATION,
+--       COALESCE(TM.LATITUDE,  29.7604)  AS LAT,    -- Houston city center fallback
+--       COALESCE(TM.LONGITUDE, -95.3698) AS LON,    -- Houston city center fallback
+--       TM.SUBSTATION_ID AS XFMR_SUBSTATION_ID
+--   FROM FLUX_DB.PRODUCTION.OUTAGE_RESTORATION_TRACKER ORT
+--   LEFT JOIN FLUX_DB.PRODUCTION.TRANSFORMER_METADATA TM
+--       ON ORT.TRANSFORMER_ID = TM.TRANSFORMER_ID
+--   ORDER BY ORT.OUTAGE_START_TIME;
+--
+-- NOTE: 1,198 rows in ORT have TRANSFORMER_ID values with a '-SPLIT-' suffix
+--       (e.g. 'XFMR-HOU-054347-SPLIT-24396').  These do NOT match any base
+--       transformer ID in TRANSFORMER_METADATA (verified: 0 recoverable via
+--       split-suffix strip). Those rows receive the Houston city-center
+--       fallback coordinates (29.7604, -95.3698) and substation_id = NULL.
+-- -----------------------------------------------------------------------------
+
+-- -----------------------------------------------------------------------------
+-- FK VALIDATION: substation_id
+--
+--   TRANSFORMER_METADATA.SUBSTATION_ID uses format  'SUB-HOU-0001'
+--   public.substations.substation_id  uses format  'SUB-0001'
+--   These formats DO NOT match → all substation_id values are set to NULL.
+--   This is expected; the FK column is ON DELETE SET NULL and is nullable.
+--   Future work: reconcile substation ID namespaces between Snowflake and
+--   Postgres if map-layer substation FK associations are needed.
+-- -----------------------------------------------------------------------------
+
+-- -----------------------------------------------------------------------------
+-- OUTAGE_ID → UUID MAPPING
+--
+--   OUTAGE_RESTORATION_TRACKER.OUTAGE_ID is a VARCHAR (e.g. 'OUT_BERYL_AUG_COASTAL_7195').
+--   public.outages.outage_id is UUID PK.
+--   The Python script generates a deterministic UUID via:
+--       uuid.uuid5(NAMESPACE_URL, 'flux-outage:<OUTAGE_ID>')
+--   This ensures idempotent re-runs: the same source row always produces the
+--   same UUID, so ON CONFLICT (outage_id) DO NOTHING skips duplicates.
+-- -----------------------------------------------------------------------------
+
+-- -----------------------------------------------------------------------------
+-- RATE-LIMIT / NOTIFY CONSIDERATIONS
+--
+--   The table has an AFTER INSERT/UPDATE trigger 'outage_change_notify' that
+--   fires NOTIFY 'outages_chan' on every row change. With 18,689 inserts, this
+--   will fire 18,689 notifications. FastAPI SSE subscribers will receive each
+--   one as a live push event (useful for a "Hurricane Beryl replay" demo).
+--
+--   To avoid overwhelming SSE connections in a live demo context, the Python
+--   script pauses 0.1 seconds after every batch of 1,000 rows.
+--   At this rate, the full load completes in approximately 2–3 minutes.
+--
+--   If the Ops Center UI is actively open during the load, operators will see
+--   the map populate in real time — this is intentional demo behaviour.
+-- -----------------------------------------------------------------------------
+
+-- -----------------------------------------------------------------------------
+-- POST-LOAD VERIFICATION QUERIES (run against FLUX_OPS_POSTGRES via psql)
+--
+-- 1. Row count, status, severity, cause breakdown:
+--    SELECT COUNT(*), status, severity, cause
+--    FROM public.outages
+--    GROUP BY 2, 3, 4
+--    ORDER BY 1 DESC;
+--
+-- 2. FK violation check (expect 0):
+--    SELECT COUNT(*) FROM public.outages
+--    WHERE substation_id IS NOT NULL
+--      AND substation_id NOT IN (SELECT substation_id FROM public.substations);
+--
+-- 3. Scenario distribution:
+--    SELECT scenario, COUNT(*), SUM(customers_affected)
+--    FROM public.outages
+--    GROUP BY 1;
+-- -----------------------------------------------------------------------------
