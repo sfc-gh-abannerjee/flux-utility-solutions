@@ -27,7 +27,7 @@
 --     - FLUX_OPS_CENTER_TOPOLOGY_NODES (view) - Asset nodes
 --     - FLUX_OPS_CENTER_SERVICE_AREAS_MV (view)
 --     - VEGETATION_RISK_COMPUTED (view)
---     - CIRCUIT_STATUS_REALTIME (view)
+--     - CIRCUIT_OUTAGE_STATUS (view)
 --
 --   ML_DEMO Schema:
 --     - GRID_NODES (table)
@@ -413,11 +413,11 @@ CREATE TABLE IF NOT EXISTS APPLICATIONS.VEGETATION_RISK_ENHANCED (
 COMMENT = 'Enhanced vegetation risk data from external processing for Postgres sync';
 
 -- -----------------------------------------------------------------------------
--- 2.6 CIRCUIT_STATUS_REALTIME - Real-time Circuit Status
+-- 2.6 CIRCUIT_OUTAGE_STATUS - Per-circuit outage events
 -- -----------------------------------------------------------------------------
 -- Live circuit status for outage tracking
 
-CREATE OR REPLACE VIEW CIRCUIT_STATUS_REALTIME AS
+CREATE OR REPLACE VIEW CIRCUIT_OUTAGE_STATUS AS
 SELECT 
     c.CIRCUIT_ID,
     c.CIRCUIT_NAME,
