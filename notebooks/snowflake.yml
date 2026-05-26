@@ -1,16 +1,14 @@
 definition_version: 2
-mixins:
-  - snowflake://ref/mixins/snowflake-default
 
 entities:
   flux_e2e_test_notebook:
     type: notebook
     identifier:
       name: FLUX_E2E_TEST_NOTEBOOK
+      database: FLUX_DB
+      schema: APPLICATIONS
     artifacts:
       - src: e2e_test.ipynb
         dest: e2e_test.ipynb
-    stage: FLUX_E2E_TEST.APPLICATIONS.NOTEBOOK_STAGE
-    handler: e2e_test.ipynb
-    runtime:
-      warehouse: FLUX_E2E_TEST_WH
+    notebook_file: e2e_test.ipynb
+    query_warehouse: FLUX_WH
