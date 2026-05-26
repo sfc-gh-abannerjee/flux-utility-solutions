@@ -6,7 +6,7 @@
 -- Run after ANY deployment path (SQL, Git, CLI, Terraform)
 --
 -- Calibrated: 2026-05-26 against se_demo / FLUX_DB (demo scale)
--- Demo scale: 100K meters / 100K customers / 100 transformers / 288M AMI rows
+-- Demo scale: 100K meters / 100K customers / ~47K transformers / 288M AMI rows
 -- (Full-scale thresholds archived in git history — not valid here)
 --
 -- Jinja2 Variables:
@@ -77,7 +77,7 @@ ORDER BY e.required DESC, e.schema_name;
 -- SECTION 2: PRODUCTION TABLE VALIDATION
 -- =============================================================================
 -- Thresholds calibrated 2026-05-26 to demo scale:
---   SUBSTATIONS 25 | TRANSFORMER_METADATA 100 | CIRCUIT_METADATA 50
+--   SUBSTATIONS 25 | TRANSFORMER_METADATA ~47K | CIRCUIT_METADATA 50
 --   METER_INFRASTRUCTURE 100K | CUSTOMERS_MASTER_DATA 100K
 --   AMI_INTERVAL_READINGS 288M | TRANSFORMER_HOURLY_LOAD 33.87M
 --   HOUSTON_WEATHER_HOURLY 720
@@ -88,7 +88,7 @@ SELECT '=== PRODUCTION TABLES ===' AS section;
 
 WITH expected_tables AS (
     SELECT 'SUBSTATIONS'           AS table_name, 1         AS min_expected_rows, TRUE  AS required UNION ALL
-    SELECT 'TRANSFORMER_METADATA',                100,                             TRUE              UNION ALL
+    SELECT 'TRANSFORMER_METADATA',                40000,                           TRUE              UNION ALL
     SELECT 'CIRCUIT_METADATA',                    1,                               TRUE              UNION ALL
     SELECT 'METER_INFRASTRUCTURE',                99000,                           TRUE              UNION ALL
     SELECT 'CUSTOMERS_MASTER_DATA',               99000,                           TRUE              UNION ALL
@@ -184,7 +184,11 @@ SELECT '=== WAREHOUSE CHECK ===' AS section;
 SELECT
     'Warehouse Access' AS check_type,
     CURRENT_WAREHOUSE() AS current_warehouse,
-    CASE WHEN CURRENT_WAREHOUSE() IS NOT NULL THEN 'PASS' ELSE 'FAIL' END AS status;
+    CASE
+      WHEN CURRENT_WAREHOUSE() IS NULL THEN 'FAIL - no warehouse'
+      WHEN CURRENT_WAREHOUSE() != 'FLUX_WH' THEN 'WARN - running on ' || CURRENT_WAREHOUSE() || ', expected FLUX_WH'
+      ELSE 'PASS'
+    END AS status;
 
 -- =============================================================================
 -- SECTION 6: ROLE VALIDATION

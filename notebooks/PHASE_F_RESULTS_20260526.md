@@ -237,3 +237,27 @@ All required criteria from the plan's pass checklist are met:
 - **Notebook stage:** `snow notebook deploy` creates its own `@notebooks` stage (not `NOTEBOOK_STAGE`). The `NOTEBOOK_STAGE` created by P3-2 is unused by the deploy tooling but harmless. Can be dropped if desired.
 
 - **P3-4 (HANDOFF + commit):** Phase F row in Recovery Phase Tracker and HANDOFF.md Quick Status should be marked ✅ COMPLETE. This is a separate step (P3-4) — not done here.
+
+---
+
+## Phase F Follow-Ups (2026-05-26 — same-day closure)
+
+### M2 — TRANSFORMER_METADATA threshold tightened
+- Before: line 91 threshold `100` (at-boundary; one-row deletion would WARN).
+- After: threshold `40000` (post-reseed actual ~47K, 7K margin).
+- Diff: see inner-repo `flux-utility-solutions` commit (Action 4 of s392d).
+
+### M3 — Section 5 warehouse assertion hardened
+- Before: `CASE WHEN CURRENT_WAREHOUSE() IS NOT NULL THEN 'PASS' ELSE 'FAIL' END`.
+- After: 3-way CASE — `FAIL` on NULL, `WARN` if not `FLUX_WH`, `PASS` otherwise.
+- Behavior: validation now flags wrong-warehouse runs (was silent before).
+
+### Orphaned meters fixed via reseed
+- Before: 0 / 100,000 meter rows resolved to TRANSFORMER_METADATA (FK gap).
+- After: 100,000 / 100,000 (full resolution).
+- Mechanism: TRUNCATE + INSERT-synthesis from METER_INFRASTRUCTURE distinct TRANSFORMER_IDs (~47,048 rows) with realistic synthesized values for the 14 non-PK columns. Backup table preserved at `FLUX_DB.PRODUCTION.TRANSFORMER_METADATA_BACKUP_20260526` (rollback path).
+- Smoke test: PASS — see msg-3b2e350d (s611e discovery: 47,048 rows seeded, orphans=0).
+- Note: `FLUX_OPS_CENTER_SERVICE_AREAS_MV` is a regular VIEW (not materialized) — no REFRESH needed despite the `_MV` suffix in the name.
+
+### Re-run verdict
+GREEN — 0 FAIL, all sections continue to PASS. TRANSFORMER_METADATA check passes at 47,048 rows (threshold 40,000). Section 5 emits `WARN - running on DEMO_WH, expected FLUX_WH` as expected (3-way CASE working correctly; WARN is advisory). Section 7 reports 100,000 / 100,000 meters with valid transformer FK (0 orphans).
