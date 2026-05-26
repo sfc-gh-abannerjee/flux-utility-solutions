@@ -245,7 +245,7 @@ All required criteria from the plan's pass checklist are met:
 ### M2 — TRANSFORMER_METADATA threshold tightened
 - Before: line 91 threshold `100` (at-boundary; one-row deletion would WARN).
 - After: threshold `40000` (post-reseed actual ~47K, 7K margin).
-- Diff: see inner-repo `flux-utility-solutions` commit (Action 4 of s392d).
+- Diff: see commit `dd3bced` in flux-utility-solutions.
 
 ### M3 — Section 5 warehouse assertion hardened
 - Before: `CASE WHEN CURRENT_WAREHOUSE() IS NOT NULL THEN 'PASS' ELSE 'FAIL' END`.
@@ -261,3 +261,6 @@ All required criteria from the plan's pass checklist are met:
 
 ### Re-run verdict
 GREEN — 0 FAIL, all sections continue to PASS. TRANSFORMER_METADATA check passes at 47,048 rows (threshold 40,000). Section 5 emits `WARN - running on DEMO_WH, expected FLUX_WH` as expected (3-way CASE working correctly; WARN is advisory). Section 7 reports 100,000 / 100,000 meters with valid transformer FK (0 orphans).
+
+### Post-review fix: V_TRANSFORMER_ML_INFERENCE regression
+Reviewer (msg-5e08f9c9) discovered that the reseed broke `FLUX_DB.ML_DEMO.V_TRANSFORMER_ML_INFERENCE` because its underlying training table `T_TRANSFORMER_TEMPORAL_TRAINING` still uses `TRF_XXXXXX` keys. Fix: restored the 100 backup `TRF_*` rows into `TRANSFORMER_METADATA` alongside the new 47,048 `XFMR-HOU-*` rows. Both keyspaces coexist (no FK conflicts; meters reference only `XFMR-HOU-*`). Final state: `TRANSFORMER_METADATA` = 47,148 rows; orphan count still 0; ML view returns rows again.
