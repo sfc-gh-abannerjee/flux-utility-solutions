@@ -131,10 +131,11 @@ def run(session, stage_name: str, source_tag: str,
                 i += step
 
             # REV-02: idempotent DELETE via bind param — no string interpolation of doc_id
+            # FIX: scope delete to SOURCE_SYSTEM to prevent cross-source wipe
             session.sql(
                 "DELETE FROM FLUX_DB.PRODUCTION.TECHNICAL_MANUALS_PDF_CHUNKS "
-                "WHERE DOCUMENT_ID = ?",
-                params=[doc_id]
+                "WHERE DOCUMENT_ID = ? AND SOURCE_SYSTEM = ?",
+                params=[doc_id, source_tag]
             ).collect()
 
             # REV-02: build rows as Python tuples; write via Snowpark DataFrame (no f-string INSERT)
