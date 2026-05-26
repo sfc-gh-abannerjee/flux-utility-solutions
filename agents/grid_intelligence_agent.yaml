@@ -3,12 +3,13 @@
 # Flux Utility Solutions - Grid Intelligence Cortex Agent
 # =============================================================================
 # Description: Main agent for utility grid analytics, transformer health,
-#              customer lookup, compliance, and operations support.
+#              customer lookup, compliance, outage history, and S3 PDF docs.
 #
 # This YAML is the reference spec. The canonical deployment script is:
 #   scripts/10_cortex_agent.sql
 #
-# The SQL script embeds this spec within a FROM SPECIFICATION $$ ... $$ block.
+# The SQL script embeds this spec within an ALTER AGENT MODIFY LIVE VERSION
+# SET SPECIFICATION $$ ... $$ block.
 # Keep this file in sync with the SQL script.
 #
 # IMPORTANT format notes (discovered via testing):
@@ -16,12 +17,16 @@
 #   - Analyst tool_resources must include execution_environment with type + warehouse
 #   - Search tool_resources use "search_service" key (NOT "name")
 #   - max_results should be an integer (not a quoted string)
+#   - "comment" is NOT a valid field inside the spec $$ block — set via
+#     ALTER AGENT ... SET COMMENT separately
+#   - Generic tools require input_schema even if properties: {} (no-arg functions)
 # =============================================================================
 
 name: GRID_INTELLIGENCE_AGENT
 comment: >
-  Grid Intelligence Agent - 5-tool utility operations assistant with semantic SQL,
-  customer/meter search, technical docs, and compliance RAG
+  Grid Intelligence Agent - 9-tool utility operations assistant: semantic SQL,
+  customer/meter/outage search, technical/compliance docs, S3 PDF search +
+  on-the-fly parse + list (Phase 3b)
 
 # =============================================================================
 # MODEL AND BUDGET
@@ -35,7 +40,7 @@ orchestration:
     tokens: 100000
 
 # =============================================================================
-# TOOLS (5 tools)
+# TOOLS (9 tools)
 # =============================================================================
 tools:
   # ---------------------------------------------------------------------------
@@ -70,14 +75,17 @@ tools:
         associated transformer, or customer segment. Use for meter lookups.
 
   # ---------------------------------------------------------------------------
-  # Cortex Search - Technical Documentation
+  # Cortex Search - Technical Documentation (internal pre-loaded corpus)
   # ---------------------------------------------------------------------------
   - tool_spec:
       type: cortex_search
       name: search_technical_docs
       description: >
-        Search technical manuals, equipment documentation, maintenance procedures,
-        and troubleshooting guides. Use for technical questions and procedures.
+        Search the curated FluxCo internal technical-docs knowledge base —
+        pre-loaded equipment summaries and quick-reference cards. Best for
+        high-level definitional lookups. For specific manuals, regulatory
+        standards, financial reports, or strategic documents prefer
+        `search_pdf_docs`.
 
   # ---------------------------------------------------------------------------
   # Cortex Search - Compliance Documentation
@@ -88,6 +96,74 @@ tools:
       description: >
         Search NERC and regulatory compliance documents including TPL-001,
         FAC-003, EOP-011, CIP standards, and internal utility policies.
+
+  # ---------------------------------------------------------------------------
+  # Cortex Search - Outage History
+  # ---------------------------------------------------------------------------
+  - tool_spec:
+      type: cortex_search
+      name: search_outages
+      description: >
+        Search 18K+ historical outage events by cause, location, time window,
+        or notes. Use for outage history, storm impact analysis
+        (Hurricane Beryl 2024-07-08), customer disruption queries, and
+        root-cause investigation.
+
+  # ---------------------------------------------------------------------------
+  # Cortex Search - S3 PDF Corpus
+  # ---------------------------------------------------------------------------
+  - tool_spec:
+      type: cortex_search
+      name: search_pdf_docs
+      description: >
+        Search the full-text S3-ingested utility-grid technical PDF corpus —
+        earnings reports, ESG reports, board strategy memos, hydrogen + battery
+        storage studies, NERC standards, ERCOT operations references, Texas hail
+        incident report, and more. Best for narrative content, manuals, regulatory
+        citations, financial reports. The corpus lives on AWS S3 and is searched
+        via Cortex Search over chunked text. Always prefer this over
+        `search_technical_docs` when the user asks for a specific manual,
+        standard, or report.
+
+  # ---------------------------------------------------------------------------
+  # Generic - On-the-fly PDF parse via AI_PARSE_DOCUMENT
+  # ---------------------------------------------------------------------------
+  - tool_spec:
+      type: generic
+      name: parse_document
+      description: >
+        Extract text and answer a specific question from a named PDF in the
+        document stage. Use ONLY when the user names a specific PDF file or you
+        have already discovered the filename via list_pdf_files. Reads bytes from
+        AWS S3 in real time via AI_PARSE_DOCUMENT(LAYOUT) — demonstrates
+        external-stage data extraction.
+      input_schema:
+        type: object
+        properties:
+          file_path:
+            type: string
+            description: "Relative PDF filename, e.g. 'Hydrogen_Strategy_Report.pdf'"
+          question:
+            type: string
+            description: "Specific question to answer from the document content (max 1000 chars)"
+        required:
+          - file_path
+          - question
+
+  # ---------------------------------------------------------------------------
+  # Generic - List available PDFs in stage
+  # ---------------------------------------------------------------------------
+  - tool_spec:
+      type: generic
+      name: list_pdf_files
+      description: >
+        List all PDFs available in the document stage. Returns relative_path,
+        size_bytes, last_modified for each PDF. Call BEFORE parse_document when
+        the user asks 'what PDFs are available' or you don't already know an
+        exact filename.
+      input_schema:
+        type: object
+        properties: {}
 
 # =============================================================================
 # TOOL RESOURCES
@@ -118,6 +194,28 @@ tool_resources:
     max_results: 5
     id_column: DOC_ID
     title_column: TITLE
+  search_outages:
+    search_service: "{{ database }}.APPLICATIONS.OUTAGE_HISTORY_SEARCH"
+    max_results: 10
+    id_column: OUTAGE_ID
+    title_column: OUTAGE_ID
+  search_pdf_docs:
+    search_service: "{{ database }}.APPLICATIONS.UTILITY_PDF_DOCS_SEARCH"
+    max_results: 5
+    id_column: CHUNK_ID
+    title_column: DOCUMENT_TITLE
+  parse_document:
+    identifier: "{{ database }}.APPLICATIONS.PARSE_AND_EXTRACT"
+    type: procedure
+    execution_environment:
+      type: warehouse
+      warehouse: "{{ warehouse }}"
+  list_pdf_files:
+    identifier: "{{ database }}.APPLICATIONS.LIST_PDF_DOCS"
+    type: function
+    execution_environment:
+      type: warehouse
+      warehouse: "{{ warehouse }}"
 
 # =============================================================================
 # INSTRUCTIONS (4-Layer Pattern)
@@ -141,6 +239,7 @@ instructions:
     | Meters | 597K devices | All active meters |
     | Substations | 98 | Distribution network |
     | Circuits | 73 | All feeders |
+    | Outage History | 18,689 events | July 2024 (incl. Hurricane Beryl 2024-07-08) |
     
     ### Data Characteristics
     
@@ -164,6 +263,11 @@ instructions:
     | "Meter MTR-...", "Meters on transformer..." | search_meters | Meter lookup |
     | "How do I...", "What causes...", "Maintenance..." | search_technical_docs | Procedures |
     | "NERC standard...", "Compliance...", "Regulatory..." | search_compliance_docs | Regulations |
+    | "outage", "outages", "power outage", "Beryl", "storm impact" | search_outages | Outage history search |
+    | "outages by cause", "outage trends", "customers affected" | grid_analyst | Aggregate outage queries via semantic view |
+    | "List PDFs", "What PDFs do you have", "Which files are available" | list_pdf_files | Returns directory listing of @UTILITY_PDF_STAGE — call BEFORE parse_document if filename unknown |
+    | "Search PDF docs", "What does the manual/report say about X", "find in the technical PDFs" | search_pdf_docs | Indexed Cortex Search over S3 PDF corpus (NERC, IEEE, ERCOT, FluxCo manuals, earnings reports) |
+    | "Read [exact_filename].pdf", "Open the file X and summarize", "Extract from [filename]" | parse_document | On-the-fly AI_PARSE_DOCUMENT + AI_COMPLETE — slower, costs more, use only when user names a specific file |
     
     ### Multi-Tool Queries
     
@@ -171,6 +275,18 @@ instructions:
     1. "Find John Smith and show his usage" → search_customers → grid_analyst
     2. "Which overloaded transformers need maintenance?" → grid_analyst → search_technical_docs
     3. "What NERC standards apply to overloaded transformers?" → grid_analyst → search_compliance_docs
+    4. "Show outage history for transformer TRF-10042 and its load data" → search_outages → grid_analyst
+    
+    ### Search Routing Precedence
+    
+    When a user asks a technical, procedural, or narrative question: (1) call
+    grid_analyst for any structured data, (2) call search_pdf_docs for
+    narrative/standard/manual content, (3) call parse_document ONLY if the user
+    named a specific file OR search_pdf_docs returned nothing relevant. Never
+    call parse_document without first knowing the filename — call list_pdf_files
+    if uncertain. AI_PARSE_DOCUMENT reads bytes from AWS S3
+    (s3://<your-pdf-bucket>/raw/pdfs/) on every call — this proves data
+    unification across Snowflake-internal and external-stage sources.
     
   response: |
     ## Layer 3: Response Guidelines
