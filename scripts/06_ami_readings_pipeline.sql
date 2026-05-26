@@ -7,6 +7,23 @@
 -- Jinja2 Variables:
 --   <% database %>   - Target database name
 --   <% warehouse %>  - Warehouse for Dynamic Table refresh
+--
+-- NOTE (2026-05-26): DATA POPULATION — Realistic AMI Variance Pipeline
+-- -----------------------------------------------------------------------
+-- This script creates the table/view DDL only. The flat GENERATE_AMI_BATCH
+-- procedure (originally in AMI_MIGRATION_DDL.sql) has been replaced with a
+-- realistic one-shot generator. To populate AMI_INTERVAL_READINGS with
+-- physically-accurate data, run the scripts in order:
+--   scripts/realistic_data/01_meter_persistence_seed.sql   — METER_PERSONA_PARAMS
+--   scripts/realistic_data/02_load_seed_outages.sql        — outage events
+--   scripts/realistic_data/03_generate_ami_realistic.sql   — 288M-row generator
+--   scripts/realistic_data/04_rebuild_transformer_hourly_load.sql
+--   scripts/realistic_data/05_swap_and_finalize.sql
+--   scripts/realistic_data/99_validation.sql               — 15-check validation
+-- The new generator features: segment baselines + per-class diurnal curves
+-- (RES/COM/IND/GOV), real Houston weather correlation, Hurricane Beryl outage
+-- zeros, EV/pool/solar special loads, per-meter persistent personas, and
+-- lognormal noise for right-skewed residuals.
 -- =============================================================================
 
 USE DATABASE IDENTIFIER('<% database %>');
