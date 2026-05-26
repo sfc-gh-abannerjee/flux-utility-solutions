@@ -779,6 +779,127 @@ tables:
       columns:
         - METER_ID
 
+  # ===========================================================================
+  # OUTAGE HISTORY TABLE (added 2026-05-26)
+  # ===========================================================================
+  - name: OUTAGE_HISTORY
+    synonyms:
+      - OUTAGES
+      - OUTAGE_EVENTS
+      - POWER_OUTAGES
+      - GRID_DISRUPTIONS
+    description: >
+      Historical outage and restoration events. 18,689 outage events from July 2024,
+      including Hurricane Beryl impact (13,637 WEATHER outages on 2024-07-08).
+      Backed by OUTAGE_RESTORATION_TRACKER. Note: in Snowflake semantic view SQL DDL,
+      dimension aliases must not shadow the OUTAGE_* auto-namespace; numeric columns
+      (OUTAGE_HOUR) belong in FACTS; SUBSTATION_ID/TRANSFORMER_ID omitted to avoid
+      join-key ambiguity (accessible via outages→xfmr relationship).
+    base_table:
+      database: "{{ database }}"
+      schema: PRODUCTION
+      table: OUTAGE_RESTORATION_TRACKER
+
+    primary_key:
+      columns:
+        - OUTAGE_ID
+
+    dimensions:
+      - name: OUTAGE_ID
+        synonyms: [outage id, outage number, event id]
+        description: Unique outage event identifier
+        expr: OUTAGE_ID
+        data_type: VARCHAR
+
+      - name: CAUSE
+        synonyms: [outage cause, outage reason, cause of outage]
+        description: Root cause of outage (WEATHER, TRANSFORMER_OVERLOAD, VEGETATION)
+        expr: CAUSE
+        data_type: VARCHAR
+        sample_values: ['WEATHER', 'TRANSFORMER_OVERLOAD', 'VEGETATION']
+
+      - name: STATUS
+        synonyms: [outage status, restoration status]
+        description: Outage lifecycle status
+        expr: STATUS
+        data_type: VARCHAR
+        sample_values: ['ACTIVE', 'RESTORED']
+
+      - name: SEVERITY
+        synonyms: [outage severity, impact level, severity level]
+        description: >
+          Derived severity based on affected customers.
+          Use OUTAGE_HISTORY_SEARCHABLE view or YAML expr for this column;
+          not exposed in SQL DDL semantic view due to OUTAGE_* namespace constraint.
+        expr: >
+          CASE
+            WHEN AFFECTED_CUSTOMERS >= 100 THEN 'CRITICAL'
+            WHEN AFFECTED_CUSTOMERS >= 10  THEN 'HIGH'
+            WHEN AFFECTED_CUSTOMERS >= 2   THEN 'MEDIUM'
+            ELSE 'LOW'
+          END
+        data_type: VARCHAR
+        sample_values: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
+
+      - name: CIRCUIT_ID
+        synonyms: [circuit, feeder]
+        description: Circuit/feeder identifier
+        expr: CIRCUIT_ID
+        data_type: VARCHAR
+
+    time_dimensions:
+      - name: OUTAGE_START_TIME
+        synonyms: [outage start, outage began, disruption start]
+        description: Timestamp when outage began (July 2024; Beryl = 2024-07-08)
+        expr: OUTAGE_START_TIME
+        data_type: TIMESTAMP_NTZ
+
+      - name: OUTAGE_DATE
+        synonyms: [outage day, date of outage, outage date]
+        description: Date of outage event
+        expr: DATE(OUTAGE_START_TIME)
+        data_type: DATE
+
+      - name: OUTAGE_HOUR
+        synonyms: [hour of outage, outage hour]
+        description: Hour of day outage began (0-23)
+        expr: HOUR(OUTAGE_START_TIME)
+        data_type: NUMBER
+
+    facts:
+      - name: AFFECTED_CUSTOMERS
+        synonyms: [customers affected, impacted customers, affected customers]
+        description: Number of customers affected by this outage
+        expr: AFFECTED_CUSTOMERS
+        data_type: NUMBER
+        access_modifier: public_access
+
+      - name: OUTAGE_DURATION_MINUTES
+        synonyms: [duration, outage length, restoration time]
+        description: Total outage duration in minutes
+        expr: OUTAGE_DURATION_MINUTES
+        data_type: NUMBER
+        access_modifier: public_access
+
+    metrics:
+      - name: OUTAGE_COUNT
+        synonyms: [number of outages, total outages, outage count, how many outages]
+        description: Count of distinct outage events
+        expr: COUNT(DISTINCT OUTAGE_ID)
+        access_modifier: public_access
+
+      - name: TOTAL_CUSTOMERS_AFFECTED
+        synonyms: [total customers affected, total impacted, customers affected total]
+        description: Sum of customers affected across all outages
+        expr: SUM(AFFECTED_CUSTOMERS)
+        access_modifier: public_access
+
+      - name: AVG_OUTAGE_DURATION
+        synonyms: [average duration, avg outage time, mean restoration time]
+        description: Average outage duration in minutes
+        expr: AVG(OUTAGE_DURATION_MINUTES)
+        access_modifier: public_access
+
 # ===========================================================================
 # RELATIONSHIPS
 # ===========================================================================
@@ -821,6 +942,15 @@ relationships:
   
   - name: transformer_load_to_metadata
     left_table: TRANSFORMER_HOURLY_LOAD
+    right_table: TRANSFORMER_METADATA
+    relationship_columns:
+      - left_column: TRANSFORMER_ID
+        right_column: TRANSFORMER_ID
+    join_type: many_to_one
+    relationship_type: many_to_one
+
+  - name: outage_to_transformer
+    left_table: OUTAGE_HISTORY
     right_table: TRANSFORMER_METADATA
     relationship_columns:
       - left_column: TRANSFORMER_ID
@@ -911,3 +1041,31 @@ verified_queries:
       JOIN {{ database }}.PRODUCTION.TRANSFORMER_HOURLY_LOAD h ON t.TRANSFORMER_ID = h.TRANSFORMER_ID
       GROUP BY 1
       ORDER BY CRITICAL_HOURS DESC
+
+  - name: beryl_outages_by_cause
+    question: "How many outages occurred during Hurricane Beryl by cause?"
+    verified_at: 2026-05-26
+    verified_by: Cortex Code
+    sql: |
+      SELECT
+        CAUSE,
+        COUNT(DISTINCT OUTAGE_ID) as OUTAGE_COUNT,
+        SUM(AFFECTED_CUSTOMERS) as TOTAL_CUSTOMERS_AFFECTED,
+        AVG(OUTAGE_DURATION_MINUTES) as AVG_DURATION_MIN
+      FROM {{ database }}.PRODUCTION.OUTAGE_RESTORATION_TRACKER
+      WHERE OUTAGE_START_TIME BETWEEN '2024-07-08' AND '2024-07-15'
+      GROUP BY 1
+      ORDER BY OUTAGE_COUNT DESC
+
+  - name: outages_total_summary
+    question: "What is the total outage count and customers affected by cause?"
+    verified_at: 2026-05-26
+    verified_by: Cortex Code
+    sql: |
+      SELECT
+        CAUSE,
+        COUNT(DISTINCT OUTAGE_ID) as OUTAGE_COUNT,
+        SUM(AFFECTED_CUSTOMERS) as TOTAL_CUSTOMERS_AFFECTED
+      FROM {{ database }}.PRODUCTION.OUTAGE_RESTORATION_TRACKER
+      GROUP BY 1
+      ORDER BY OUTAGE_COUNT DESC
