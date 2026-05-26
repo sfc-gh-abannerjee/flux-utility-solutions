@@ -33,7 +33,7 @@
 --     6. search_outages      - 18K+ historical outage events (incl. Beryl 2024)
 --     7. search_pdf_docs     - S3 PDF corpus (earnings, ESG, manuals, standards)
 --     8. parse_document      - On-the-fly AI_PARSE_DOCUMENT + AI_COMPLETE
---     9. list_pdf_files      - Directory listing UDTF for @UTILITY_PDF_STAGE
+--     9. list_pdf_files      - Directory listing SP for @UTILITY_PDF_STAGE (LIST_PDF_DOCS_PROC)
 --
 -- NOTE: Service names must match those created in 09_cortex_search_services.sql
 --
@@ -299,8 +299,8 @@ tool_resources:
       type: warehouse
       warehouse: "<% warehouse %>"
   list_pdf_files:
-    identifier: "<% database %>.APPLICATIONS.LIST_PDF_DOCS"
-    type: function
+    identifier: "<% database %>.APPLICATIONS.LIST_PDF_DOCS_PROC"
+    type: procedure
     execution_environment:
       type: warehouse
       warehouse: "<% warehouse %>"
@@ -333,7 +333,7 @@ GRANT USAGE ON CORTEX SEARCH SERVICE <% database %>.APPLICATIONS.UTILITY_PDF_DOC
 -- Grant access to generic tool procedures/functions
 GRANT USAGE ON PROCEDURE <% database %>.APPLICATIONS.PARSE_AND_EXTRACT(STRING, STRING)
     TO ROLE IDENTIFIER('<% user_role | default("PUBLIC") %>');
-GRANT USAGE ON FUNCTION <% database %>.APPLICATIONS.LIST_PDF_DOCS()
+GRANT USAGE ON PROCEDURE <% database %>.APPLICATIONS.LIST_PDF_DOCS_PROC()
     TO ROLE IDENTIFIER('<% user_role | default("PUBLIC") %>');
 
 -- Grant access to semantic view for Cortex Analyst
@@ -364,7 +364,7 @@ SELECT 'Agent GRID_INTELLIGENCE_AGENT updated successfully with 9 tools' AS STAT
 --   6. search_outages      - Historical outage events (18K+, incl. Beryl)
 --   7. search_pdf_docs     - S3 PDF corpus Cortex Search
 --   8. parse_document      - On-the-fly AI_PARSE_DOCUMENT + AI_COMPLETE
---   9. list_pdf_files      - Directory listing UDTF for @UTILITY_PDF_STAGE
+--   9. list_pdf_files      - Directory listing SP for @UTILITY_PDF_STAGE (LIST_PDF_DOCS_PROC)
 --
 -- Invocation methods:
 --   1. SQL: SELECT SNOWFLAKE.CORTEX.DATA_AGENT_RUN('DB.SCHEMA.AGENT', $$...$$)

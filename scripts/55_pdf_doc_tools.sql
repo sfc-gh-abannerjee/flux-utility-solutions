@@ -7,8 +7,9 @@
 --   2. UTILITY_PDF_DOCS_SEARCH     — Cortex Search Service (APPLICATIONS)
 --   3. PARSE_AND_EXTRACT           — Snowpark Python SP, RETURNS VARIANT
 --   4. LIST_PDF_DOCS               — SQL UDTF (table function)
---   5. LIST_PDF_DOCS_SP            — SQL SP wrapper (for Cortex Agent generic tool)
---   6. RBAC grants to FLUX_RL_AGENT
+--   5. LIST_PDF_DOCS_SP            — SQL SP wrapper (SQL, wraps LIST_PDF_DOCS UDTF — kept for reference)
+--   6. LIST_PDF_DOCS_PROC          — Python SP wrapper (EXECUTE AS CALLER; live binding for agent generic tool)
+--   7. RBAC grants to FLUX_RL_AGENT
 --
 -- Source stage : FLUX_DB.APPLICATIONS.UTILITY_PDF_STAGE (20 PDFs in S3, 53_utility_pdf_stage.sql)
 -- Chunks table : FLUX_DB.PRODUCTION.TECHNICAL_MANUALS_PDF_CHUNKS (SOURCE_SYSTEM='S3_STAGE')
@@ -385,6 +386,50 @@ $$;
 
 
 -- =============================================================================
+-- SECTION 5b: LIST_PDF_DOCS_PROC (Python SP wrapper — live agent binding)
+--
+-- Cortex Agent generic tools require a stored procedure, not a table UDTF.
+-- This Python SP reads DIRECTORY(@UTILITY_PDF_STAGE) directly and returns a
+-- VARIANT array — this is what GRID_INTELLIGENCE_AGENT binds as list_pdf_files
+-- (type: procedure). LIST_PDF_DOCS_SP (Section 5) is kept for reference.
+--
+-- IMPORTANT: This is the canonical live object used by the agent. Do NOT switch
+-- the agent back to LIST_PDF_DOCS (UDTF / type:function) — it will not work.
+--
+-- Committed per ORPHAN-01 remediation (Phase 4 fix). DDL sourced verbatim from
+-- GET_DDL('PROCEDURE','FLUX_DB.APPLICATIONS.LIST_PDF_DOCS_PROC()') on 2026-05-26.
+-- =============================================================================
+
+USE SCHEMA APPLICATIONS;
+
+CREATE OR REPLACE PROCEDURE FLUX_DB.APPLICATIONS.LIST_PDF_DOCS_PROC()
+RETURNS VARIANT
+LANGUAGE PYTHON
+RUNTIME_VERSION = '3.11'
+PACKAGES = ('snowflake-snowpark-python')
+HANDLER = 'list_pdf_docs_proc'
+EXECUTE AS CALLER
+AS $$
+def list_pdf_docs_proc(session):
+    rows = session.sql(
+        "SELECT RELATIVE_PATH, SIZE AS SIZE_BYTES, "
+        "TO_VARCHAR(LAST_MODIFIED) AS LAST_MODIFIED "
+        "FROM DIRECTORY(@FLUX_DB.APPLICATIONS.UTILITY_PDF_STAGE) "
+        "WHERE RELATIVE_PATH LIKE '%.pdf' "
+        "ORDER BY RELATIVE_PATH"
+    ).collect()
+    return [
+        {
+            'relative_path': row['RELATIVE_PATH'],
+            'size_bytes': int(row['SIZE_BYTES']),
+            'last_modified': row['LAST_MODIFIED']
+        }
+        for row in rows
+    ]
+$$;
+
+
+-- =============================================================================
 -- SECTION 6: RBAC — Production grants to FLUX_RL_AGENT
 --
 -- REV-03: FLUX_RL_AGENT is the runtime role for Cortex Agents. All new objects
@@ -396,6 +441,7 @@ GRANT USAGE ON CORTEX SEARCH SERVICE FLUX_DB.APPLICATIONS.UTILITY_PDF_DOCS_SEARC
 GRANT USAGE ON PROCEDURE  FLUX_DB.APPLICATIONS.PARSE_AND_EXTRACT(STRING, STRING)                TO ROLE FLUX_RL_AGENT;
 GRANT USAGE ON FUNCTION   FLUX_DB.APPLICATIONS.LIST_PDF_DOCS()                                  TO ROLE FLUX_RL_AGENT;
 GRANT USAGE ON PROCEDURE  FLUX_DB.APPLICATIONS.LIST_PDF_DOCS_SP()                               TO ROLE FLUX_RL_AGENT;
+GRANT USAGE ON PROCEDURE  FLUX_DB.APPLICATIONS.LIST_PDF_DOCS_PROC()                             TO ROLE FLUX_RL_AGENT;
 GRANT READ   ON STAGE     FLUX_DB.APPLICATIONS.UTILITY_PDF_STAGE                                TO ROLE FLUX_RL_AGENT;
 
 -- Verify grants
@@ -404,3 +450,4 @@ SHOW GRANTS ON CORTEX SEARCH SERVICE FLUX_DB.APPLICATIONS.UTILITY_PDF_DOCS_SEARC
 SHOW GRANTS ON PROCEDURE  FLUX_DB.APPLICATIONS.PARSE_AND_EXTRACT(STRING, STRING);
 SHOW GRANTS ON FUNCTION   FLUX_DB.APPLICATIONS.LIST_PDF_DOCS();
 SHOW GRANTS ON PROCEDURE  FLUX_DB.APPLICATIONS.LIST_PDF_DOCS_SP();
+SHOW GRANTS ON PROCEDURE  FLUX_DB.APPLICATIONS.LIST_PDF_DOCS_PROC();

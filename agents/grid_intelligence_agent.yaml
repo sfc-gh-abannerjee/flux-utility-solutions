@@ -211,8 +211,8 @@ tool_resources:
       type: warehouse
       warehouse: "{{ warehouse }}"
   list_pdf_files:
-    identifier: "{{ database }}.APPLICATIONS.LIST_PDF_DOCS"
-    type: function
+    identifier: "{{ database }}.APPLICATIONS.LIST_PDF_DOCS_PROC"
+    type: procedure
     execution_environment:
       type: warehouse
       warehouse: "{{ warehouse }}"
