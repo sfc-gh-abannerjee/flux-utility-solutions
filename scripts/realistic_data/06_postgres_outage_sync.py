@@ -9,9 +9,12 @@ into FLUX_OPS_POSTGRES public.outages.
   Rows without a matching transformer (e.g. -SPLIT- suffix IDs) fall back to
   Houston city-center coordinates (29.7604, -95.3698).
 - Maps CAUSE / severity / scenario to public.outages enum values.
-- FK-validates substation_id against public.substations; sets NULL on mismatch
-  (TRANSFORMER_METADATA uses 'SUB-HOU-*' format; public.substations uses
-  'SUB-0001' format — no overlap, all substation_id values will be NULL).
+- Normalizes Snowflake SUBSTATION_ID to PG format via normalize_substation_id_for_pg():
+    SUB-HOU-NNNN (4-digit) → SUB-HOU-NNN (3-digit, LPAD 3)
+    SUB_NNNN     (underscore, 4-digit) → SUB-NNNN (hyphen, 4-digit)
+  A direct set-lookup without normalization yields 0 FK matches because the
+  formats differ; the function resolves this and achieves ~100% coverage.
+- Inserts source_outage_id = original Snowflake OUTAGE_ID string for traceability.
 - OUTAGE_ID (VARCHAR) → deterministic UUID via uuid5 for idempotent re-runs.
 - ON CONFLICT (outage_id) DO NOTHING — safe to re-run.
 - Pauses 0.1s per 1,000-row batch to avoid overwhelming live SSE connections
@@ -21,10 +24,12 @@ Author : Abhinav Bannerjee
 Date   : 2026-05-26
 """
 
+import re
 import time
 import tomllib
 import uuid
 from pathlib import Path
+from typing import Optional
 
 import psycopg2
 import psycopg2.extras
@@ -88,7 +93,7 @@ INSERT INTO public.outages (
     outage_id, status, cause, severity, lat, lon, substation_id,
     circuit_id, customers_affected, start_time,
     predicted_resolution_time, actual_resolution_time,
-    scenario, created_at, updated_at
+    scenario, created_at, updated_at, source_outage_id
 ) VALUES %s
 ON CONFLICT (outage_id) DO NOTHING
 """
@@ -158,6 +163,35 @@ def get_postgres_conn() -> psycopg2.extensions.connection:
 def make_outage_uuid(outage_id_str: str) -> str:
     """Deterministic UUID from source OUTAGE_ID (idempotent re-run safe)."""
     return str(uuid.uuid5(_UUID_NS, f"flux-outage:{outage_id_str}"))
+
+
+def normalize_substation_id_for_pg(
+    snowflake_id: Optional[str], pg_substation_set: set
+) -> Optional[str]:
+    """
+    Normalize Snowflake TRANSFORMER_METADATA.SUBSTATION_ID to PG format.
+
+    Format mismatch (source of all-NULL substation_id in previous sync runs):
+      SUB-HOU-NNNN (Snowflake, 4-digit) → SUB-HOU-NNN (PG, 3-digit): drop leading zero
+      SUB_NNNN     (Snowflake, underscore) → SUB-NNNN  (PG, hyphen): replace _ with -
+
+    Returns the normalized PG ID if it exists in pg_substation_set, else None.
+    Always validates against the live FK set to prevent constraint violations.
+    """
+    if not snowflake_id:
+        return None
+
+    m = re.match(r"^SUB-HOU-(\d+)$", snowflake_id)
+    if m:
+        normalized = f"SUB-HOU-{int(m.group(1)):03d}"
+        return normalized if normalized in pg_substation_set else None
+
+    m = re.match(r"^SUB_(\d+)$", snowflake_id)
+    if m:
+        normalized = f"SUB-{int(m.group(1)):04d}"
+        return normalized if normalized in pg_substation_set else None
+
+    return snowflake_id if snowflake_id in pg_substation_set else None
 
 
 def map_severity(cause: str, customers_affected: int) -> str:
@@ -251,8 +285,8 @@ def main() -> None:
         if abs(float(lat) - HOUSTON_LAT) < 0.0001 and abs(float(lon) - HOUSTON_LON) < 0.0001:
             no_latlon_fallback += 1
 
-        # FK validation — most will be NULL due to format mismatch (SUB-HOU-* vs SUB-*)
-        sub_id = xfmr_substation_id if xfmr_substation_id in valid_substations else None
+        # Normalize Snowflake SUBSTATION_ID to PG FK format and validate
+        sub_id = normalize_substation_id_for_pg(xfmr_substation_id, valid_substations)
 
         batch.append((
             make_outage_uuid(outage_id_str),   # outage_id (deterministic UUID)
@@ -261,7 +295,7 @@ def main() -> None:
             map_severity(cause, ca),           # severity
             float(lat),                        # lat
             float(lon),                        # lon
-            sub_id,                            # substation_id (FK-validated or NULL)
+            sub_id,                            # substation_id (normalized + FK-validated)
             circuit_id,                        # circuit_id
             ca,                                # customers_affected
             start_time,                        # start_time
@@ -270,6 +304,7 @@ def main() -> None:
             map_scenario(cause),               # scenario
             start_time,                        # created_at
             end_time,                          # updated_at
+            outage_id_str,                     # source_outage_id (original Snowflake ID)
         ))
 
         if len(batch) >= BATCH_SIZE:
@@ -288,8 +323,13 @@ def main() -> None:
         batches_flushed += 1
 
     # --- Final count ---
-    pg_cur.execute("SELECT COUNT(*) FROM public.outages")
-    final_count = pg_cur.fetchone()[0]
+    pg_cur.execute(
+        "SELECT COUNT(*) AS total, COUNT(substation_id) AS with_sub "
+        "FROM public.outages"
+    )
+    final_row = pg_cur.fetchone()
+    final_count = final_row[0]
+    sub_populated = final_row[1]
     actually_inserted = final_count - baseline_count
 
     pg_cur.close()
@@ -303,7 +343,7 @@ def main() -> None:
     print(f"  Rows actually inserted (new):     {actually_inserted}")
     print(f"  Rows skipped (ON CONFLICT):        {len(rows) - actually_inserted}")
     print(f"  Rows using lat/lon fallback:      {no_latlon_fallback}")
-    print(f"  Substation FK resolved (non-NULL): 0  (format mismatch; see SQL doc)")
+    print(f"  Substation FK resolved (non-NULL): {sub_populated}")
     print(f"  Final public.outages row count:   {final_count}")
     print("=" * 60)
     print("\nNOTIFY 'outages_chan' fired for each inserted row via trigger.")
