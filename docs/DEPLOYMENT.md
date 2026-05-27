@@ -18,6 +18,18 @@ Complete guide for deploying Flux across all 5 paths.
 | CLI | Python 3.9+, Snow CLI |
 | Terraform | Terraform 1.0+, Snowflake provider |
 
+## Configuration placeholders
+
+This repository uses environment variables and placeholder strings for deployment-specific values. Before running scripts, ensure the following are configured:
+
+### Environment variables
+- `FLUX_OPS_PG_HOST` — Postgres hostname for outage sync (consumed by `scripts/realistic_data/06_postgres_outage_sync.py`).
+
+### SQL/YAML placeholders to substitute before deployment
+- `<your-pdf-bucket>` — your S3 bucket name (in `scripts/53_utility_pdf_stage.sql`, `scripts/55_pdf_doc_tools.sql`, `scripts/10_cortex_agent.sql`, `agents/grid_intelligence_agent.yaml`).
+- `<YOUR_S3_INTEGRATION>` — your Snowflake storage integration name (same files).
+- `<your-pg-host-prefix>` — Postgres host prefix used in `.pgpass` lookups (note: now auto-derived from `FLUX_OPS_PG_HOST` in the script; this placeholder may appear in older comments).
+
 ## Path 1: SQL Scripts
 
 Recommended for: Manual deployment, testing, learning

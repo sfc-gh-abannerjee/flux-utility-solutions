@@ -322,6 +322,7 @@ def parse_and_extract(session, file_path: str, question: str) -> dict:
                 "file":  file_path,
                 "type":  "s3_stage",
                 "stage": "FLUX_DB.APPLICATIONS.UTILITY_PDF_STAGE",
+                # Replace <your-pdf-bucket> with your actual S3 bucket before deploying.
                 "s3_path": f"s3://<your-pdf-bucket>/raw/pdfs/{file_path}",
             }
         ],

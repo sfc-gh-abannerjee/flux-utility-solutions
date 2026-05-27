@@ -39,11 +39,12 @@ import snowflake.connector
 # Configuration
 # ---------------------------------------------------------------------------
 
-PG_HOST = (
-    "<your-pg-host-prefix>"
-    ".example.aws.postgres.localhost"
-)
-PG_HOST_PREFIX = "<your-pg-host-prefix>"
+import os
+
+PG_HOST = os.environ.get("FLUX_OPS_PG_HOST", "")
+if not PG_HOST:
+    raise SystemExit("Set FLUX_OPS_PG_HOST env var to your Postgres hostname.")
+PG_HOST_PREFIX = PG_HOST.split(".")[0]
 PG_PORT = 5432
 PG_DBNAME = "postgres"
 PG_USER = "snowflake_admin"
