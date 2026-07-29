@@ -255,9 +255,15 @@ circuit_connections AS (
         s1.LONGITUDE AS FROM_LONGITUDE,
         'CIRCUIT_' || c.CIRCUIT_ID AS TO_ASSET_ID,
         'CIRCUIT' AS TO_ASSET_TYPE,
-        -- Circuit endpoint (simulated as offset from substation)
-        s1.LATITUDE + (RANDOM() - 0.5) * 0.05 AS TO_LATITUDE,
-        s1.LONGITUDE + (RANDOM() - 0.5) * 0.05 AS TO_LONGITUDE,
+        -- Feeder representative point -- REAL coordinates, not fabricated.
+        -- Until 2026-07-29 this was s1.LATITUDE + (RANDOM() - 0.5) * 0.05, which was
+        -- catastrophically wrong: Snowflake RANDOM() returns a SIGNED 64-BIT INTEGER,
+        -- not a [0,1) float, so this produced "latitudes" of ~4.6e17, NaN distances and
+        -- a 10,110 km median edge length. CIRCUIT_METADATA now carries a real
+        -- REPRESENTATIVE_LAT/LON (see scripts/31_regenerate_coherent_topology.sql), so
+        -- read it. NEVER reintroduce bare RANDOM() arithmetic here.
+        c.REPRESENTATIVE_LAT AS TO_LATITUDE,
+        c.REPRESENTATIVE_LON AS TO_LONGITUDE,
         c.SUBSTATION_ID,
         c.CIRCUIT_ID,
         c.CIRCUIT_ID AS FEEDER_ID,
