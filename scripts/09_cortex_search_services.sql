@@ -69,18 +69,28 @@ AS (
 
 -- First create the searchable view
 -- Maps actual METER_INFRASTRUCTURE columns to expected search service schema
+--
+-- 2026-07-29: SUBSTATION_ID was hardcoded to NULL here ("not in actual table"),
+-- which meant the substation attribute filter matched nothing for all 100,000
+-- rows and the agent's search_meters tool was effectively broken since it was
+-- built. After the topology regeneration (scripts/31) meters carry a real
+-- TRANSFORMER_ID and CIRCUIT_ID, so the substation is now resolvable by join.
+-- Also surfaces the human-readable feeder/substation NAMES so operators can
+-- filter and search by name instead of by key.
 CREATE OR REPLACE VIEW PRODUCTION.AMI_METADATA_SEARCHABLE AS
 SELECT
     m.METER_ID,
     -- Map CUSTOMER_CLASS -> CUSTOMER_SEGMENT_ID for agent compatibility
     m.CUSTOMER_CLASS AS CUSTOMER_SEGMENT_ID,
     m.CITY,
-    -- ZIP_CODE not in actual table; use NULL placeholder
+    -- ZIP_CODE genuinely absent from METER_INFRASTRUCTURE; still a placeholder
     NULL::VARCHAR AS ZIP_CODE,
     m.COUNTY_NAME,
     m.TRANSFORMER_ID,
-    -- SUBSTATION_ID not in actual table; use NULL placeholder
-    NULL::VARCHAR AS SUBSTATION_ID,
+    t.SUBSTATION_ID                                   AS SUBSTATION_ID,
+    m.CIRCUIT_ID                                      AS CIRCUIT_ID,
+    s.SUBSTATION_NAME                                 AS SUBSTATION_NAME,
+    c.CIRCUIT_NAME                                    AS CIRCUIT_NAME,
     -- Static value for now (can be updated via scheduled task)
     0 as AVG_DAILY_KWH,
     -- Search text
@@ -89,17 +99,24 @@ SELECT
         COALESCE(m.CITY, ''), ' ',
         COALESCE(m.COUNTY_NAME, ''), ' ',
         COALESCE(m.TRANSFORMER_ID, ''), ' ',
+        COALESCE(m.CIRCUIT_ID, ''), ' ',
+        COALESCE(c.CIRCUIT_NAME, ''), ' ',
+        COALESCE(t.SUBSTATION_ID, ''), ' ',
+        COALESCE(s.SUBSTATION_NAME, ''), ' ',
         COALESCE(m.CUSTOMER_CLASS, '')
     ) AS SEARCH_TEXT
-FROM PRODUCTION.METER_INFRASTRUCTURE m;
+FROM PRODUCTION.METER_INFRASTRUCTURE m
+LEFT JOIN PRODUCTION.TRANSFORMER_METADATA t ON m.TRANSFORMER_ID = t.TRANSFORMER_ID
+LEFT JOIN PRODUCTION.CIRCUIT_METADATA    c ON m.CIRCUIT_ID     = c.CIRCUIT_ID
+LEFT JOIN PRODUCTION.SUBSTATIONS         s ON t.SUBSTATION_ID  = s.SUBSTATION_ID;
 
 -- Now create the search service
 CREATE OR REPLACE CORTEX SEARCH SERVICE AMI_METADATA_SEARCH
     ON SEARCH_TEXT
-    ATTRIBUTES CUSTOMER_SEGMENT_ID, CITY, ZIP_CODE, COUNTY_NAME, TRANSFORMER_ID, SUBSTATION_ID
+    ATTRIBUTES CUSTOMER_SEGMENT_ID, CITY, ZIP_CODE, COUNTY_NAME, TRANSFORMER_ID, SUBSTATION_ID, CIRCUIT_ID, SUBSTATION_NAME, CIRCUIT_NAME
     WAREHOUSE = <% warehouse %>
     TARGET_LAG = '1 hour'
-    COMMENT = 'Meter metadata search - 597K meters, searchable by ID, location, topology'
+    COMMENT = 'Meter metadata search - 100K meters, searchable by meter id, location, and topology (transformer / feeder / substation, by key or by name)'
 AS (
     SELECT 
         SEARCH_TEXT,
@@ -110,6 +127,9 @@ AS (
         COUNTY_NAME,
         TRANSFORMER_ID,
         SUBSTATION_ID,
+        CIRCUIT_ID,
+        SUBSTATION_NAME,
+        CIRCUIT_NAME,
         AVG_DAILY_KWH
     FROM <% database %>.PRODUCTION.AMI_METADATA_SEARCHABLE
 );
