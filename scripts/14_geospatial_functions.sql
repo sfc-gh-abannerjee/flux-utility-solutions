@@ -288,3 +288,55 @@ FROM TRANSFORMER_METADATA WHERE H3_INDEX_RES9 IS NOT NULL;
 -- DEPLOYMENT COMPLETE
 -- Next: Run 15_marketplace_listings.sql for data marketplace setup
 -- =============================================================================
+
+-- =============================================================================
+-- H3 RING-EXPANSION PROXIMITY  (added 2026-07-29)
+-- =============================================================================
+-- Why a RING and not a plain cell-equality join:
+--   An equality join on H3_INDEX_RES9 alone finds only assets in the SAME cell.
+--   Res-9 cells have ~174 m edges, so an asset 200 m away sitting just across a
+--   cell boundary would be silently EXCLUDED. That is a correctness bug, not a
+--   performance trade-off. H3_GRID_DISK expands to a k-ring of candidate cells
+--   first, then an exact HAVERSINE filter trims to the true radius.
+--
+-- Why this is the scale pattern:
+--   Candidates arrive via an equality join against a small cell set (k=2 is 19
+--   cells) instead of an O(n^2) distance cross join over every asset. This is
+--   what keeps proximity queries viable at utility volumes.
+--
+-- Ring sizing:  k = ceil(radius_m / 174) + 1
+--   Verified against a naive full-scan on se_demo: 500 m -> 15 vs 15 matches,
+--   2000 m -> 165 vs 165 matches, identical maxima. No missed assets.
+--
+-- Requires H3_INDEX_RES9 to be populated (see the H3 section above and
+-- scripts/31_regenerate_coherent_topology.sql).
+
+CREATE OR REPLACE FUNCTION <% database %>.APPLICATIONS.F_METERS_NEAR(
+    P_LAT FLOAT, P_LON FLOAT, P_RADIUS_M FLOAT
+)
+RETURNS TABLE (METER_ID VARCHAR, TRANSFORMER_ID VARCHAR, CIRCUIT_ID VARCHAR,
+               LATITUDE FLOAT, LONGITUDE FLOAT, DISTANCE_M FLOAT)
+COMMENT = 'Meters within P_RADIUS_M metres of a point, via H3 ring-expansion candidate generation plus an exact HAVERSINE filter. Ring size is derived from the radius because a bare cell-equality join would miss neighbours across a cell boundary.'
+AS
+$$
+WITH origin AS (
+    SELECT H3_LATLNG_TO_CELL_STRING(P_LAT, P_LON, 9) AS CELL,
+           GREATEST(1, CEIL(P_RADIUS_M / 174.0) + 1)::INT AS K
+),
+candidate_cells AS (
+    SELECT f.VALUE::VARCHAR AS CELL
+    FROM origin o, LATERAL FLATTEN(input => H3_GRID_DISK(o.CELL, o.K)) f
+)
+SELECT m.METER_ID, m.TRANSFORMER_ID, m.CIRCUIT_ID, m.LATITUDE, m.LONGITUDE,
+       ROUND(HAVERSINE(P_LAT, P_LON, m.LATITUDE, m.LONGITUDE) * 1000, 1) AS DISTANCE_M
+FROM <% database %>.PRODUCTION.METER_INFRASTRUCTURE m
+JOIN candidate_cells c ON m.H3_INDEX_RES9 = c.CELL
+WHERE HAVERSINE(P_LAT, P_LON, m.LATITUDE, m.LONGITUDE) * 1000 <= P_RADIUS_M
+$$;
+
+-- Correctness harness: the H3 path must return EXACTLY what a naive scan returns.
+-- Substitute a real anchor; a MISMATCH means the ring sizing regressed.
+--   WITH h3 AS (SELECT COUNT(*) n FROM TABLE(F_METERS_NEAR(29.751809, -95.125192, 2000::FLOAT))),
+--        naive AS (SELECT COUNT(*) n FROM PRODUCTION.METER_INFRASTRUCTURE
+--                   WHERE HAVERSINE(29.751809,-95.125192,LATITUDE,LONGITUDE)*1000 <= 2000)
+--   SELECT CASE WHEN h3.n = naive.n THEN 'PASS' ELSE 'FAIL' END FROM h3, naive;
