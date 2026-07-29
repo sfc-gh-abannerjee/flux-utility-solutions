@@ -150,11 +150,20 @@ SELECT
 FROM <% database %>.PRODUCTION.SUBSTATIONS s;
 
 -- -----------------------------------------------------------------------------
--- 2.3 FLUX_OPS_CENTER_TOPOLOGY_FEEDERS - Feeder/Circuit Details
+-- 2.3 FLUX_OPS_CENTER_TOPOLOGY_CIRCUITS - Feeder/Circuit Details
 -- -----------------------------------------------------------------------------
--- Circuit-level topology for drill-down from substations
+-- Circuit-level topology for drill-down from substations.
+--
+-- NOTE (2026-07-29): this was previously named FLUX_OPS_CENTER_TOPOLOGY_FEEDERS,
+-- but the SPCS backend's /api/topology/feeders endpoint expects an EDGE-shaped
+-- result (substation -> transformer, with from/to coordinates), not this
+-- circuit-shaped one. The name collision made that endpoint fail with
+-- "invalid identifier 'TRANSFORMER_ID'" (HTTP 500), which rejected the
+-- frontend's Promise.all and prevented ALL substations from rendering on the
+-- map. This view keeps the circuit drill-down data product under an accurate
+-- name; section 2.3b below defines the edge-shaped view the API actually reads.
 
-CREATE OR REPLACE VIEW FLUX_OPS_CENTER_TOPOLOGY_FEEDERS AS
+CREATE OR REPLACE VIEW FLUX_OPS_CENTER_TOPOLOGY_CIRCUITS AS
 SELECT 
     c.CIRCUIT_ID,
     c.CIRCUIT_NAME,
@@ -310,6 +319,57 @@ SELECT
     0.240 AS VOLTAGE_KV
 FROM <% database %>.PRODUCTION.METER_INFRASTRUCTURE
 WHERE LATITUDE IS NOT NULL;
+
+-- -----------------------------------------------------------------------------
+-- 2.4b FLUX_OPS_CENTER_TOPOLOGY_FEEDERS - Substation -> Transformer Feeder Edges
+-- -----------------------------------------------------------------------------
+-- Used by: /api/topology/feeders (flux_ops_center_spcs backend/server_fastapi.py
+--          ~line 1682) and the frontend FeederConnection deck.gl line layer.
+--
+-- CONTRACT: the 12 columns below are dictated by that endpoint's SELECT list.
+-- Do NOT add, remove, or rename columns without updating the endpoint in the
+-- same change. Breaking this contract returns HTTP 500 from the endpoint, which
+-- rejects the frontend's Promise.all([metro, feeders]) and silently prevents
+-- ALL substations from rendering -- not just the feeder lines. That exact
+-- regression was live from the cpe_demo_CLI migration until 2026-07-29.
+--
+-- VOLTAGE_LEVEL is emitted as text because the frontend filters distribution
+-- feeders with a substring test that excludes '138', '230' and '345'. Keep the
+-- decimal point in the formatted value so e.g. 34.5 kV does not read as '345'.
+--
+-- ONE ROW PER TRANSFORMER. Do NOT join CIRCUIT_METADATA on SUBSTATION_ID here:
+-- circuits are per-substation, so that join fans out every transformer once per
+-- circuit on its substation (measured 50x on 2026-07-29, and it would reach
+-- millions of rows at full seed scale). CIRCUIT_ID is a deterministic scalar pick.
+--
+-- SCALE NOTE: this yields only ~100 edges today because PRODUCTION.SUBSTATIONS
+-- keys on SUB_0001 while PRODUCTION.TRANSFORMER_METADATA keys on SUB-HOU-0001.
+-- Reconciling that key space scales this view to ~47k real edges with no DDL change.
+
+CREATE OR REPLACE VIEW FLUX_OPS_CENTER_TOPOLOGY_FEEDERS AS
+SELECT
+    tm.SUBSTATION_ID                             AS SUBSTATION_ID,
+    tm.TRANSFORMER_ID                            AS TRANSFORMER_ID,
+    'SUBSTATION_TO_TRANSFORMER'                  AS CONNECTION_TYPE,
+    s.LATITUDE                                   AS FROM_LATITUDE,
+    s.LONGITUDE                                  AS FROM_LONGITUDE,
+    tm.LATITUDE                                  AS TO_LATITUDE,
+    tm.LONGITUDE                                 AS TO_LONGITUDE,
+    CASE
+        WHEN tm.CAPACITY_KVA IS NULL OR tm.CAPACITY_KVA = 0 THEN NULL
+        ELSE ROUND(100.0 * tm.CURRENT_LOAD_KVA / tm.CAPACITY_KVA, 2)
+    END                                          AS LOAD_UTILIZATION_PCT,
+    (SELECT MIN(c.CIRCUIT_ID)
+       FROM <% database %>.PRODUCTION.CIRCUIT_METADATA c
+      WHERE c.SUBSTATION_ID = tm.SUBSTATION_ID)  AS CIRCUIT_ID,
+    tm.CAPACITY_KVA                              AS RATED_KVA,
+    ROUND(HAVERSINE(s.LATITUDE, s.LONGITUDE,
+                    tm.LATITUDE, tm.LONGITUDE), 3) AS DISTANCE_KM,
+    COALESCE(TO_VARCHAR(ROUND(tm.PRIMARY_VOLTAGE_KV, 2)) || ' kV', '12.47 kV') AS VOLTAGE_LEVEL
+FROM <% database %>.PRODUCTION.TRANSFORMER_METADATA tm
+JOIN <% database %>.PRODUCTION.SUBSTATIONS s
+      ON tm.SUBSTATION_ID = s.SUBSTATION_ID
+WHERE tm.LATITUDE IS NOT NULL AND s.LATITUDE IS NOT NULL;
 
 -- -----------------------------------------------------------------------------
 -- 2.5 FLUX_OPS_CENTER_SERVICE_AREAS_MV - Service Area Aggregations
