@@ -1014,8 +1014,25 @@ WHERE n.LAT IS NOT NULL;
 
 -- 5.6 PRECOMPUTED_CASCADES — Scenario-based cascade simulations
 -- Consumed by /api/cascade/precomputed-scenarios endpoint.
--- Uses the 15-column schema with SCENARIO_ID, PATIENT_ZERO_ID, CASCADE_ORDER,
--- WAVE_BREAKDOWN, etc. that the backend expects.
+--
+-- 2026-07-29 REWRITE. This block used to hardcode patient-zero keys from the
+-- retired 25-placeholder key space ('SUB_0001', 'SUB_0005', 'SUB_0012',
+-- 'SUB_0003') plus invented node names ('Substation 1'), invented coordinates
+-- (29.76 / -95.37) and transformer ids ('TRF_000101') that no longer exist.
+-- After the topology regeneration all 4 of 4 rows had an orphaned
+-- PATIENT_ZERO_ID, and because this section does TRUNCATE + INSERT, redeploying
+-- the script silently reintroduced the orphans.
+--
+-- Everything is now DERIVED from PRODUCTION.SUBSTATIONS, so it stays valid
+-- across any future regeneration and contains no fabricated geometry:
+--   * patient zero is chosen by a deterministic rank (largest capacity first,
+--     SUBSTATION_ID as tie-break) rather than a literal key
+--   * the cascade wavefront is the N-1 real substations nearest to patient zero,
+--     N being that scenario's node count
+--   * node_name / lat / lon come from the substation row itself
+--   * wave_depth is banded off real distance, so wave 0 is patient zero
+-- Scenario names, simulation params and impact magnitudes stay as authored --
+-- those are narrative, not topology.
 TRUNCATE TABLE IF EXISTS PRECOMPUTED_CASCADES;
 
 INSERT INTO PRECOMPUTED_CASCADES (
@@ -1027,58 +1044,103 @@ INSERT INTO PRECOMPUTED_CASCADES (
     MAX_CASCADE_DEPTH, CASCADE_DEPTH, LOAD_SHED_MW,
     SIMULATION_TIMESTAMP, SIMULATION_SCENARIO, COMPUTED_AT
 )
+WITH scenarios AS (
+    SELECT 'scenario_1' AS scenario_id, 'Summer Peak 2025' AS scenario_name, 1 AS pz_rank,
+           '{"temperature_c": 40, "load_multiplier": 1.4, "failure_threshold": 0.6}' AS sim_params,
+           13 AS total_nodes, 52.4 AS affected_mw, 64800 AS affected_customers, 3 AS max_depth
+    UNION ALL SELECT 'scenario_2', 'Winter Storm Scenario', 2,
+           '{"temperature_c": -10, "load_multiplier": 1.6, "failure_threshold": 0.5}',
+           22, 258.6, 324000, 5
+    UNION ALL SELECT 'scenario_3', 'Hurricane Season', 3,
+           '{"temperature_c": 30, "load_multiplier": 1.2, "failure_threshold": 0.55}',
+           9, 46.2, 54000, 2
+    UNION ALL SELECT 'scenario_4', 'Normal Operations Baseline', 4,
+           '{"temperature_c": 25, "load_multiplier": 1.0, "failure_threshold": 0.8}',
+           1, 55.0, 0, 0
+),
+ranked AS (
+    SELECT SUBSTATION_ID, SUBSTATION_NAME, LATITUDE, LONGITUDE, CAPACITY_MVA,
+           ROW_NUMBER() OVER (ORDER BY CAPACITY_MVA DESC NULLS LAST, SUBSTATION_ID) AS RN
+      FROM <% database %>.PRODUCTION.SUBSTATIONS
+     WHERE LATITUDE IS NOT NULL AND LONGITUDE IS NOT NULL
+),
+patient_zero AS (
+    SELECT s.scenario_id, s.scenario_name, s.sim_params, s.total_nodes,
+           s.affected_mw, s.affected_customers, s.max_depth,
+           r.SUBSTATION_ID AS pz_id, r.SUBSTATION_NAME AS pz_name,
+           r.LATITUDE AS pz_lat, r.LONGITUDE AS pz_lon
+      FROM scenarios s
+      JOIN ranked r ON r.RN = s.pz_rank
+),
+-- Wavefront: patient zero at distance 0, then the nearest real substations.
+wavefront AS (
+    SELECT p.scenario_id,
+           r.SUBSTATION_ID, r.SUBSTATION_NAME, r.LATITUDE, r.LONGITUDE, r.CAPACITY_MVA,
+           HAVERSINE(p.pz_lat, p.pz_lon, r.LATITUDE, r.LONGITUDE) AS DIST_KM,
+           ROW_NUMBER() OVER (
+               PARTITION BY p.scenario_id
+               ORDER BY HAVERSINE(p.pz_lat, p.pz_lon, r.LATITUDE, r.LONGITUDE), r.SUBSTATION_ID
+           ) AS HOP
+      FROM patient_zero p
+      JOIN ranked r ON TRUE
+),
+cascade_nodes AS (
+    SELECT w.scenario_id, w.HOP,
+           OBJECT_CONSTRUCT(
+               'order',       w.HOP - 1,
+               'node_id',     w.SUBSTATION_ID,
+               'node_name',   w.SUBSTATION_NAME,
+               'node_type',   'SUBSTATION',
+               'wave_depth',  LEAST(CEIL(w.DIST_KM / 8.0)::INT, 5),
+               'capacity_kw', COALESCE(w.CAPACITY_MVA, 0),
+               'lat',         w.LATITUDE,
+               'lon',         w.LONGITUDE,
+               'distance_km', ROUND(w.DIST_KM, 3)
+           ) AS NODE_OBJ
+      FROM wavefront w
+      JOIN patient_zero p ON p.scenario_id = w.scenario_id
+     WHERE w.HOP <= p.total_nodes
+),
+assembled AS (
+    SELECT scenario_id,
+           ARRAY_AGG(NODE_OBJ) WITHIN GROUP (ORDER BY HOP) AS cascade_order_arr
+      FROM cascade_nodes
+     GROUP BY scenario_id
+),
+waves AS (
+    SELECT c.scenario_id,
+           ARRAY_AGG(OBJECT_CONSTRUCT('wave', WV, 'nodes', N, 'capacity_kw', CAP))
+             WITHIN GROUP (ORDER BY WV) AS wave_arr
+      FROM (
+          SELECT scenario_id,
+                 NODE_OBJ:wave_depth::INT AS WV,
+                 COUNT(*) AS N,
+                 SUM(NODE_OBJ:capacity_kw::FLOAT) AS CAP
+            FROM cascade_nodes
+           GROUP BY scenario_id, NODE_OBJ:wave_depth::INT
+      ) c
+     GROUP BY c.scenario_id
+)
 SELECT
-    scenario_id, scenario_name,
-    patient_zero_id, patient_zero_id,
-    patient_zero_name, patient_zero_name,
+    p.scenario_id, p.scenario_name,
+    p.pz_id, p.pz_id,
+    p.pz_name, p.pz_name,
     'SUBSTATION' AS INITIATING_NODE_TYPE,
-    PARSE_JSON(sim_params) AS SIMULATION_PARAMS,
-    PARSE_JSON(cascade_order_json) AS CASCADE_ORDER,
-    PARSE_JSON(wave_json) AS WAVE_BREAKDOWN,
+    PARSE_JSON(p.sim_params) AS SIMULATION_PARAMS,
+    a.cascade_order_arr AS CASCADE_ORDER,
+    w.wave_arr AS WAVE_BREAKDOWN,
     PARSE_JSON('[]') AS PROPAGATION_PATHS,
-    total_nodes,
-    affected_mw,
-    affected_customers, affected_customers,
-    max_depth, max_depth,
-    affected_mw AS LOAD_SHED_MW,
+    p.total_nodes,
+    p.affected_mw,
+    p.affected_customers, p.affected_customers,
+    p.max_depth, p.max_depth,
+    p.affected_mw AS LOAD_SHED_MW,
     CURRENT_TIMESTAMP() AS SIMULATION_TIMESTAMP,
-    scenario_name AS SIMULATION_SCENARIO,
+    p.scenario_name AS SIMULATION_SCENARIO,
     CURRENT_TIMESTAMP() AS COMPUTED_AT
-FROM (
-    SELECT 
-        'scenario_1' AS scenario_id,
-        'Summer Peak 2025' AS scenario_name,
-        'SUB_0001' AS patient_zero_id,
-        'Substation 1' AS patient_zero_name,
-        '{"temperature_c": 40, "load_multiplier": 1.4, "failure_threshold": 0.6}' AS sim_params,
-        '[{"order":0,"node_id":"SUB_0001","node_name":"Substation 1","node_type":"SUBSTATION","wave_depth":0,"capacity_kw":50000,"lat":29.76,"lon":-95.37},{"order":1,"node_id":"TRF_000101","node_name":"Transformer 101","node_type":"TRANSFORMER","wave_depth":1,"capacity_kw":200,"lat":29.77,"lon":-95.38}]' AS cascade_order_json,
-        '[{"wave":0,"nodes":1,"capacity_kw":50000},{"wave":1,"nodes":12,"capacity_kw":2400}]' AS wave_json,
-        13 AS total_nodes, 52.4 AS affected_mw, 64800 AS affected_customers, 3 AS max_depth
-    UNION ALL
-    SELECT 
-        'scenario_2', 'Winter Storm Scenario',
-        'SUB_0005', 'Substation 5',
-        '{"temperature_c": -10, "load_multiplier": 1.6, "failure_threshold": 0.5}',
-        '[{"order":0,"node_id":"SUB_0005","node_name":"Substation 5","node_type":"SUBSTATION","wave_depth":0,"capacity_kw":75000,"lat":29.82,"lon":-95.45},{"order":1,"node_id":"SUB_0008","node_name":"Substation 8","node_type":"SUBSTATION","wave_depth":1,"capacity_kw":60000,"lat":29.80,"lon":-95.42}]',
-        '[{"wave":0,"nodes":1,"capacity_kw":75000},{"wave":1,"nodes":3,"capacity_kw":180000},{"wave":2,"nodes":18,"capacity_kw":3600}]',
-        22, 258.6, 324000, 5
-    UNION ALL
-    SELECT 
-        'scenario_3', 'Hurricane Season',
-        'SUB_0012', 'Substation 12',
-        '{"temperature_c": 30, "load_multiplier": 1.2, "failure_threshold": 0.55}',
-        '[{"order":0,"node_id":"SUB_0012","node_name":"Substation 12","node_type":"SUBSTATION","wave_depth":0,"capacity_kw":45000,"lat":29.68,"lon":-95.28},{"order":1,"node_id":"TRF_000108","node_name":"Transformer 108","node_type":"TRANSFORMER","wave_depth":1,"capacity_kw":150,"lat":29.69,"lon":-95.29}]',
-        '[{"wave":0,"nodes":1,"capacity_kw":45000},{"wave":1,"nodes":8,"capacity_kw":1200}]',
-        9, 46.2, 54000, 2
-    UNION ALL
-    SELECT 
-        'scenario_4', 'Normal Operations Baseline',
-        'SUB_0003', 'Substation 3',
-        '{"temperature_c": 25, "load_multiplier": 1.0, "failure_threshold": 0.8}',
-        '[{"order":0,"node_id":"SUB_0003","node_name":"Substation 3","node_type":"SUBSTATION","wave_depth":0,"capacity_kw":55000,"lat":29.74,"lon":-95.35}]',
-        '[{"wave":0,"nodes":1,"capacity_kw":55000}]',
-        1, 55.0, 0, 0
-);
+FROM patient_zero p
+JOIN assembled a ON a.scenario_id = p.scenario_id
+JOIN waves     w ON w.scenario_id = p.scenario_id;
 
 -- =============================================================================
 -- SECTION 6: MISSING PRODUCTION TABLES FOR OPS CENTER
