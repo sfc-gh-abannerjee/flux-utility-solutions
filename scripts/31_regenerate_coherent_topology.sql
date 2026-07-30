@@ -470,6 +470,17 @@ SELECT
          WHEN 3 THEN 13.8 ELSE 24.94 END                    AS PRIMARY_VOLTAGE_KV,
     0.24                                                    AS SECONDARY_VOLTAGE_KV,
     UNIFORM(1972, 2025, HASH(g.TRANSFORMER_ID,'year'))      AS INSTALL_YEAR,
+    -- 2026-07-29: AGE_YEARS must be emitted here.
+    -- This script CREATE OR REPLACEs TRANSFORMER_METADATA, so any column it does
+    -- not select is DROPPED -- and AGE_YEARS was not selected. Five scripts plus
+    -- both semantic models read it (03, 07, 11, 15, 30,
+    -- models/utility_semantic_model.yaml, models/domain_views/grid_topology_domain.yaml),
+    -- so a fresh deploy failed in script 30 with "invalid identifier 'AGE_YEARS'"
+    -- immediately after this script succeeded. It is derived rather than stored
+    -- because script 03 can no longer compute it as a virtual column (Snowflake
+    -- rejects CURRENT_DATE() in a virtual-column expression as non-deterministic).
+    YEAR(CURRENT_DATE()) - UNIFORM(1972, 2025, HASH(g.TRANSFORMER_ID,'year'))
+                                                            AS AGE_YEARS,
     CASE UNIFORM(0,8,HASH(g.TRANSFORMER_ID,'mfr'))
          WHEN 0 THEN 'ABB' WHEN 1 THEN 'Siemens' WHEN 2 THEN 'GE'
          WHEN 3 THEN 'Eaton' WHEN 4 THEN 'Schneider Electric'

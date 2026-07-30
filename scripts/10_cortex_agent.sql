@@ -61,6 +61,24 @@ USE SCHEMA APPLICATIONS;
 --   - tools[].tool_spec.type: Must match valid tool types
 --   - tool_resources: Must reference valid semantic views or search services
 
+-- 2026-07-29: a fresh deploy failed here with
+--   Agent 'GRID_INTELLIGENCE_AGENT' does not exist or not authorized
+-- because ALTER AGENT ... MODIFY LIVE VERSION requires the agent to already exist, and
+-- the CREATE AGENT block was left COMMENTED OUT at the bottom of this file with a note
+-- telling the operator to run it by hand first. That manual step is now automated.
+--
+-- CREATE AGENT IF NOT EXISTS is a no-op when the agent is already there, so the
+-- in-place-update semantics described above are preserved on an existing account: the
+-- agent identity, created_on and any aliased versions survive, and only the LIVE
+-- specification is replaced by the ALTER that follows.
+CREATE AGENT IF NOT EXISTS GRID_INTELLIGENCE_AGENT
+FROM SPECIFICATION $$
+models:
+  orchestration: claude-sonnet-4-5
+tools: []
+tool_resources: {}
+$$;
+
 ALTER AGENT GRID_INTELLIGENCE_AGENT MODIFY LIVE VERSION SET SPECIFICATION = $$
 models:
   orchestration: claude-sonnet-4-5

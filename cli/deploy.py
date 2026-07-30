@@ -47,6 +47,10 @@ CONFIG_FILE = SCRIPT_DIR / "config.yaml"
 #   - 19 (git integration) must run BEFORE 51_load_seed_data.sql, which COPY INTOs from
 #     '@FLUX_SOLUTIONS_REPO/branches/main/seed_data/parquet'. That stage does not exist
 #     until 19 creates the GIT REPOSITORY and FETCHes it.
+#   - 53/53a/55/55a (PDF stages + doc tools) must run BEFORE 10, because the agent spec
+#     in 10 wires tools to APPLICATIONS.PARSE_AND_EXTRACT, a procedure created by 55.
+#     Numeric order put them last, so a fresh deploy failed with
+#     "Procedure 'APPLICATIONS.PARSE_AND_EXTRACT' does not exist".
 SCRIPT_ORDER = [
     # --- core infrastructure and base tables ---
     "01_database_infrastructure.sql",
@@ -68,6 +72,11 @@ SCRIPT_ORDER = [
     # --- topology regeneration, then the tables/views that read it ---
     "31_regenerate_coherent_topology.sql",
     "30_ops_center_dependencies.sql",
+    # --- document/PDF tooling: creates PARSE_AND_EXTRACT, needed by the agent in 10 ---
+    "53_utility_pdf_stage.sql",
+    "53a_internal_stage_validate.sql",
+    "55_pdf_doc_tools.sql",
+    "55a_pdf_doc_tools_validate.sql",
     # --- semantic + AI layer (needs OUTAGE_RESTORATION_TRACKER from 30) ---
     "08_semantic_view.sql",
     "09_cortex_search_services.sql",
@@ -89,11 +98,6 @@ SCRIPT_ORDER = [
     "24_streamlit_stage_setup.sql",
     "25_streamlit_apps.sql",
     "26_notebooks_deployment.sql",
-    # --- document/PDF tooling ---
-    "53_utility_pdf_stage.sql",
-    "53a_internal_stage_validate.sql",
-    "55_pdf_doc_tools.sql",
-    "55a_pdf_doc_tools_validate.sql",
     # --- assertions, then final validation ---
     "32_topology_invariants.sql",
     "99_validate_deployment.sql",

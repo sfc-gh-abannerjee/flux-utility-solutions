@@ -36,13 +36,23 @@ WHERE H3_INDEX_RES9 IS NULL AND LATITUDE IS NOT NULL;
 ALTER TABLE METER_INFRASTRUCTURE ADD COLUMN IF NOT EXISTS 
     H3_INDEX_RES9 VARCHAR(20);
 
+-- 2026-07-29: this parsed a "lat,lon" string column named LOCATION:
+--   CAST(SPLIT_PART(LOCATION, ',', 1) AS FLOAT), CAST(SPLIT_PART(LOCATION, ',', 2) ...)
+-- METER_INFRASTRUCTURE has no LOCATION column in any generation of the schema, so a
+-- fresh deploy failed with "invalid identifier 'LOCATION'". It carries real numeric
+-- coordinates instead, so use them directly -- which is also what the
+-- TRANSFORMER_METADATA update immediately above already does. COALESCE covers both
+-- spellings: script 04 creates METER_LATITUDE/METER_LONGITUDE as NOT NULL, while
+-- script 31 regenerates the table with canonical LATITUDE/LONGITUDE.
 UPDATE METER_INFRASTRUCTURE 
 SET H3_INDEX_RES9 = H3_LATLNG_TO_CELL_STRING(
-    CAST(SPLIT_PART(LOCATION, ',', 1) AS FLOAT),
-    CAST(SPLIT_PART(LOCATION, ',', 2) AS FLOAT),
+    COALESCE(LATITUDE,  METER_LATITUDE),
+    COALESCE(LONGITUDE, METER_LONGITUDE),
     9
 )
-WHERE H3_INDEX_RES9 IS NULL AND LOCATION IS NOT NULL;
+WHERE H3_INDEX_RES9 IS NULL
+  AND COALESCE(LATITUDE,  METER_LATITUDE)  IS NOT NULL
+  AND COALESCE(LONGITUDE, METER_LONGITUDE) IS NOT NULL;
 
 -- -----------------------------------------------------------------------------
 -- 2. GEOSPATIAL ANALYSIS FUNCTIONS
@@ -54,23 +64,34 @@ CREATE OR REPLACE FUNCTION FIND_NEARBY_TRANSFORMERS(
     P_LON FLOAT,
     P_RADIUS_KM FLOAT DEFAULT 5.0
 )
+-- 2026-07-29: declared types must match the body's INFERRED types EXACTLY or
+-- Snowflake refuses the function:
+--   "Declared return type 'NUMBER(38,0)' for column 'HEALTH_SCORE' is
+--    incompatible with actual return type 'FLOAT'"
+-- Actuals on TRANSFORMER_METADATA: CAPACITY_KVA NUMBER(5,1), CURRENT_LOAD_KVA FLOAT,
+-- HEALTH_SCORE FLOAT. A bare NUMBER means NUMBER(38,0), which does NOT match
+-- NUMBER(5,1). Both the declaration and the body casts below are pinned.
 RETURNS TABLE (
     TRANSFORMER_ID VARCHAR,
     DISTANCE_KM FLOAT,
-    RATED_KVA NUMBER,
+    RATED_KVA NUMBER(5,1),
     LOAD_UTILIZATION_PCT FLOAT,
-    HEALTH_SCORE NUMBER
+    HEALTH_SCORE FLOAT
 )
 LANGUAGE SQL
 COMMENT = 'Find transformers within specified radius of a point'
 AS
 $$
+    -- 2026-07-29: TRANSFORMER_METADATA has neither RATED_KVA nor
+    -- LOAD_UTILIZATION_PCT. The real columns are CAPACITY_KVA and CURRENT_LOAD_KVA,
+    -- so utilisation is derived. The RETURNS TABLE signature above is unchanged, so
+    -- existing callers keep the same output column names.
     SELECT 
-        TRANSFORMER_ID,
-        HAVERSINE(P_LAT, P_LON, LATITUDE, LONGITUDE) AS DISTANCE_KM,
-        RATED_KVA,
-        LOAD_UTILIZATION_PCT,
-        HEALTH_SCORE
+        TRANSFORMER_ID::VARCHAR AS TRANSFORMER_ID,
+        HAVERSINE(P_LAT, P_LON, LATITUDE, LONGITUDE)::FLOAT AS DISTANCE_KM,
+        CAPACITY_KVA::NUMBER(5,1) AS RATED_KVA,
+        (ROUND(100.0 * CURRENT_LOAD_KVA / NULLIF(CAPACITY_KVA, 0), 2))::FLOAT AS LOAD_UTILIZATION_PCT,
+        HEALTH_SCORE::FLOAT AS HEALTH_SCORE
     FROM TRANSFORMER_METADATA
     WHERE HAVERSINE(P_LAT, P_LON, LATITUDE, LONGITUDE) <= P_RADIUS_KM
     ORDER BY DISTANCE_KM
@@ -97,7 +118,7 @@ $$
             COUNT(DISTINCT s.SUBSTATION_ID) AS SUBSTATION_COUNT,
             0 AS TRANSFORMER_COUNT,
             0 AS METER_COUNT,
-            SUM(s.TOTAL_CAPACITY_MVA * 1000) AS TOTAL_CAPACITY_KVA
+            SUM(s.CAPACITY_MVA * 1000)::NUMBER(38,0) AS TOTAL_CAPACITY_KVA  -- 2026-07-29: was s.TOTAL_CAPACITY_MVA (no such column)
         FROM SUBSTATIONS s
         GROUP BY 1
         
@@ -108,7 +129,7 @@ $$
             0 AS SUBSTATION_COUNT,
             COUNT(DISTINCT t.TRANSFORMER_ID) AS TRANSFORMER_COUNT,
             0 AS METER_COUNT,
-            SUM(t.RATED_KVA) AS TOTAL_CAPACITY_KVA
+            SUM(t.CAPACITY_KVA)::NUMBER(38,0) AS TOTAL_CAPACITY_KVA  -- was t.RATED_KVA; cast pins NUMBER(38,1)->NUMBER(38,0)
         FROM TRANSFORMER_METADATA t
         GROUP BY 1
     )
@@ -117,7 +138,7 @@ $$
         SUM(SUBSTATION_COUNT) AS SUBSTATION_COUNT,
         SUM(TRANSFORMER_COUNT) AS TRANSFORMER_COUNT,
         SUM(METER_COUNT) AS METER_COUNT,
-        SUM(TOTAL_CAPACITY_KVA) AS TOTAL_CAPACITY_KVA
+        SUM(TOTAL_CAPACITY_KVA)::NUMBER(38,0) AS TOTAL_CAPACITY_KVA
     FROM hex_coverage
     GROUP BY H3_INDEX
 $$;
@@ -150,8 +171,13 @@ $$
         SELECT 
             H3_INDEX,
             METER_COUNT,
-            H3_CELL_TO_LAT(H3_INDEX) AS CENTER_LAT,
-            H3_CELL_TO_LNG(H3_INDEX) AS CENTER_LON
+            -- 2026-07-29: H3_CELL_TO_LAT / H3_CELL_TO_LNG do not exist in Snowflake
+            -- ("Unknown functions H3_CELL_TO_LAT, H3_CELL_TO_LNG"). The supported call
+            -- is H3_CELL_TO_POINT(cell), which returns a GEOGRAPHY point; take
+            -- latitude with ST_Y and longitude with ST_X. Verified against the
+            -- account: H3_CELL_TO_POINT('8a2a1072b59ffff') -> (40.6894, -74.0444).
+            ST_Y(H3_CELL_TO_POINT(H3_INDEX)) AS CENTER_LAT,
+            ST_X(H3_CELL_TO_POINT(H3_INDEX)) AS CENTER_LON
         FROM meter_hexes
         WHERE METER_COUNT < P_MIN_METERS_PER_HEX
     )
@@ -248,7 +274,7 @@ SELECT
     LONGITUDE,
     H3_INDEX_RES9,
     TO_GEOGRAPHY(ST_MAKEPOINT(LONGITUDE, LATITUDE)) AS GEO_POINT,
-    TOTAL_CAPACITY_MVA * 1000 AS CAPACITY_KVA,
+    CAPACITY_MVA * 1000 AS CAPACITY_KVA,  -- 2026-07-29: was TOTAL_CAPACITY_MVA (no such column)
     NULL AS PARENT_ASSET_ID
 FROM PRODUCTION.SUBSTATIONS
 WHERE LATITUDE IS NOT NULL
@@ -263,7 +289,7 @@ SELECT
     LONGITUDE,
     H3_INDEX_RES9,
     TO_GEOGRAPHY(ST_MAKEPOINT(LONGITUDE, LATITUDE)) AS GEO_POINT,
-    RATED_KVA AS CAPACITY_KVA,
+    CAPACITY_KVA,  -- 2026-07-29: was 'RATED_KVA AS CAPACITY_KVA' (source col is CAPACITY_KVA)
     SUBSTATION_ID AS PARENT_ASSET_ID
 FROM PRODUCTION.TRANSFORMER_METADATA
 WHERE LATITUDE IS NOT NULL;

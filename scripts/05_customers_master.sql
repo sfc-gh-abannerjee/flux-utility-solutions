@@ -52,7 +52,30 @@ CREATE OR ALTER TABLE CUSTOMERS_MASTER_DATA (
     CUSTOMER_EMBEDDING VECTOR(FLOAT, 768),
     
     -- Audit
-    CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP()
+    CREATED_AT TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
+
+    -- ---------------------------------------------------------------------
+    -- 2026-07-29: canonical-schema parity columns.
+    --
+    -- 08_semantic_view.sql maps  customers.CUSTOMER_SEGMENT AS CUSTOMER_CLASS,
+    -- i.e. it reads the CANONICAL column name, which this script never created.
+    -- A fresh deploy therefore failed with "invalid identifier 'CUSTOMER_CLASS'".
+    --
+    -- This is the FOURTH table with the same divergence (see also 04
+    -- METER_INFRASTRUCTURE, 06 AMI_INTERVAL_READINGS, 07 TRANSFORMER_HOURLY_LOAD):
+    -- these scripts describe an older schema generation, while the live tables were
+    -- produced by the AMI generator, and downstream scripts were written against
+    -- live. Adding the canonical spellings alongside the descriptive ones keeps
+    -- both sets of consumers working.
+    --   METER_ID       mirrors PRIMARY_METER_ID
+    --   CUSTOMER_CLASS mirrors CUSTOMER_SEGMENT
+    --
+    -- MUST stay at the end of the column list -- CREATE OR ALTER TABLE rejects
+    -- adding a column before the end of an existing list.
+    -- ---------------------------------------------------------------------
+    METER_ID VARCHAR(20),
+    STATE VARCHAR(2),
+    CUSTOMER_CLASS VARCHAR(20)
 )
 CLUSTER BY (CITY, ZIP_CODE, CUSTOMER_SEGMENT)
 COMMENT = 'Customer master data - 686,000 profiles with demographics';

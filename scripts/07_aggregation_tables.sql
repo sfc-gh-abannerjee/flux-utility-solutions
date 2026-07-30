@@ -40,7 +40,28 @@ CREATE OR ALTER TABLE TRANSFORMER_HOURLY_LOAD (
     
     -- Thermal stress category
     THERMAL_STRESS_CATEGORY VARCHAR(20),  -- LOW, MODERATE, HIGH, CRITICAL
-    
+
+    -- ---------------------------------------------------------------------
+    -- 2026-07-29: canonical-schema parity columns.
+    --
+    -- The live PRODUCTION.TRANSFORMER_HOURLY_LOAD exposes CURRENT_LOAD_KW and
+    -- TEMPERATURE_C, which this script did not create. Script 30 reads
+    -- CURRENT_LOAD_KW (matching live), so a FRESH deploy failed with
+    --   invalid identifier 'CURRENT_LOAD_KW'
+    -- even though script 07 itself had already succeeded -- the table existed,
+    -- just with a different spelling of the same measure.
+    --
+    -- Same failure mode as the TIMESTAMP/VOLTAGE divergence fixed in script 06:
+    -- a script creates one name and a downstream script queries the canonical
+    -- one. CURRENT_LOAD_KW is the canonical spelling of LOAD_KW above; both are
+    -- kept so existing consumers of LOAD_KW keep working.
+    --
+    -- MUST stay at the end of the column list -- CREATE OR ALTER TABLE rejects
+    -- adding a column before the end of an existing list.
+    -- ---------------------------------------------------------------------
+    CURRENT_LOAD_KW NUMBER(10,2),
+    TEMPERATURE_C NUMBER(6,2),
+
     PRIMARY KEY (TRANSFORMER_ID, LOAD_HOUR)
 )
 CLUSTER BY (DATE_TRUNC('DAY', LOAD_HOUR), TRANSFORMER_ID)

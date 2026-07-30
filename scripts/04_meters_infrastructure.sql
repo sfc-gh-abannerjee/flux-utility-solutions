@@ -118,7 +118,42 @@ CREATE OR ALTER TABLE METER_INFRASTRUCTURE (
     
     -- Audit
     LAST_UPDATED TIMESTAMP_LTZ DEFAULT CURRENT_TIMESTAMP(),
-    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+    CREATED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
+
+    -- ---------------------------------------------------------------------
+    -- 2026-07-29: canonical-schema parity columns.
+    --
+    -- The live PRODUCTION.METER_INFRASTRUCTURE carries 7 columns this script
+    -- did not create, so a FRESH deploy failed in
+    -- 31_regenerate_coherent_topology.sql PHASE 5 with
+    --   invalid identifier 'METER_NUMBER'
+    -- when it staged the meter identity columns.
+    --
+    -- Added rather than restructured: this table is a 35-column superset of
+    -- the canonical 17, and other consumers read the building-association and
+    -- OSM-snapping columns, so removing them to "match live" would break more
+    -- than it fixes. Script 31 later CREATE OR REPLACEs this table down to the
+    -- canonical shape anyway -- this script only has to be able to FEED it.
+    --
+    -- MUST stay at the END of the column list: CREATE OR ALTER TABLE rejects
+    -- adding a column before the end of an existing column list, so an
+    -- existing deployment cannot absorb these if they are interleaved above.
+    --
+    -- Three pairs are synonyms of columns already present -- both spellings are
+    -- kept because live has the canonical name and existing consumers use the
+    -- descriptive one:
+    --   INSTALL_DATE    mirrors COMMISSIONED_DATE
+    --   STATUS          mirrors CONDITION_STATUS
+    --   CUSTOMER_CLASS  mirrors CUSTOMER_SEGMENT_ID
+    --   LATITUDE/LONGITUDE mirror METER_LATITUDE/METER_LONGITUDE
+    -- ---------------------------------------------------------------------
+    METER_NUMBER VARCHAR(30),
+    LATITUDE FLOAT,
+    LONGITUDE FLOAT,
+    INSTALL_DATE DATE,
+    STATUS VARCHAR(20),
+    CUSTOMER_CLASS VARCHAR(20),
+    H3_INDEX_RES9 VARCHAR(20)
 )
 CLUSTER BY (TRANSFORMER_ID, CIRCUIT_ID, ZIP_CODE)
 COMMENT = 'Smart meter infrastructure - 597,000 meters with topology assignments';
