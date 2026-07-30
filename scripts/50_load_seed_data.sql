@@ -241,7 +241,12 @@ SELECT
 FROM TABLE(GENERATOR(ROWCOUNT => 168));  -- 7 days * 24 hours
 
 -- Insert AMI readings
-INSERT INTO AMI_INTERVAL_READINGS (METER_ID, TIMESTAMP, USAGE_KWH, VOLTAGE, POWER_FACTOR, CUSTOMER_SEGMENT_ID, SOURCE_TABLE)
+-- 2026-07-29: column list was (METER_ID, TIMESTAMP, USAGE_KWH, VOLTAGE, ...), which no
+-- longer matches AMI_INTERVAL_READINGS. Script 06 now creates the canonical live schema
+-- (READING_TIMESTAMP, VOLTAGE_V), so this INSERT failed with "invalid identifier
+-- 'TIMESTAMP'". Only the AMI columns are renamed here -- HOUSTON_WEATHER_HOURLY and the
+-- other seed tables keep their own timestamp column names.
+INSERT INTO AMI_INTERVAL_READINGS (METER_ID, READING_TIMESTAMP, USAGE_KWH, VOLTAGE_V, POWER_FACTOR, CUSTOMER_SEGMENT_ID, SOURCE_TABLE)
 SELECT 
     m.METER_ID,
     t.reading_time,

@@ -117,6 +117,15 @@ CREATE TABLE IF NOT EXISTS CUSTOMERS_MASTER_DATA (
 -- ============================================================================
 
 -- Set stage path (Git repo or named stage)
+--
+-- 2026-07-29: this read  SET stage_path = '@' || $git_repo || '...'  but NOTHING in this
+-- script (or any other) ever SET $git_repo, so the statement failed with
+-- "syntax error ... unexpected '||'" and the script could never run. The repository name
+-- now comes from config.yaml (git_repo_name), which 19_git_integration.sql also creates.
+--
+-- PREREQUISITE: 19_git_integration.sql must have run, so the GIT REPOSITORY exists and
+-- has been FETCHed. Without it these COPY INTO statements have no stage to read.
+SET git_repo = '<% git_repo_name %>';
 SET stage_path = '@' || $git_repo || '/branches/main/seed_data/parquet';
 
 -- Substations (275 rows)

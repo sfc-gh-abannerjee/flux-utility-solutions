@@ -99,7 +99,17 @@ CREATE TABLE IF NOT EXISTS TRANSFORMER_METADATA (
     PARENT_TRANSFORMER_ID VARCHAR(50),
     
     -- Computed columns for semantic view compatibility
-    AGE_YEARS NUMBER(5,0) AS (YEAR(CURRENT_DATE()) - INSTALL_YEAR),
+    -- 2026-07-29: this was a VIRTUAL column,
+    --   AGE_YEARS NUMBER(5,0) AS (YEAR(CURRENT_DATE()) - INSTALL_YEAR)
+    -- which Snowflake rejects outright:
+    --   "Invalid usage of CURRENT_DATE non deterministic function in AGE_YEARS
+    --    virtual column definition."
+    -- Virtual columns must be deterministic. It is now a plain column that loaders
+    -- populate as YEAR(CURRENT_DATE()) - INSTALL_YEAR at insert time. Readers are
+    -- unaffected: models/utility_semantic_model.yaml and scripts/11_ml_feature_tables.sql
+    -- both just SELECT AGE_YEARS, and a stored column satisfies them identically.
+    AGE_YEARS NUMBER(5,0),
+
     LOCATION_AREA VARCHAR(17) AS (
         CASE 
             WHEN LATITUDE < 29.4 THEN 'Coastal Texas'
@@ -108,7 +118,16 @@ CREATE TABLE IF NOT EXISTS TRANSFORMER_METADATA (
             ELSE 'Harris County'
         END
     ),
-    FEEDER_ID VARCHAR(16777216) AS ('FEEDER-' || COALESCE(RIGHT(CIRCUIT_ID, 3), '000')),
+    -- 2026-07-29: this was FEEDER_ID VARCHAR(16777216) AS ('FEEDER-' || COALESCE(RIGHT(CIRCUIT_ID, 3), '000'))
+    -- and it made the whole script fail on a fresh deploy:
+    --   "Data type of virtual column does not match the data type of its expression for
+    --    column 'FEEDER_ID'. Expected VARCHAR(16777216), found VARCHAR(16777223)."
+    -- RIGHT() does not narrow its argument, so it returns max VARCHAR, and prefixing 7
+    -- characters pushes the inferred length 7 past the maximum. A virtual column's
+    -- declared type must match its expression exactly, so cast the expression to the
+    -- same right-sized type. The value is at most 10 characters ('FEEDER-' + 3).
+    FEEDER_ID VARCHAR(20) AS (('FEEDER-' || COALESCE(RIGHT(CIRCUIT_ID, 3), '000'))::VARCHAR(20)),
+
     ASSET_ID VARCHAR(16777216) AS (TRANSFORMER_ID),
     LOAD_SERVING_CLASS VARCHAR(11) AS (
         CASE

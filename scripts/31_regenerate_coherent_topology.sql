@@ -528,10 +528,21 @@ FROM placed p;
 -- moved, never re-keyed. Each meter is bound to a pole-mounted transformer and
 -- placed within R = 0.36 km of its pole (audit service-drop mean 241 m).
 --
--- Reads the meter identity columns from the PRE-REGEN ZERO-COPY CLONE rather
--- than from METER_INFRASTRUCTURE itself, so the source is unambiguous while the
--- target is being replaced.
+-- Meter identity columns are staged into a transient table FIRST, so the source is
+-- unambiguous while the target is being replaced.
+--
+-- 2026-07-29: this previously read
+--   FROM PRODUCTION_PREREGEN_20260729.METER_INFRASTRUCTURE
+-- an account-specific, date-stamped rollback clone that only existed in se_demo on
+-- the day of the regeneration. Any fresh deployment failed here with "schema does
+-- not exist". The staging table below makes the script portable and removes the
+-- dependency on a clone that a new deployment will never have.
 -- ---------------------------------------------------------------------------
+CREATE OR REPLACE TRANSIENT TABLE _METER_IDENTITY_STAGE AS
+SELECT METER_ID, METER_NUMBER, METER_TYPE, INSTALL_DATE, STATUS,
+       CUSTOMER_CLASS, HEALTH_SCORE, COUNTY_NAME, CITY
+  FROM METER_INFRASTRUCTURE;
+
 CREATE OR REPLACE TABLE METER_INFRASTRUCTURE AS
 WITH poles AS (
     SELECT POLE_ID, TRANSFORMER_ID, SUBSTATION_ID, CIRCUIT_ID,
@@ -546,7 +557,7 @@ old AS (
            -- deterministic pole assignment from the meter's own immutable key.
            -- FLOOR(uniform * N) -- never ABS(HASH(x)) % N, since ABS(-2^63) overflows negative.
            FLOOR(UNIFORM(0::FLOAT, 1::FLOAT, HASH(m.METER_ID, 'pole')) * pc.N_POLES) AS POLE_RN
-    FROM PRODUCTION_PREREGEN_20260729.METER_INFRASTRUCTURE m
+    FROM _METER_IDENTITY_STAGE m
     CROSS JOIN pole_count pc
 ),
 joined AS (
@@ -584,3 +595,11 @@ UPDATE CIRCUIT_METADATA c
 SET CUSTOMER_COUNT = COALESCE(m.CNT, 0)
 FROM (SELECT CIRCUIT_ID, COUNT(*) AS CNT FROM METER_INFRASTRUCTURE GROUP BY CIRCUIT_ID) m
 WHERE c.CIRCUIT_ID = m.CIRCUIT_ID;
+
+
+-- ---------------------------------------------------------------------------
+-- PHASE 7 -- Clean up the meter-identity staging table from PHASE 5.
+-- Dropped last so PHASE 5/6 can be re-read while debugging a failed run.
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS _METER_IDENTITY_STAGE;
+

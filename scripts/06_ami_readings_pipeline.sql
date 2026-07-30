@@ -39,11 +39,11 @@ USE SCHEMA PRODUCTION;
 CREATE OR ALTER TABLE AMI_INTERVAL_READINGS (
     -- Keys
     METER_ID VARCHAR(20) NOT NULL,
-    TIMESTAMP TIMESTAMP_NTZ NOT NULL,
+    READING_TIMESTAMP TIMESTAMP_NTZ NOT NULL,
     
     -- Measurements
     USAGE_KWH FLOAT,
-    VOLTAGE NUMBER(10,0),
+    VOLTAGE_V NUMBER(10,0),
     POWER_FACTOR NUMBER(5,2),
     
     -- Context
@@ -51,9 +51,9 @@ CREATE OR ALTER TABLE AMI_INTERVAL_READINGS (
     SOURCE_TABLE VARCHAR(50),  -- Data lineage tracking
     
     -- Clustering for query performance
-    PRIMARY KEY (METER_ID, TIMESTAMP)
+    PRIMARY KEY (METER_ID, READING_TIMESTAMP)
 )
-CLUSTER BY (DATE_TRUNC('DAY', TIMESTAMP), METER_ID)
+CLUSTER BY (DATE_TRUNC('DAY', READING_TIMESTAMP), METER_ID)
 COMMENT = 'AMI interval readings - 7.1B rows, 15-minute granularity, Jul 2024 - Aug 2025';
 
 -- -----------------------------------------------------------------------------
@@ -78,14 +78,14 @@ COMMENT = 'Bronze layer - raw JSON AMI data ingestion';
 
 CREATE OR ALTER TABLE AMI_STREAMING_DATA (
     METER_ID VARCHAR(20),
-    TIMESTAMP TIMESTAMP_NTZ,
+    READING_TIMESTAMP TIMESTAMP_NTZ,
     USAGE_KWH FLOAT,
-    VOLTAGE NUMBER(10,0),
+    VOLTAGE_V NUMBER(10,0),
     POWER_FACTOR NUMBER(5,2),
     INGESTION_TIME TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP(),
     SOURCE_SYSTEM VARCHAR(50)
 )
-CLUSTER BY (DATE_TRUNC('HOUR', TIMESTAMP))
+CLUSTER BY (DATE_TRUNC('HOUR', READING_TIMESTAMP))
 COMMENT = 'Near real-time AMI streaming data';
 
 -- -----------------------------------------------------------------------------
@@ -96,24 +96,24 @@ COMMENT = 'Near real-time AMI streaming data';
 CREATE OR ALTER VIEW AMI_READINGS_WITH_VOLTAGE_EVENTS AS
 SELECT 
     METER_ID,
-    TIMESTAMP,
+    READING_TIMESTAMP,
     USAGE_KWH,
-    VOLTAGE,
+    VOLTAGE_V,
     POWER_FACTOR,
     CUSTOMER_SEGMENT_ID,
     -- Voltage event detection
     CASE 
-        WHEN VOLTAGE < 108 THEN 'SEVERE_SAG'
-        WHEN VOLTAGE < 114 THEN 'MODERATE_SAG'
-        WHEN VOLTAGE > 126 THEN 'SWELL'
+        WHEN VOLTAGE_V < 108 THEN 'SEVERE_SAG'
+        WHEN VOLTAGE_V < 114 THEN 'MODERATE_SAG'
+        WHEN VOLTAGE_V > 126 THEN 'SWELL'
         ELSE NULL
     END as SAG_TYPE,
     CASE 
-        WHEN VOLTAGE < 114 THEN 120 - VOLTAGE 
+        WHEN VOLTAGE_V < 114 THEN 120 - VOLTAGE_V 
         ELSE 0 
     END as VOLTAGE_DROP_AMOUNT,
     CASE 
-        WHEN VOLTAGE < 114 THEN 'VSE-' || TO_VARCHAR(TIMESTAMP, 'YYYYMMDDHH24MISS') || '-' || METER_ID
+        WHEN VOLTAGE_V < 114 THEN 'VSE-' || TO_VARCHAR(READING_TIMESTAMP, 'YYYYMMDDHH24MISS') || '-' || METER_ID
         ELSE NULL
     END as VOLTAGE_SAG_EVENT_ID
 FROM AMI_INTERVAL_READINGS;
@@ -126,9 +126,9 @@ FROM AMI_INTERVAL_READINGS;
 CREATE OR ALTER VIEW AMI_READINGS_FINAL AS
 SELECT 
     v.METER_ID,
-    v.TIMESTAMP,
+    v.READING_TIMESTAMP,
     v.USAGE_KWH,
-    v.VOLTAGE,
+    v.VOLTAGE_V,
     v.POWER_FACTOR,
     v.CUSTOMER_SEGMENT_ID,
     v.SAG_TYPE,
@@ -136,12 +136,12 @@ SELECT
     v.VOLTAGE_SAG_EVENT_ID,
     -- Outage detection (usage = 0 with low voltage)
     CASE 
-        WHEN v.USAGE_KWH = 0 AND v.VOLTAGE < 100 THEN TRUE 
+        WHEN v.USAGE_KWH = 0 AND v.VOLTAGE_V < 100 THEN TRUE 
         ELSE FALSE 
     END as IS_OUTAGE,
     -- Adjusted usage (0 during outages)
     CASE 
-        WHEN v.USAGE_KWH = 0 AND v.VOLTAGE < 100 THEN 0
+        WHEN v.USAGE_KWH = 0 AND v.VOLTAGE_V < 100 THEN 0
         ELSE v.USAGE_KWH 
     END as USAGE_KWH_ADJUSTED
 FROM AMI_READINGS_WITH_VOLTAGE_EVENTS v;
@@ -181,8 +181,23 @@ COMMENT = 'Monthly AMI aggregations - 2.4M rows for dashboard performance';
 -- -----------------------------------------------------------------------------
 -- Real-time circuit health computed from AMI data
 
+-- 2026-07-29: two fixes, both of which had been applied to the live account in an
+-- earlier session but never propagated back here -- so redeploying this script
+-- silently reintroduced the broken version.
+--
+-- 1. TARGET_LAG was '15 minutes'. The AMI source is a static historical load, so a
+--    15-minute lag rescanned 288,000,000 rows for no new data. Raised to 24 hours.
+-- 2. The window was  READING_TIMESTAMP > DATEADD('hour', -1, CURRENT_TIMESTAMP()).
+--    The AMI series ENDS 2024-07-30, so "the last hour" is ~729 days in the future and
+--    the table was EMPTY BY CONSTRUCTION -- it sat at 0 rows for months and nobody
+--    noticed, because an empty dynamic table looks identical to a quiet grid. The
+--    window is now anchored to the data's own maximum timestamp.
+--
+-- NOTE: the MAX() scalar subquery forces FULL refresh mode -- Snowflake reports
+-- "Change tracking is not supported on queries with subquery expressions." That is an
+-- acceptable trade for correctness here, since the source does not change.
 CREATE OR ALTER DYNAMIC TABLE APPLICATIONS.CIRCUIT_HEALTH_REALTIME
-    TARGET_LAG = '15 minutes'
+    TARGET_LAG = '24 hours'
     WAREHOUSE = <% warehouse %>
 AS
 SELECT 
@@ -200,7 +215,10 @@ SELECT
     MAX(a.READING_TIMESTAMP) as LAST_READING_TIME
 FROM PRODUCTION.AMI_INTERVAL_READINGS a
 JOIN PRODUCTION.METER_INFRASTRUCTURE m ON a.METER_ID = m.METER_ID
-WHERE a.READING_TIMESTAMP > DATEADD('hour', -1, CURRENT_TIMESTAMP())
+WHERE a.READING_TIMESTAMP > DATEADD(
+        'hour', -1,
+        (SELECT MAX(READING_TIMESTAMP) FROM PRODUCTION.AMI_INTERVAL_READINGS)
+      )
 GROUP BY m.CIRCUIT_ID;
 
 -- -----------------------------------------------------------------------------

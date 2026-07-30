@@ -23,8 +23,32 @@ from typing import Optional, List, Dict
 SCRIPT_DIR = Path(__file__).parent.parent / "scripts"
 CONFIG_FILE = SCRIPT_DIR / "config.yaml"
 
-# Script execution order
+# Script execution order.
+#
+# 2026-07-29: this list stopped at 19_git_integration.sql, so 22 of the 41 scripts in
+# scripts/ were NEVER deployed -- including 30_ops_center_dependencies.sql, which builds
+# every view the SPCS Ops Center queries, 31_regenerate_coherent_topology.sql, which
+# produces the correct grid topology, and 99_validate_deployment.sql. A new user ran
+# deploy.py, got a partial database, and the dashboard had no views. All 41 are listed
+# now; keep this in sync when adding a script (validated by scripts_in_order_match_disk
+# in cli/validate.py).
+# Ordering notes that are NOT just numeric. These were found by actually running a
+# fresh deploy into a scratch database on 2026-07-29, not by reading the scripts:
+#   - 31 (regenerate topology) must run BEFORE 30, because 30 derives its
+#     PRECOMPUTED_CASCADES patient-zero from PRODUCTION.SUBSTATIONS and its views read
+#     the regenerated tables.
+#   - 30 must run BEFORE 08, because 30 is the ONLY script that creates
+#     PRODUCTION.OUTAGE_RESTORATION_TRACKER, and 08's semantic view selects from it.
+#     Deploying in numeric order fails with "Table OUTAGE_RESTORATION_TRACKER does not
+#     exist". Verified safe: 30 has no reference to the semantic view or to any Cortex
+#     Search service, so moving it earlier creates no new cycle.
+#   - 32 (invariants) must run AFTER 30 and 31, since it asserts the post-regeneration
+#     state, and 99 (validation) runs last.
+#   - 19 (git integration) must run BEFORE 51_load_seed_data.sql, which COPY INTOs from
+#     '@FLUX_SOLUTIONS_REPO/branches/main/seed_data/parquet'. That stage does not exist
+#     until 19 creates the GIT REPOSITORY and FETCHes it.
 SCRIPT_ORDER = [
+    # --- core infrastructure and base tables ---
     "01_database_infrastructure.sql",
     "02_warehouses.sql",
     "03_substations_transformers.sql",
@@ -32,10 +56,24 @@ SCRIPT_ORDER = [
     "05_customers_master.sql",
     "06_ami_readings_pipeline.sql",
     "07_aggregation_tables.sql",
+    # --- git integration, required by the parquet seed loaders below ---
+    "19_git_integration.sql",
+    # --- seed data, before the regeneration that re-parents it ---
+    "50_load_seed_data.sql",
+    "51_load_seed_data.sql",
+    "51_load_full_seed_data.sql",
+    "51_generate_ami_sample.sql",
+    "52_load_ami_from_s3.sql",
+    "60_ami_chunked_orchestration.sql",
+    # --- topology regeneration, then the tables/views that read it ---
+    "31_regenerate_coherent_topology.sql",
+    "30_ops_center_dependencies.sql",
+    # --- semantic + AI layer (needs OUTAGE_RESTORATION_TRACKER from 30) ---
     "08_semantic_view.sql",
     "09_cortex_search_services.sql",
     "10_cortex_agent.sql",
     "11_ml_feature_tables.sql",
+    # --- infrastructure, access and apps ---
     "12_postgres_instance.sql",
     "13_spcs_compute.sql",
     "14_geospatial_functions.sql",
@@ -43,28 +81,86 @@ SCRIPT_ORDER = [
     "16_rbac_final.sql",
     "17_validation_queries.sql",
     "18_deploy_orchestrator.sql",
-    "19_git_integration.sql",
+    "20_model_registry.sql",
+    "21_cascade_procedures.sql",
+    "22_sample_queries.sql",
+    "23_postgres_external_access.sql",
+    "24_postgres_sync_pipeline.sql",
+    "24_streamlit_stage_setup.sql",
+    "25_streamlit_apps.sql",
+    "26_notebooks_deployment.sql",
+    # --- document/PDF tooling ---
+    "53_utility_pdf_stage.sql",
+    "53a_internal_stage_validate.sql",
+    "55_pdf_doc_tools.sql",
+    "55a_pdf_doc_tools_validate.sql",
+    # --- assertions, then final validation ---
+    "32_topology_invariants.sql",
+    "99_validate_deployment.sql",
 ]
 
 
 def load_config(env: str) -> Dict:
-    """Load configuration for the specified environment."""
+    """
+    Load configuration for the specified environment.
+
+    2026-07-29: the 'common:' block in config.yaml was never merged in, so shared keys
+    were invisible to templating. It is now merged under the environment, with the
+    environment's own keys winning on conflict.
+
+    postgres_password is deliberately NOT read from config.yaml -- a deployment
+    credential does not belong in a file that gets committed. It comes from the
+    FLUX_POSTGRES_PASSWORD environment variable, and is only required by the one
+    script that uses it (23_postgres_external_access.sql).
+    """
     with open(CONFIG_FILE, 'r') as f:
         config = yaml.safe_load(f)
-    
+
     if env not in config:
         print(f"Error: Environment '{env}' not found in config.yaml")
-        print(f"Available environments: {list(config.keys())}")
+        print(f"Available environments: {[k for k in config if k != 'common']}")
         sys.exit(1)
-    
-    return config[env]
+
+    merged = dict(config.get("common", {}))
+    merged.update(config[env])
+    merged.setdefault("environment", env)
+
+    pg_pw = os.environ.get("FLUX_POSTGRES_PASSWORD")
+    if pg_pw:
+        merged["postgres_password"] = pg_pw
+
+    return merged
 
 
 def render_template(sql_content: str, config: Dict) -> str:
-    """Render Jinja2 template with configuration values."""
+    """
+    Substitute config values into a SQL script.
+
+    2026-07-29: this only handled the "{{ key }}" form, but 36 of the 41 scripts in
+    scripts/ use the "<% key %>" form and none use "{{ key }}". So no script was ever
+    actually rendered -- a deploy sent the literal placeholder to Snowflake and failed
+    on the first templated statement. Both forms are now supported, with and without
+    inner padding, so either convention works.
+    """
     for key, value in config.items():
-        sql_content = sql_content.replace(f"{{{{ {key} }}}}", str(value))
+        for pattern in (f"<% {key} %>", f"<%{key}%>",
+                        f"{{{{ {key} }}}}", f"{{{{{key}}}}}"):
+            sql_content = sql_content.replace(pattern, str(value))
     return sql_content
+
+
+def unrendered_placeholders(sql_content: str) -> list:
+    """
+    Return any placeholders left after rendering.
+
+    A leftover placeholder means config.yaml is missing a key the script needs.
+    Failing loudly here is much cheaper than a confusing Snowflake syntax error.
+    """
+    import re
+    return sorted(set(
+        re.findall(r"<%\s*[A-Za-z_][A-Za-z0-9_]*\s*%>", sql_content) +
+        re.findall(r"\{\{\s*[A-Za-z_][A-Za-z0-9_]*\s*\}\}", sql_content)
+    ))
 
 
 def execute_sql(sql_file: Path, config: Dict, dry_run: bool = False, 
@@ -76,14 +172,25 @@ def execute_sql(sql_file: Path, config: Dict, dry_run: bool = False,
         sql_content = f.read()
     
     rendered_sql = render_template(sql_content, config)
-    
+
+    # Fail before touching Snowflake if any placeholder is still unresolved. Sending a
+    # literal "<% database %>" produces a confusing SQL syntax error several statements
+    # in; naming the missing config key here is far cheaper to diagnose.
+    leftover = unrendered_placeholders(rendered_sql)
+    if leftover:
+        print(f"\n  ERROR {sql_file.name}: unresolved placeholder(s): {', '.join(leftover)}")
+        missing = [p.strip("<%>{} ") for p in leftover]
+        print(f"        add to scripts/config.yaml (or export FLUX_POSTGRES_PASSWORD): {', '.join(missing)}")
+        return False
+
     if dry_run:
         print(f"\n{'='*60}")
         print(f"DRY RUN: {sql_file.name}")
         print(f"{'='*60}")
         print(f"Would execute with config:")
         for key, value in config.items():
-            print(f"  {key}: {value}")
+            shown = "***" if "password" in key.lower() else value
+            print(f"  {key}: {shown}")
         print(f"SQL preview (first 500 chars):")
         print(rendered_sql[:500])
         return True
@@ -146,23 +253,42 @@ def deploy(env: str, scripts: Optional[List[str]] = None,
     config = load_config(env)
     print(f"Configuration loaded for '{env}':")
     for key, value in config.items():
-        print(f"  {key}: {value}")
-    
-    # Determine which scripts to run
+        shown = "***" if "password" in key.lower() else value
+        print(f"  {key}: {shown}")
+
+    # Determine which scripts to run.
+    #
+    # 2026-07-29: this did int(item) on each --scripts token and int(s.split('_')[0]) on
+    # each candidate, so it crashed two ways: passing a filename raised ValueError, and
+    # any range covering 53a/55a raised on int('53a'). Selection now accepts filenames,
+    # bare prefixes and ranges, and compares on the numeric part so letter-suffixed
+    # scripts match. Output always follows SCRIPT_ORDER, never the order given.
     if scripts:
-        # Parse script numbers (e.g., "01,02,03" or "01-05")
-        script_nums = set()
-        for item in scripts:
-            if '-' in item:
-                start, end = item.split('-')
-                script_nums.update(range(int(start), int(end) + 1))
+        wanted_files, wanted_prefixes = set(), set()
+        for raw in scripts:
+            item = raw.strip()
+            if not item:
+                continue
+            if item.endswith(".sql"):
+                wanted_files.add(item)
+            elif "-" in item and all(part.strip().isdigit() for part in item.split("-", 1)):
+                start, end = (int(part) for part in item.split("-", 1))
+                wanted_prefixes.update(str(n).zfill(2) for n in range(start, end + 1))
             else:
-                script_nums.add(int(item))
-        
-        scripts_to_run = [
-            s for s in SCRIPT_ORDER 
-            if int(s.split('_')[0]) in script_nums
-        ]
+                wanted_prefixes.add(item.zfill(2) if item.isdigit() else item)
+
+        def _matches(name: str) -> bool:
+            if name in wanted_files:
+                return True
+            prefix = name.split("_")[0]                      # e.g. "53a"
+            numeric = "".join(ch for ch in prefix if ch.isdigit())
+            return prefix in wanted_prefixes or numeric in wanted_prefixes
+
+        scripts_to_run = [s for s in SCRIPT_ORDER if _matches(s)]
+
+        unknown = wanted_files - set(SCRIPT_ORDER)
+        if unknown:
+            print(f"\n⚠️  Not in SCRIPT_ORDER, will be skipped: {', '.join(sorted(unknown))}")
     else:
         scripts_to_run = SCRIPT_ORDER
     
@@ -204,11 +330,21 @@ def main():
         description="Flux Utility Solutions CLI Deployment Tool"
     )
     
+    # 2026-07-29: these choices were hardcoded to ["dev","staging","prod","si_demos"].
+    # "si_demos" was the database on the cpe_demo_CLI account, deleted 2026-05-23, so it
+    # was an unusable option; meanwhile "local" existed in config.yaml but could not be
+    # selected. Read the environments from config.yaml so the two can never drift again.
+    try:
+        with open(CONFIG_FILE) as _f:
+            _envs = [k for k in yaml.safe_load(_f) if k != "common"]
+    except Exception:
+        _envs = ["dev", "staging", "prod"]
+
     parser.add_argument(
         "--env", "-e",
-        choices=["dev", "staging", "prod", "si_demos"],
-        default="dev",
-        help="Target environment (default: dev)"
+        choices=_envs,
+        default="dev" if "dev" in _envs else _envs[0],
+        help=f"Target environment (default: dev). From config.yaml: {', '.join(_envs)}"
     )
     
     parser.add_argument(

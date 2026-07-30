@@ -22,6 +22,9 @@ dev:
   postgres_instance: FLUX_DEV_POSTGRES
   compute_pool: FLUX_DEV_POOL
   spcs_service: FLUX_DEV_OPS_CENTER
+  schema: PRODUCTION            # scripts use <% schema %>
+  source_db: FLUX_DEV            # 17_validation_queries.sql compares against this
+  postgres_host: ""              # REQUIRED for 23_postgres_external_access.sql
   
 # -----------------------------------------------------------------------------
 # Staging Environment
@@ -35,6 +38,9 @@ staging:
   postgres_instance: FLUX_STAGING_POSTGRES
   compute_pool: FLUX_STAGING_POOL
   spcs_service: FLUX_STAGING_OPS_CENTER
+  schema: PRODUCTION            # scripts use <% schema %>
+  source_db: FLUX_STAGING        # 17_validation_queries.sql compares against this
+  postgres_host: ""              # REQUIRED for 23_postgres_external_access.sql
 
 # -----------------------------------------------------------------------------
 # Production Environment
@@ -48,6 +54,9 @@ prod:
   postgres_instance: FLUX_OPERATIONS_POSTGRES
   compute_pool: FLUX_INTERACTIVE_POOL
   spcs_service: FLUX_OPS_CENTER
+  schema: PRODUCTION            # scripts use <% schema %>
+  source_db: FLUX_PROD           # 17_validation_queries.sql compares against this
+  postgres_host: ""              # REQUIRED for 23_postgres_external_access.sql
 
 # -----------------------------------------------------------------------------
 # Local/Demo Environment (for quick testing with existing data)
@@ -61,6 +70,27 @@ local:
   postgres_instance: FLUX_OPERATIONS_POSTGRES
   compute_pool: FLUX_INTERACTIVE_POOL
   spcs_service: FLUX_OPS_CENTER
+  schema: PRODUCTION            # scripts use <% schema %>
+  source_db: FLUX_DATABASE       # 17_validation_queries.sql compares against this
+  postgres_host: ""              # REQUIRED for 23_postgres_external_access.sql
+
+# -----------------------------------------------------------------------------
+# Scratch environment for deploy dry-runs. Points at a throwaway database and
+# REUSES the existing warehouse/pool so a dry-run never provisions costly
+# account-level infrastructure. Safe to drop at any time.
+# -----------------------------------------------------------------------------
+deploytest:
+  database: FLUX_DEPLOYTEST
+  warehouse: FLUX_WH
+  warehouse_size: MEDIUM
+  admin_role: ACCOUNTADMIN
+  user_role: PUBLIC
+  postgres_instance: FLUX_OPS_POSTGRES
+  compute_pool: FLUX_OPS_CENTER_POOL
+  spcs_service: FLUX_DEPLOYTEST_SVC
+  schema: PRODUCTION            # scripts use <% schema %>
+  source_db: FLUX_DB            # 17_validation_queries.sql compares against this
+  postgres_host: ""             # REQUIRED for 23_postgres_external_access.sql
 
 # -----------------------------------------------------------------------------
 # Common Settings (shared across all environments)
@@ -92,3 +122,16 @@ common:
   
   # Seed data stage
   seed_data_stage: "@flux_seed_data"
+
+  # AMI sample window used by 51_generate_ami_sample.sql
+  days: 30
+
+  # Git integration (19_git_integration.sql)
+  git_repo_url: "https://github.com/sfc-gh-abannerjee/flux-utility-solutions.git"
+  # Snowflake GIT REPOSITORY object created by 19_git_integration.sql. This is the
+  # object NAME, not the URL -- 51_load_seed_data.sql builds a stage path from it.
+  git_repo_name: FLUX_SOLUTIONS_REPO
+
+  # postgres_password is intentionally ABSENT. It is a credential and must not be
+  # committed. deploy.py reads it from the FLUX_POSTGRES_PASSWORD env var instead.
+

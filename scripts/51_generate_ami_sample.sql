@@ -62,20 +62,22 @@ SELECT 'Meters sampled: ' || COUNT(*) AS status FROM meter_sample;
 -- =============================================================================
 -- Step 3: Generate AMI readings with realistic patterns
 -- =============================================================================
--- Columns: METER_ID, TIMESTAMP, USAGE_KWH, VOLTAGE, POWER_FACTOR, CUSTOMER_SEGMENT_ID, SOURCE_TABLE
+-- Columns: METER_ID, READING_TIMESTAMP, USAGE_KWH, VOLTAGE_V, POWER_FACTOR, CUSTOMER_SEGMENT_ID, SOURCE_TABLE
 
+-- 2026-07-29: renamed TIMESTAMP -> READING_TIMESTAMP and VOLTAGE -> VOLTAGE_V to match
+-- the canonical AMI_INTERVAL_READINGS schema that script 06 now creates.
 INSERT INTO AMI_INTERVAL_READINGS (
     METER_ID,
-    TIMESTAMP,
+    READING_TIMESTAMP,
     USAGE_KWH,
-    VOLTAGE,
+    VOLTAGE_V,
     POWER_FACTOR,
     CUSTOMER_SEGMENT_ID,
     SOURCE_TABLE
 )
 SELECT
     m.METER_ID,
-    t.interval_time AS TIMESTAMP,
+    t.interval_time AS READING_TIMESTAMP,
     
     -- Usage KWH with realistic patterns
     ROUND(
@@ -90,7 +92,7 @@ SELECT
     , 3) AS USAGE_KWH,
     
     -- Voltage (typically 120V with small variation)
-    ROUND(120 * (0.95 + (RANDOM() / 10000000000000000000 * 0.1)), 1) AS VOLTAGE,
+    ROUND(120 * (0.95 + (RANDOM() / 10000000000000000000 * 0.1)), 1) AS VOLTAGE_V,
     
     -- Power factor (0.85-0.99)
     ROUND(0.85 + (RANDOM() / 10000000000000000000 * 0.14), 2) AS POWER_FACTOR,
@@ -110,8 +112,8 @@ SELECT 'AMI readings generated: ' || COUNT(*) || ' rows' AS status FROM AMI_INTE
 SELECT '=== AMI Sample Generation Complete ===' AS phase;
 
 SELECT 
-    MIN(TIMESTAMP) AS earliest_reading,
-    MAX(TIMESTAMP) AS latest_reading,
+    MIN(READING_TIMESTAMP) AS earliest_reading,
+    MAX(READING_TIMESTAMP) AS latest_reading,
     COUNT(DISTINCT METER_ID) AS unique_meters,
     COUNT(*) AS total_readings
 FROM AMI_INTERVAL_READINGS;
